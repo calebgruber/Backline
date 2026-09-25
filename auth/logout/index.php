@@ -16,4 +16,4 @@ if (!function_exists('app_config')) {
 
 auth_logout();
 flash_set('info', 'Signed out.');
-redirect('/auth/login');
+redirect('/');

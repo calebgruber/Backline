@@ -34,12 +34,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 render_page('Login', function (): void {
+    $brandingDir = __DIR__ . '/../../uploads/branding';
+    $logoLightFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']) : null;
+    $logoPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : null;
     ?>
     <div class="row justify-content-center mt-6">
         <div class="col-md-5">
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Login</h3></div>
                 <div class="card-body">
+                    <?php if ($logoPath): ?>
+                        <div class="text-center mb-4">
+                            <img src="<?= e($logoPath) ?>" alt="logo" class="auth-page-logo">
+                        </div>
+                    <?php endif; ?>
                     <form method="post" autocomplete="on">
                         <?= csrf_input() ?>
                         <div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
