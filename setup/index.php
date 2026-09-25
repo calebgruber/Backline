@@ -47,6 +47,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $dbUser = trim((string) ($_POST['db_user'] ?? 'root'));
     $dbPass = (string) ($_POST['db_pass'] ?? '');
     $dbCharset = trim((string) ($_POST['db_charset'] ?? 'utf8mb4'));
+    $allowedCharsets = ['utf8mb4', 'utf8', 'latin1', 'ascii'];
+    if (!in_array(strtolower($dbCharset), $allowedCharsets, true)) {
+        $errors[] = 'Unsupported DB charset.';
+    }
     $form = [
         'app_name' => $appName,
         'db_host' => $dbHost,
@@ -99,7 +103,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
-            $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $dbCharset);
+            $safeCharset = strtolower($dbCharset);
+            $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
             $pdo->exec('USE ' . $dbNameSql);
 
             $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
