@@ -46,7 +46,12 @@ function render_page(string $title, callable $content): void
 {
     $settings = app_settings();
     $user = $_SESSION['user'] ?? null;
-    $path = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
+    $pathRaw = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+    $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
+    if ($basePath !== '' && $basePath !== '/' && str_starts_with($pathRaw, $basePath)) {
+        $pathRaw = substr($pathRaw, strlen($basePath)) ?: '/';
+    }
+    $path = trim($pathRaw, '/');
     $path = $path === '' ? 'auth/login' : $path;
     $logo = safe_logo_src(trim((string) ($settings['branding_logo'] ?? '')));
 
