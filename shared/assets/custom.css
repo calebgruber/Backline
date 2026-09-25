@@ -2,7 +2,3 @@
 .alert {
   border-left: 5px solid var(--tblr-alert-color)!important;
 }
-.card-title-enhanced .card-header .card-title-pill {
-  margin-left: -1.5rem;
-  margin-top: -2rem;
-}
