@@ -48,7 +48,8 @@ document.addEventListener('click', (e) => {
   try {
     const target = new URL(anchor.href, window.location.href);
     const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app');
-    if (inApp && target.pathname === '/dash/home') label = 'Exiting app…';
+    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app');
+    if (inApp && target.origin === window.location.origin && !targetIsApp) label = 'Exiting app…';
   } catch {
     label = '';
   }
@@ -65,7 +66,8 @@ document.addEventListener('keydown', (e) => {
   try {
     const target = new URL(active.href, window.location.href);
     const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app');
-    if (inApp && target.pathname === '/dash/home') label = 'Exiting app…';
+    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app');
+    if (inApp && target.origin === window.location.origin && !targetIsApp) label = 'Exiting app…';
   } catch {
     label = '';
   }

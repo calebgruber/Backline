@@ -321,6 +321,10 @@ if (!function_exists('render_shop_app_page')) {
                                         trim((string) ($assistantsDecoded['assistant_shop_manager']['phone'] ?? '')),
                                     ], static fn ($v) => $v !== '')));
                                 }
+                                $displayOrDash = static function ($value): string {
+                                    $text = trim((string) ($value ?? ''));
+                                    return $text !== '' ? $text : '—';
+                                };
                                 ?>
                                 <div class="col-md-6"><div class="small text-secondary">Lead Contact</div><div><?= e($leadContact !== '' ? $leadContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e((string) ($selectedShow['assistant_snd_designer_name'] ?? '')) ?></div></div>
@@ -329,10 +333,10 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager Contact</div><div><?= e($shopManagerContact !== '' ? $shopManagerContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager</div><div><?= e($assistantShopManagerName !== '' ? $assistantShopManagerName : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager Contact</div><div><?= e($assistantShopManagerContact !== '' ? $assistantShopManagerContact : '—') ?></div></div>
-                                <div class="col-md-6"><div class="small text-secondary">Pull / Return / Strike</div><div><?= e((string) ($selectedShow['pull_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['return_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['strike_date'] ?? '—')) ?></div></div>
-                                <div class="col-md-6"><div class="small text-secondary">Opening / Closing</div><div><?= e((string) ($selectedShow['opening_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['closing_date'] ?? '—')) ?></div></div>
-                                <div class="col-12"><div class="small text-secondary">Theatre Address</div><div><?= nl2br(e((string) ($selectedShow['theatre_address'] ?? '—'))) ?></div></div>
-                                <div class="col-12"><div class="small text-secondary">Shop Address</div><div><?= nl2br(e((string) ($selectedShow['shop_address'] ?? '—'))) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Pull / Return / Strike</div><div><?= e($displayOrDash($selectedShow['pull_date'] ?? null)) ?> / <?= e($displayOrDash($selectedShow['return_date'] ?? null)) ?> / <?= e($displayOrDash($selectedShow['strike_date'] ?? null)) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Opening / Closing</div><div><?= e($displayOrDash($selectedShow['opening_date'] ?? null)) ?> / <?= e($displayOrDash($selectedShow['closing_date'] ?? null)) ?></div></div>
+                                <div class="col-12"><div class="small text-secondary">Theatre Address</div><div><?= nl2br(e($displayOrDash($selectedShow['theatre_address'] ?? null))) ?></div></div>
+                                <div class="col-12"><div class="small text-secondary">Shop Address</div><div><?= nl2br(e($displayOrDash($selectedShow['shop_address'] ?? null))) ?></div></div>
                             </div>
                         </div>
                     </div>
