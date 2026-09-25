@@ -49,7 +49,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $dbPass = (string) ($_POST['db_pass'] ?? '');
     $dbCharset = trim((string) ($_POST['db_charset'] ?? 'utf8mb4'));
     $allowedCharsets = ['utf8mb4', 'utf8', 'latin1', 'ascii'];
-    if (!in_array(strtolower($dbCharset), $allowedCharsets, true)) {
+    $safeCharset = strtolower($dbCharset);
+    if (!in_array($safeCharset, $allowedCharsets, true)) {
         $errors[] = 'Unsupported DB charset.';
     }
     $form = [
@@ -98,13 +99,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 throw new RuntimeException('Setup has already been completed.');
             }
 
-            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $dbHost, $dbPort, $dbCharset);
+            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $dbHost, $dbPort, $safeCharset);
             $pdo = new PDO($dsn, $dbUser, $dbPass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
-            $safeCharset = strtolower($dbCharset);
             $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
             $pdo->exec('USE ' . $dbNameSql);
 

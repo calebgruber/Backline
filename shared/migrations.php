@@ -77,16 +77,19 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
             }
 
             try {
-                $pdo->beginTransaction();
+                $isLikelyDdl = preg_match('/\\b(CREATE|ALTER|DROP|RENAME|TRUNCATE)\\b/i', $sql) === 1;
+                if (!$isLikelyDdl) {
+                    $pdo->beginTransaction();
+                }
                 $pdo->exec($sql);
                 $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
                 $stmt->execute([$name]);
-                if ($pdo->inTransaction()) {
+                if (!$isLikelyDdl && $pdo->inTransaction()) {
                     $pdo->commit();
                 }
                 $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
             } catch (Throwable $error) {
-                if ($pdo->inTransaction()) {
+                if (!$isLikelyDdl && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
                 $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];

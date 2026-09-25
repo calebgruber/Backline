@@ -70,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $errors[] = 'Failed to write settings file.';
             }
+        } catch (RuntimeException $error) {
+            $errors[] = $error->getMessage();
         } catch (Throwable) {
             $errors[] = 'Database connection test failed; settings were not saved.';
         }
