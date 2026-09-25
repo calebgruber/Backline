@@ -50,6 +50,9 @@ $disposition = $safeInline ? 'inline' : 'attachment';
 $downloadName = $name;
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $downloadName);
 $encodedFilename = rawurlencode($downloadName);
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
 header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");

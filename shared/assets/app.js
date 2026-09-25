@@ -143,6 +143,24 @@
         clone.removeAttribute('hidden');
         clone.removeAttribute('aria-hidden');
         clone.classList.remove('d-none', 'hidden');
+        const idMap = new Map();
+        clone.querySelectorAll('[id]').forEach(function (el, index) {
+          const oldId = el.id;
+          const newId = oldId + '-clone-' + Date.now() + '-' + index;
+          idMap.set(oldId, newId);
+          el.id = newId;
+        });
+        clone.querySelectorAll('[for],[aria-describedby],[aria-labelledby],[list]').forEach(function (el) {
+          ['for', 'aria-describedby', 'aria-labelledby', 'list'].forEach(function (attr) {
+            const value = el.getAttribute(attr);
+            if (!value) return;
+            const remapped = value
+              .split(/\s+/)
+              .map(function (token) { return idMap.get(token) || token; })
+              .join(' ');
+            el.setAttribute(attr, remapped);
+          });
+        });
         clone.querySelectorAll('input, select, textarea').forEach(function (el) {
           el.value = '';
         });
