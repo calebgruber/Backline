@@ -53,7 +53,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
             </h1>
             <?php if ($user): ?>
             <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-icon" id="theme-toggle" aria-label="Toggle theme">
+                <button type="button" class="btn btn-icon theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
                     <i class="ti ti-sun"></i>
                 </button>
                 <div class="nav-item">
@@ -69,7 +69,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
             </div>
             <?php else: ?>
             <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-icon" id="theme-toggle" aria-label="Toggle theme">
+                <button type="button" class="btn btn-icon theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
                     <i class="ti ti-sun"></i>
                 </button>
                 <a href="/auth/login" class="btn btn-primary">Sign in</a>

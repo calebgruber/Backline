@@ -126,8 +126,19 @@ $catsByShop = ['lx' => [], 'snd' => []];
 foreach ($cats as $cat) {
     $catsByShop[$cat['shop_type']][] = $cat;
 }
+$itemsGroupedByShopCategory = ['lx' => [], 'snd' => []];
+foreach ($itemsByShop as $shop => $shopItems) {
+    foreach ($shopItems as $item) {
+        $group = trim((string) ($item['category_name'] ?? ''));
+        if ($group === '') {
+            $group = 'Uncategorized';
+        }
+        $itemsGroupedByShopCategory[$shop][$group][] = $item;
+    }
+    ksort($itemsGroupedByShopCategory[$shop]);
+}
 
-render_page('Inventory', function () use ($itemsByShop, $catsByShop): void {
+render_page('Inventory', function () use ($itemsByShop, $catsByShop, $itemsGroupedByShopCategory): void {
     $shops = [
         'lx' => 'Lighting Inventory',
         'snd' => 'Sound Inventory',
@@ -186,23 +197,28 @@ render_page('Inventory', function () use ($itemsByShop, $catsByShop): void {
                         <table class="table table-vcenter">
                             <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Spacer</th><th></th></tr></thead>
                             <tbody>
-                            <?php foreach ($itemsByShop[$shopKey] as $item): ?>
-                                <tr>
-                                    <td><?= e((string) $item['category_name']) ?></td>
-                                    <td><?= e($item['name']) ?></td>
-                                    <td><?= e((string) $item['sku']) ?></td>
-                                    <td><?= (int) $item['shop_quantity'] ?></td>
-                                    <td><?= e($item['unit']) ?></td>
-                                    <td><?= (int) $item['is_spacer'] ? 'Yes' : 'No' ?></td>
-                                    <td>
-                                        <form method="post">
-                                            <?= csrf_input() ?>
-                                            <input type="hidden" name="action" value="delete_item">
-                                            <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                                            <button class="btn btn-sm btn-outline-danger">Delete</button>
-                                        </form>
-                                    </td>
+                            <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
+                                <tr class="table-secondary">
+                                    <td colspan="7"><strong><?= e($categoryName) ?></strong></td>
                                 </tr>
+                                <?php foreach ($groupItems as $item): ?>
+                                    <tr>
+                                        <td><?= e((string) $item['category_name']) ?></td>
+                                        <td><?= e($item['name']) ?></td>
+                                        <td><?= e((string) $item['sku']) ?></td>
+                                        <td><?= (int) $item['shop_quantity'] ?></td>
+                                        <td><?= e($item['unit']) ?></td>
+                                        <td><?= (int) $item['is_spacer'] ? 'Yes' : 'No' ?></td>
+                                        <td>
+                                            <form method="post">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="action" value="delete_item">
+                                                <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                                <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
                             <?php endforeach; ?>
                             </tbody>
                         </table>

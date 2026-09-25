@@ -6,7 +6,10 @@ html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-light { display: none; 
 html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-dark { display: inline-block; }
 html[data-bs-theme="light"] .logo-dark { display: none; }
 .preloader-backdrop { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: grid; place-items: center; z-index: 2000; transition: opacity .25s ease; }
+html[data-bs-theme="dark"] .preloader-backdrop { background: rgba(15, 23, 42, .92); }
 .preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
+.theme-toggle-btn { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.theme-toggle-btn:hover, .theme-toggle-btn:focus { border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .show-context { border-left: 4px solid var(--tblr-primary); }
 .order-action-add { background: #d1f5e0; }
 .order-action-return { background: #ffd9d9; }

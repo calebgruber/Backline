@@ -19,36 +19,95 @@ $user = require_permission('categories.manage');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
+    $shop = post('shop_type');
+
     if ($action === 'create') {
         $stmt = db()->prepare('INSERT INTO inventory_categories (shop_type, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
-        $stmt->execute([post('shop_type'), post('name'), (int) post('sort_order', '0')]);
+        $stmt->execute([$shop, post('name'), (int) post('sort_order', '0')]);
+        flash_set('success', strtoupper($shop) . ' category created.');
     }
+
     if ($action === 'delete') {
         $stmt = db()->prepare('DELETE FROM inventory_categories WHERE id = ?');
         $stmt->execute([(int) post('id')]);
+        flash_set('warning', 'Category deleted.');
     }
+
+    if ($action === 'clear_shop_categories') {
+        $stmt = db()->prepare('DELETE FROM inventory_categories WHERE shop_type = ?');
+        $stmt->execute([$shop]);
+        flash_set('warning', strtoupper($shop) . ' categories cleared.');
+    }
+
     redirect('/admin/categories');
 }
 
 $categories = db()->query('SELECT * FROM inventory_categories ORDER BY shop_type, sort_order, name')->fetchAll();
+$categoriesByShop = ['lx' => [], 'snd' => []];
+foreach ($categories as $cat) {
+    $categoriesByShop[$cat['shop_type']][] = $cat;
+}
 
-render_page('Categories', function () use ($categories): void {
+render_page('Categories', function () use ($categoriesByShop): void {
+    $shops = [
+        'lx' => 'Lighting Categories',
+        'snd' => 'Sound Categories',
+    ];
     ?>
     <div class="row row-cards">
-        <div class="col-lg-4"><div class="card"><div class="card-header"><h3 class="card-title">Create Category</h3></div><div class="card-body">
-            <form method="post"><?= csrf_input() ?><input type="hidden" name="action" value="create">
-                <div class="mb-3"><select name="shop_type" class="form-select"><option value="lx">Lighting</option><option value="snd">Sound</option></select></div>
-                <div class="mb-3"><input class="form-control" name="name" placeholder="Category Name" required></div>
-                <div class="mb-3"><input class="form-control" type="number" name="sort_order" placeholder="Sort Order" value="0"></div>
-                <button class="btn btn-primary">Create</button>
-            </form>
-        </div></div></div>
-        <div class="col-lg-8"><div class="card"><div class="table-responsive"><table class="table"><thead><tr><th>Shop</th><th>Name</th><th>Sort</th><th></th></tr></thead><tbody id="category-sortable">
-            <?php foreach ($categories as $cat): ?>
-                <tr data-id="<?= (int) $cat['id'] ?>"><td><?= e(strtoupper($cat['shop_type'])) ?></td><td><?= e($cat['name']) ?></td><td><?= (int) $cat['sort_order'] ?></td><td><form method="post"><?= csrf_input() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $cat['id'] ?>"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td></tr>
-            <?php endforeach; ?>
-        </tbody></table></div></div></div>
+        <?php foreach ($shops as $shopKey => $shopLabel): ?>
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center">
+                        <h3 class="card-title"><?= e($shopLabel) ?></h3>
+                        <div class="ms-auto">
+                            <form method="post" onsubmit="return confirm('Clear all <?= e(strtoupper($shopKey)) ?> categories?')">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="clear_shop_categories">
+                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                <button class="btn btn-outline-danger btn-sm">Clear <?= e(strtoupper($shopKey)) ?> Categories</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="mb-2">Create <?= e(strtoupper($shopKey)) ?> Category</h4>
+                        <form method="post" class="row g-2">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="action" value="create">
+                            <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                            <div class="col-md-6"><input class="form-control" name="name" placeholder="Category Name" required></div>
+                            <div class="col-md-3"><input class="form-control" type="number" name="sort_order" placeholder="Sort Order" value="0"></div>
+                            <div class="col-md-3"><button class="btn btn-primary w-100">Create Category</button></div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header"><h3 class="card-title"><?= e($shopLabel) ?> List</h3></div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter">
+                            <thead><tr><th>Name</th><th>Sort</th><th></th></tr></thead>
+                            <tbody>
+                            <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
+                                <tr>
+                                    <td><?= e($cat['name']) ?></td>
+                                    <td><?= (int) $cat['sort_order'] ?></td>
+                                    <td>
+                                        <form method="post">
+                                            <?= csrf_input() ?>
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="id" value="<?= (int) $cat['id'] ?>">
+                                            <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
     </div>
-    <script>new Sortable(document.getElementById('category-sortable'),{animation:150});</script>
     <?php
 }, $user);
