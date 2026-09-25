@@ -65,7 +65,7 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
     foreach ($items as $item) {
         echo '<li>';
         if ($item['is_dir']) {
-            echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . '</a>';
+            echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . ' <span class="muted">(folder)</span></a>';
         } else {
             echo '<a target="_blank" rel="noopener" href="' . htmlspecialchars($item['url']) . '">' . htmlspecialchars($item['name']) . '</a>';
         }

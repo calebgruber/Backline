@@ -128,10 +128,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             if (!save_settings($candidateSettings)) {
-                $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
-                $cleanupConcentrations->execute([$adminEmail]);
-                $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
-                $cleanup->execute([$adminEmail]);
+                $pdo->beginTransaction();
+                try {
+                    $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
+                    $cleanupConcentrations->execute([$adminEmail]);
+                    $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
+                    $cleanup->execute([$adminEmail]);
+                    $pdo->commit();
+                } catch (Throwable) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                }
                 throw new RuntimeException('Could not save setup settings file.');
             }
             if (!mark_setup_complete()) {
@@ -140,10 +148,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 } else {
                     @unlink(settings_file());
                 }
-                $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
-                $cleanupConcentrations->execute([$adminEmail]);
-                $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
-                $cleanup->execute([$adminEmail]);
+                $pdo->beginTransaction();
+                try {
+                    $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
+                    $cleanupConcentrations->execute([$adminEmail]);
+                    $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
+                    $cleanup->execute([$adminEmail]);
+                    $pdo->commit();
+                } catch (Throwable) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                }
                 throw new RuntimeException('Could not write setup completion marker.');
             }
 

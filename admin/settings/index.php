@@ -22,12 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($csrfToken, $submittedToken)) {
         $errors[] = 'Invalid CSRF token.';
     } elseif (isset($_POST['save_settings'])) {
-        $settings['app_name'] = trim((string) ($_POST['app_name'] ?? 'Backline'));
-        $settings['branding_logo'] = trim((string) ($_POST['branding_logo'] ?? ''));
-        $settings['branding_logo_dark'] = trim((string) ($_POST['branding_logo_dark'] ?? ''));
-        $settings['branding_footer_made_in'] = trim((string) ($_POST['branding_footer_made_in'] ?? ''));
+        $candidateSettings = $settings;
+        $candidateSettings['app_name'] = trim((string) ($_POST['app_name'] ?? 'Backline'));
+        $candidateSettings['branding_logo'] = trim((string) ($_POST['branding_logo'] ?? ''));
+        $candidateSettings['branding_logo_dark'] = trim((string) ($_POST['branding_logo_dark'] ?? ''));
+        $candidateSettings['branding_footer_made_in'] = trim((string) ($_POST['branding_footer_made_in'] ?? ''));
         $dbPassInput = (string) ($_POST['db_pass'] ?? '');
-        $settings['db'] = [
+        $candidateSettings['db'] = [
             'host' => trim((string) ($_POST['db_host'] ?? '127.0.0.1')),
             'port' => trim((string) ($_POST['db_port'] ?? '3306')),
             'name' => trim((string) ($_POST['db_name'] ?? 'backline')),
@@ -37,14 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         try {
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $settings['db']['host'], $settings['db']['port'], $settings['db']['name'], $settings['db']['charset']);
-            $validationPdo = new PDO($dsn, (string) $settings['db']['user'], (string) $settings['db']['pass'], [
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $candidateSettings['db']['host'], $candidateSettings['db']['port'], $candidateSettings['db']['name'], $candidateSettings['db']['charset']);
+            $validationPdo = new PDO($dsn, (string) $candidateSettings['db']['user'], (string) $candidateSettings['db']['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $validationPdo->query('SELECT 1');
 
-            if (save_settings($settings)) {
+            if (save_settings($candidateSettings)) {
+                $settings = $candidateSettings;
                 reset_db_connection();
                 $messages[] = 'Settings saved locally.';
             } else {
