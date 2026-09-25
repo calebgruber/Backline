@@ -48,11 +48,6 @@ if (!function_exists('render_shop_app_page')) {
             $currentTab = 'info';
         }
 
-        if (isset($_GET['export']) && $_GET['export'] === 'latest' && $selectedShowId > 0) {
-            flash_set('info', 'Paperwork export is not wired yet.');
-            redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=paperwork');
-        }
-
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             csrf_verify_or_fail();
             $action = post('action');
@@ -171,6 +166,10 @@ if (!function_exists('render_shop_app_page')) {
                     }
                     flash_set('success', 'Revision lines saved.');
                 }
+            }
+
+            if ($action === 'export_latest' && $selectedShowId > 0) {
+                flash_set('info', 'Paperwork export is not wired yet.');
             }
 
             redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
@@ -293,7 +292,13 @@ if (!function_exists('render_shop_app_page')) {
                                 <?php endforeach; ?>
                             </ul>
                             <div class="mt-3">
-                                <a class="btn btn-outline-primary btn-sm" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=paperwork&export=latest">Export Latest Paperwork</a>
+                                <form method="post" class="d-inline-block">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="export_latest">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="current_tab" value="paperwork">
+                                    <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
+                                </form>
                             </div>
                         <?php endif; ?>
                     </div>
