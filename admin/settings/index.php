@@ -52,7 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } catch (Throwable $error) {
-            $errors[] = $error->getMessage();
+            error_log('Migration apply failure: ' . $error->getMessage());
+            $errors[] = 'Migration apply failed. Check server logs for details.';
         }
     }
 }

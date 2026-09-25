@@ -42,8 +42,11 @@ if ($requestMethod === 'POST') {
     }
 
     $sessionUser = null;
+    $hasExistingUsers = false;
     if (db_ready()) {
         try {
+            $countStmt = db()->query('SELECT COUNT(*) FROM users');
+            $hasExistingUsers = (int) $countStmt->fetchColumn() > 0;
             $stmt = db()->prepare('SELECT id, email, role FROM users WHERE email = ? LIMIT 1');
             $stmt->execute([$email]);
             $userRow = $stmt->fetch();
@@ -63,6 +66,21 @@ if ($requestMethod === 'POST') {
     }
 
     if ($sessionUser === null) {
+        if ($hasExistingUsers) {
+            $errors[] = 'Unknown user account.';
+            render_page('Login', function () use ($errors, $csrfToken): void {
+                echo '<section class="panel"><h1>Login</h1>';
+                foreach ($errors as $error) {
+                    echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
+                }
+                echo '<form method="post" class="grid">';
+                echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
+                echo '<label>Email<input type="email" name="email" required></label>';
+                echo '<label>Login token<input type="password" name="bootstrap_token" required></label>';
+                echo '<button type="submit">Continue</button></form></section>';
+            });
+            exit;
+        }
         $bootstrapAdminEmail = trim((string) getenv('BACKLINE_BOOTSTRAP_ADMIN_EMAIL'));
         $role = ($bootstrapAdminEmail !== '' && strcasecmp($bootstrapAdminEmail, $email) === 0) ? 'admin' : 'user';
         $defaultConcentrations = array_values(array_intersect(

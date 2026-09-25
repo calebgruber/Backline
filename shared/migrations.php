@@ -36,6 +36,12 @@ function apply_pending_migrations(): array
 {
     ensure_migrations_table();
     $results = [];
+    $pdo = db();
+    $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_migrations', 10)")->fetchColumn();
+    if (!$lockAcquired) {
+        return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
+    }
+
     foreach (pending_migrations() as $file) {
         $name = basename($file);
         $sql = trim((string) file_get_contents($file));
@@ -45,10 +51,9 @@ function apply_pending_migrations(): array
         }
 
         try {
-            $pdo = db();
             $pdo->beginTransaction();
             $pdo->exec($sql);
-            $stmt = $pdo->prepare('INSERT IGNORE INTO schema_migrations (migration) VALUES (?)');
+            $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
             $stmt->execute([$name]);
             $pdo->commit();
             $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
@@ -60,6 +65,7 @@ function apply_pending_migrations(): array
             break;
         }
     }
+    $pdo->query("SELECT RELEASE_LOCK('backline_migrations')");
 
     return $results;
 }

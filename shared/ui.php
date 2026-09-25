@@ -26,6 +26,22 @@ function nav_items(): array
     return $items;
 }
 
+function safe_logo_src(string $logo): string
+{
+    if ($logo === '') {
+        return '';
+    }
+    if (str_starts_with($logo, '/')) {
+        return $logo;
+    }
+    $scheme = parse_url($logo, PHP_URL_SCHEME);
+    if (in_array(strtolower((string) $scheme), ['http', 'https'], true)) {
+        return $logo;
+    }
+
+    return '';
+}
+
 function render_page(string $title, callable $content): void
 {
     $settings = app_settings();
@@ -61,21 +77,6 @@ function render_page(string $title, callable $content): void
         echo htmlspecialchars((string) ($settings['app_name'] ?? 'Backline'));
     }
 
-    function safe_logo_src(string $logo): string
-    {
-        if ($logo === '') {
-            return '';
-        }
-        if (str_starts_with($logo, '/')) {
-            return $logo;
-        }
-        $scheme = parse_url($logo, PHP_URL_SCHEME);
-        if (in_array(strtolower((string) $scheme), ['http', 'https'], true)) {
-            return $logo;
-        }
-
-        return '';
-    }
     echo '</div><nav>';
     foreach (nav_items() as $label => $href) {
         $active = ($path === $href || str_starts_with($path, $href . '/')) ? 'active' : '';
