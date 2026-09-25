@@ -80,7 +80,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     ];
 
     if ($errors === []) {
+        $setupLockHandle = null;
         try {
+            if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
+                throw new RuntimeException('Could not prepare setup storage directory.');
+            }
+            $setupLockHandle = fopen(storage_path('setup.lock'), 'c+');
+            if ($setupLockHandle === false || !flock($setupLockHandle, LOCK_EX)) {
+                throw new RuntimeException('Could not acquire setup filesystem lock.');
+            }
+            if (is_setup_complete()) {
+                throw new RuntimeException('Setup has already been completed.');
+            }
+
             $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $dbHost, $dbPort, $dbName, $dbCharset);
             $pdo = new PDO($dsn, $dbUser, $dbPass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -107,9 +119,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             try {
-                if (is_setup_complete()) {
-                    throw new RuntimeException('Setup has already been completed.');
-                }
                 foreach (apply_pending_migrations_with_pdo($pdo, 'backline_setup_migrations') as $result) {
                     if (($result['status'] ?? '') === 'failed') {
                         throw new RuntimeException((string) ($result['migration'] ?? 'migration') . ': ' . (string) ($result['message'] ?? 'Failed'));
@@ -126,9 +135,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $insertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?)');
                 $insertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
 
-                $adminLookup = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-                $adminLookup->execute([$adminEmail]);
-                $adminId = (int) $adminLookup->fetchColumn();
+                $adminId = (int) $pdo->lastInsertId();
                 if ($adminId <= 0) {
                     throw new RuntimeException('Could not resolve admin user id.');
                 }
@@ -170,6 +177,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
             error_log('Setup failed: ' . $error->getMessage());
             $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
+        } finally {
+            if (is_resource($setupLockHandle)) {
+                flock($setupLockHandle, LOCK_UN);
+                fclose($setupLockHandle);
+            }
         }
     }
 }

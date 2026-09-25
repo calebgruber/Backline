@@ -87,7 +87,7 @@ function render_page(string $title, callable $content): void
     .kpi{padding:12px;border-radius:10px;border:1px solid var(--line);background:#0d1735}.kpi .value{font:600 22px/1 "JetBrains Mono",ui-monospace,monospace}
     .stack{display:flex;flex-wrap:wrap;gap:8px}.list-reset{list-style:none;padding:0;margin:0}
     .divider{height:1px;background:var(--line);margin:12px 0}
-    @media(max-width:860px){.grid.two{grid-template-columns:1fr}}
+    @media(max-width:860px){.grid.two,.grid.three{grid-template-columns:1fr}}
     </style></head><body>';
     echo '<div id="preloader" class="preloader" aria-hidden="true"><div class="spinner" aria-hidden="true"></div></div>';
     echo '<header><div class="brand">';
