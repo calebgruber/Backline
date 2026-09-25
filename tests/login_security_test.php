@@ -34,5 +34,9 @@ assert_true(
     normalized_session_concentrations(['foo', 'bar']) === [],
     'unsupported concentrations should be removed'
 );
+assert_true(
+    normalized_session_concentrations(['SND', 'LX', 'snd']) === ['snd'],
+    'concentrations are case-sensitive and should keep only exact supported values'
+);
 
 fwrite(STDOUT, "login_security_test: OK\n");

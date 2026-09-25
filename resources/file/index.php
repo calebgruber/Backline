@@ -52,9 +52,7 @@ $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $d
 $encodedFilename = rawurlencode($downloadName);
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
-if ($disposition === 'attachment') {
-    header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
-}
+header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');

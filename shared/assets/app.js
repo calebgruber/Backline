@@ -140,6 +140,9 @@
         if (!template) return;
         const clone = template.cloneNode(true);
         clone.removeAttribute('data-row-template');
+        clone.removeAttribute('hidden');
+        clone.removeAttribute('aria-hidden');
+        clone.classList.remove('d-none', 'hidden');
         clone.querySelectorAll('input, select, textarea').forEach(function (el) {
           el.value = '';
         });

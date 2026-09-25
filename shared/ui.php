@@ -154,7 +154,7 @@ function render_page(string $title, callable $content): void
     echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/custom.css')) . '">';
-    echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
+    echo '<script>(function(){var t;try{t=localStorage.getItem("cg-theme");}catch(e){t=null;}if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
     echo '</head><body>';
     echo '<div id="page-loader" aria-hidden="true"></div>';
 
