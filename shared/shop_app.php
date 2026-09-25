@@ -327,9 +327,9 @@ if (!function_exists('render_shop_app_page')) {
                                 };
                                 ?>
                                 <div class="col-md-6"><div class="small text-secondary">Lead Contact</div><div><?= e($leadContact !== '' ? $leadContact : '—') ?></div></div>
-                                <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e((string) ($selectedShow['assistant_snd_designer_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e($displayOrDash($selectedShow['assistant_snd_designer_name'] ?? null)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Contact</div><div><?= e($assistantContact !== '' ? $assistantContact : '—') ?></div></div>
-                                <div class="col-md-6"><div class="small text-secondary">Shop Manager</div><div><?= e((string) ($selectedShow['shop_manager_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Shop Manager</div><div><?= e($displayOrDash($selectedShow['shop_manager_name'] ?? null)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager Contact</div><div><?= e($shopManagerContact !== '' ? $shopManagerContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager</div><div><?= e($assistantShopManagerName !== '' ? $assistantShopManagerName : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager Contact</div><div><?= e($assistantShopManagerContact !== '' ? $assistantShopManagerContact : '—') ?></div></div>
