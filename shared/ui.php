@@ -33,6 +33,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $loginBackgroundDarkPath = $path === '/auth/login' && $loginBackgroundDarkFile ? '/uploads/branding/' . basename($loginBackgroundDarkFile) : '';
     $isLxContext = path_starts_with($path, '/lx');
     $isSndContext = path_starts_with($path, '/snd');
+    $isLxAppContext = path_starts_with($path, '/lx/app');
+    $isSndAppContext = path_starts_with($path, '/snd/app');
+    $isShopAppContext = $isLxAppContext || $isSndAppContext;
     $activeLogoLightPath = $logoLightPath;
     $activeLogoDarkPath = $logoDarkPath;
     if ($isLxContext) {
@@ -82,7 +85,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
             </h1>
             <?php if ($user): ?>
             <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
-                <?php if ($appContextLabel !== ''): ?>
+                <?php if ($appContextLabel !== '' && !$isShopAppContext): ?>
                 <span class="badge bg-blue-lt app-context-badge"><?= e($appContextLabel) ?></span>
                 <a href="/dash/home" class="btn btn-outline-secondary btn-sm"><i class="ti ti-arrow-left me-1"></i>Back to Dash</a>
                 <?php endif; ?>
@@ -120,14 +123,27 @@ function render_page(string $title, callable $body, ?array $user = null): void
             <div class="navbar">
                 <div class="container-xl">
                     <ul class="navbar-nav">
-                        <?php nav_item('/dash/home', 'Dashboard', $path); ?>
-                        <?php if (user_has_permission($user, 'admin.access')) nav_item('/admin/settings', 'Settings', $path); ?>
-                        <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
-                        <?php if (user_has_permission($user, 'categories.manage')) nav_item('/admin/categories', 'Categories', $path); ?>
-                        <?php if (user_has_permission($user, 'users.manage')) nav_item('/admin/users', 'Users', $path); ?>
-                        <?php nav_item('/lx', 'LX', $path); ?>
-                        <?php nav_item('/snd', 'SND', $path); ?>
-                        <?php nav_item('/resources', 'Resources', $path); ?>
+                        <?php if ($isLxAppContext): ?>
+                            <?php nav_item('/dash/home', 'Back Home', $path); ?>
+                            <?php nav_item('/lx/app', 'LX Orders', $path); ?>
+                            <?php nav_item('/dash/shows', 'Shows', $path); ?>
+                            <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
+                        <?php elseif ($isSndAppContext): ?>
+                            <?php nav_item('/dash/home', 'Back Home', $path); ?>
+                            <?php nav_item('/snd/app', 'SND Orders', $path); ?>
+                            <?php nav_item('/dash/shows', 'Shows', $path); ?>
+                            <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
+                        <?php else: ?>
+                            <?php nav_item('/dash/home', 'Dashboard', $path); ?>
+                            <?php nav_item('/dash/shows', 'Shows', $path); ?>
+                            <?php if (user_has_permission($user, 'admin.access')) nav_item('/admin/settings', 'Settings', $path); ?>
+                            <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
+                            <?php if (user_has_permission($user, 'categories.manage')) nav_item('/admin/categories', 'Categories', $path); ?>
+                            <?php if (user_has_permission($user, 'users.manage')) nav_item('/admin/users', 'Users', $path); ?>
+                            <?php nav_item('/lx', 'LX', $path); ?>
+                            <?php nav_item('/snd', 'SND', $path); ?>
+                            <?php nav_item('/resources', 'Resources', $path); ?>
+                        <?php endif; ?>
                     </ul>
                 </div>
             </div>

@@ -80,20 +80,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_item') {
-        $stmt = db()->prepare('UPDATE inventory_items
-            SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-            WHERE id = ? AND shop_type = ?');
-        $stmt->execute([
-            (int) post('category_id', '0') ?: null,
-            post('name'),
-            $shop === 'snd' ? (post('sku') ?: null) : null,
-            (int) post('shop_quantity', '0'),
-            post('unit', 'ea'),
-            isset($_POST['is_spacer']) ? 1 : 0,
-            (int) post('sort_order', '0'),
-            (int) post('id'),
-            $shop,
-        ]);
+        if ($shop === 'snd') {
+            $stmt = db()->prepare('UPDATE inventory_items
+                SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, default_note = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                WHERE id = ? AND shop_type = ?');
+            $stmt->execute([
+                (int) post('category_id', '0') ?: null,
+                post('name'),
+                post('sku') ?: null,
+                (int) post('shop_quantity', '0'),
+                post('unit', 'ea'),
+                post('default_note'),
+                post('description'),
+                isset($_POST['is_spacer']) ? 1 : 0,
+                (int) post('sort_order', '0'),
+                (int) post('id'),
+                $shop,
+            ]);
+        } else {
+            $stmt = db()->prepare('UPDATE inventory_items
+                SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, default_note = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                WHERE id = ? AND shop_type = ?');
+            $stmt->execute([
+                (int) post('category_id', '0') ?: null,
+                post('name'),
+                (int) post('shop_quantity', '0'),
+                post('unit', 'ea'),
+                post('default_note'),
+                post('description'),
+                isset($_POST['is_spacer']) ? 1 : 0,
+                (int) post('sort_order', '0'),
+                (int) post('id'),
+                $shop,
+            ]);
+        }
         flash_set('success', 'Item updated.');
     }
 
@@ -245,11 +265,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
-                                <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
+                                <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Default Note</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                                 <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tbody>
                                     <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-category-name="<?= e($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
-                                        <td colspan="8">
+                                        <td colspan="10">
                                             <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-right me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
                                         </td>
                                     </tr>
@@ -266,9 +286,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                                 </select>
                                             </td>
                                             <td><input class="form-control" name="name" value="<?= e($item['name']) ?>" form="item-update-<?= (int) $item['id'] ?>" required></td>
-                                            <td><input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>" <?= $shopKey === 'lx' ? 'disabled' : '' ?>></td>
+                                            <td>                                            <input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>" <?= $shopKey === 'lx' ? 'readonly' : '' ?>></td>
                                             <td><input class="form-control" type="number" name="shop_quantity" value="<?= (int) $item['shop_quantity'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td><input class="form-control" name="unit" value="<?= e($item['unit']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
+                                            <td><input class="form-control" name="default_note" value="<?= e((string) $item['default_note']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
+                                            <td><input class="form-control" name="description" value="<?= e((string) $item['description']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td class="text-center"><input class="form-check-input" type="checkbox" name="is_spacer" value="1" form="item-update-<?= (int) $item['id'] ?>" <?= (int) $item['is_spacer'] ? 'checked' : '' ?>></td>
                                             <td><input class="form-control" type="number" name="sort_order" value="<?= (int) $item['sort_order'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td class="text-end">
@@ -319,13 +341,24 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
       const applyInventoryFilter = (shop) => {
         const search = (document.querySelector('.inventory-search[data-shop=\"' + shop + '\"]')?.value || '').toLowerCase();
         const selectedCategory = (document.querySelector('.inventory-category-filter[data-shop=\"' + shop + '\"]')?.value || '').toLowerCase();
+        const rowSearchText = (row) => {
+          const directText = row.textContent || '';
+          const fieldText = Array.from(row.querySelectorAll('input, select, textarea'))
+            .map((el) => {
+              if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value || '';
+              if (el instanceof HTMLSelectElement) return el.options[el.selectedIndex]?.text || '';
+              return '';
+            })
+            .join(' ');
+          return (directText + ' ' + fieldText).toLowerCase();
+        };
         document.querySelectorAll('.category-header-row[data-shop=\"' + shop + '\"]').forEach((header) => {
           const categoryName = (header.getAttribute('data-category-name') || '').toLowerCase();
           const group = document.getElementById(header.getAttribute('data-target') || '');
           if (!group) return;
           let visibleRows = 0;
           group.querySelectorAll('tr[data-item-id]').forEach((row) => {
-            const text = row.innerText.toLowerCase();
+            const text = rowSearchText(row);
             const matchSearch = search === '' || text.includes(search);
             const matchCategory = selectedCategory === '' || categoryName === selectedCategory;
             const show = matchSearch && matchCategory;

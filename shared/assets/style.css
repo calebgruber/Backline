@@ -13,9 +13,9 @@ html[data-bs-theme="dark"] .preloader-backdrop { background: #0b1220; }
     width: 84px;
     height: 84px;
     border-radius: 50%;
-    background: conic-gradient(from 0deg, #ff7a18 0deg, #ff9f43 130deg, #ffb347 230deg, #ff7a18 360deg);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
-    mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
+    border: 10px solid rgba(255, 138, 0, .25);
+    border-top-color: #ff8a00;
+    border-right-color: #ff8a00;
     animation: preloader-spin .8s linear infinite;
 }
 @keyframes preloader-spin { to { transform: rotate(1turn); } }

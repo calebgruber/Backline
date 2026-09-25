@@ -23,6 +23,7 @@ $routes = [
     '/auth/invite' => __DIR__ . '/auth/invite/index.php',
     '/setup' => __DIR__ . '/setup/index.php',
     '/dash/home' => __DIR__ . '/dash/home/index.php',
+    '/dash/shows' => __DIR__ . '/dash/shows/index.php',
     '/admin/dash' => __DIR__ . '/admin/dash/index.php',
     '/admin/settings' => __DIR__ . '/admin/settings/index.php',
     '/admin/users' => __DIR__ . '/admin/users/index.php',

@@ -23,11 +23,23 @@ const isNavigableAnchor = (anchor) => {
   return true;
 };
 
+const resolvesToSameDocument = (anchor) => {
+  try {
+    const target = new URL(anchor.href, window.location.href);
+    return target.origin === window.location.origin &&
+      target.pathname === window.location.pathname &&
+      target.search === window.location.search;
+  } catch {
+    return true;
+  }
+};
+
 document.addEventListener('click', (e) => {
   const anchor = e.target.closest('a[href]');
   if (!anchor) return;
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   if (!isNavigableAnchor(anchor)) return;
+  if (resolvesToSameDocument(anchor)) return;
   showPreloader();
 });
 
@@ -36,5 +48,6 @@ document.addEventListener('keydown', (e) => {
   const active = document.activeElement;
   if (!(active instanceof HTMLAnchorElement) || !active.hasAttribute('href')) return;
   if (!isNavigableAnchor(active)) return;
+  if (resolvesToSameDocument(active)) return;
   showPreloader();
 });

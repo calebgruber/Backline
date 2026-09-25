@@ -26,6 +26,7 @@ render_page('Dashboard', function () use ($user): void {
         <?php if (user_has_permission($user, 'admin.access')): ?>
         <div class="col-md-4"><a href="/admin/settings" class="card card-link"><div class="card-body"><strong>System Settings</strong><p class="text-secondary mb-0">Migrations, branding, DB operations.</p></div></a></div>
         <?php endif; ?>
+        <div class="col-md-4"><a href="/dash/shows" class="card card-link"><div class="card-body"><strong>Shows</strong><p class="text-secondary mb-0">Create, manage, and edit your shows.</p></div></a></div>
         <?php if (user_has_permission($user, 'inventory.manage')): ?>
         <div class="col-md-4"><a href="/admin/inventory" class="card card-link"><div class="card-body"><strong>Inventory</strong><p class="text-secondary mb-0">Manage LX and SND items.</p></div></a></div>
         <?php endif; ?>
