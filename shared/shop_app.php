@@ -21,9 +21,9 @@ if (!function_exists('render_shop_app_page')) {
     {
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
-            ? db()->query('SELECT id, show_name FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
+            ? db()->query('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
             : (function () use ($user) {
-                $stmt = db()->prepare('SELECT id, show_name FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY show_name');
+                $stmt = db()->prepare('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY show_name');
                 $stmt->execute([(int) $user['id']]);
                 return $stmt;
             })();
@@ -222,7 +222,7 @@ if (!function_exists('render_shop_app_page')) {
                         FROM order_lines ol
                         JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                         LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
-                        WHERE ol.revision_id = ?
+                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
                         ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ol.sort_order, ii.name');
                     $lineStmt->execute([$selectedRevisionId]);
                     $lines = $lineStmt->fetchAll();
@@ -287,7 +287,55 @@ if (!function_exists('render_shop_app_page')) {
                 </div>
 
                 <?php if ($selectedShow && $currentTab === 'info'): ?>
-                    <div class="card"><div class="card-body text-secondary">Show information is managed in <a href="/dash/shows">Shows</a>.</div></div>
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                            <h3 class="card-title mb-0">Show Information</h3>
+                            <a class="btn btn-outline-primary btn-sm" href="/dash/shows?edit=<?= (int) $selectedShowId ?>">Edit Show</a>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6"><div class="small text-secondary">Show</div><div><?= e((string) ($selectedShow['show_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Theatre</div><div><?= e((string) ($selectedShow['theatre_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Shop</div><div><?= e((string) ($selectedShow['shop_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Lead Designer</div><div><?= e((string) ($selectedShow['lead_designer_name'] ?? '')) ?></div></div>
+                                <?php
+                                $leadContact = implode(' · ', array_values(array_filter([
+                                    trim((string) ($selectedShow['lead_designer_email'] ?? '')),
+                                    trim((string) ($selectedShow['lead_designer_phone'] ?? '')),
+                                ], static fn ($v) => $v !== '')));
+                                $assistantContact = implode(' · ', array_values(array_filter([
+                                    trim((string) ($selectedShow['assistant_snd_designer_email'] ?? '')),
+                                    trim((string) ($selectedShow['assistant_snd_designer_phone'] ?? '')),
+                                ], static fn ($v) => $v !== '')));
+                                $shopManagerContact = implode(' · ', array_values(array_filter([
+                                    trim((string) ($selectedShow['shop_manager_email'] ?? '')),
+                                    trim((string) ($selectedShow['shop_manager_phone'] ?? '')),
+                                ], static fn ($v) => $v !== '')));
+                                $assistantShopManagerName = '';
+                                $assistantShopManagerContact = '';
+                                $assistantsDecoded = json_decode((string) ($selectedShow['assistants_json'] ?? ''), true);
+                                if (is_array($assistantsDecoded) && isset($assistantsDecoded['assistant_shop_manager']) && is_array($assistantsDecoded['assistant_shop_manager'])) {
+                                    $assistantShopManagerName = trim((string) ($assistantsDecoded['assistant_shop_manager']['name'] ?? ''));
+                                    $assistantShopManagerContact = implode(' · ', array_values(array_filter([
+                                        trim((string) ($assistantsDecoded['assistant_shop_manager']['email'] ?? '')),
+                                        trim((string) ($assistantsDecoded['assistant_shop_manager']['phone'] ?? '')),
+                                    ], static fn ($v) => $v !== '')));
+                                }
+                                ?>
+                                <div class="col-md-6"><div class="small text-secondary">Lead Contact</div><div><?= e($leadContact !== '' ? $leadContact : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e((string) ($selectedShow['assistant_snd_designer_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant Contact</div><div><?= e($assistantContact !== '' ? $assistantContact : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Shop Manager</div><div><?= e((string) ($selectedShow['shop_manager_name'] ?? '')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Shop Manager Contact</div><div><?= e($shopManagerContact !== '' ? $shopManagerContact : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager</div><div><?= e($assistantShopManagerName !== '' ? $assistantShopManagerName : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager Contact</div><div><?= e($assistantShopManagerContact !== '' ? $assistantShopManagerContact : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Pull / Return / Strike</div><div><?= e((string) ($selectedShow['pull_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['return_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['strike_date'] ?? '—')) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Opening / Closing</div><div><?= e((string) ($selectedShow['opening_date'] ?? '—')) ?> / <?= e((string) ($selectedShow['closing_date'] ?? '—')) ?></div></div>
+                                <div class="col-12"><div class="small text-secondary">Theatre Address</div><div><?= nl2br(e((string) ($selectedShow['theatre_address'] ?? '—'))) ?></div></div>
+                                <div class="col-12"><div class="small text-secondary">Shop Address</div><div><?= nl2br(e((string) ($selectedShow['shop_address'] ?? '—'))) ?></div></div>
+                            </div>
+                        </div>
+                    </div>
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
                     <div class="card"><div class="card-body text-secondary">
                         <p class="mb-3">Paperwork views are coming next. Use export to generate the latest paperwork when enabled.</p>

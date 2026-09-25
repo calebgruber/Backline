@@ -1,10 +1,14 @@
 window.addEventListener('load', () => {
   const el = document.getElementById('global-preloader');
+  const text = document.getElementById('global-preloader-text');
+  if (text) text.textContent = 'Loading…';
   if (el) el.classList.add('hidden');
 });
 
-const showPreloader = () => {
+const showPreloader = (label) => {
   const el = document.getElementById('global-preloader');
+  const text = document.getElementById('global-preloader-text');
+  if (text) text.textContent = (label || 'Loading…');
   if (el) el.classList.remove('hidden');
 };
 
@@ -40,7 +44,15 @@ document.addEventListener('click', (e) => {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   if (!isNavigableAnchor(anchor)) return;
   if (resolvesToSameDocument(anchor)) return;
-  showPreloader();
+  let label = '';
+  try {
+    const target = new URL(anchor.href, window.location.href);
+    const inApp = window.location.pathname.startsWith('/lx') || window.location.pathname.startsWith('/snd');
+    if (inApp && target.pathname === '/dash/home') label = 'Exiting app…';
+  } catch {
+    label = '';
+  }
+  showPreloader(label);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -49,5 +61,13 @@ document.addEventListener('keydown', (e) => {
   if (!(active instanceof HTMLAnchorElement) || !active.hasAttribute('href')) return;
   if (!isNavigableAnchor(active)) return;
   if (resolvesToSameDocument(active)) return;
-  showPreloader();
+  let label = '';
+  try {
+    const target = new URL(active.href, window.location.href);
+    const inApp = window.location.pathname.startsWith('/lx') || window.location.pathname.startsWith('/snd');
+    if (inApp && target.pathname === '/dash/home') label = 'Exiting app…';
+  } catch {
+    label = '';
+  }
+  showPreloader(label);
 });

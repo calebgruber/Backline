@@ -41,6 +41,18 @@ function render_page(string $title, callable $body, ?array $user = null): void
     if (!in_array($selectedShopTab, ['info', 'initial', 'revisions', 'paperwork'], true)) {
         $selectedShopTab = 'info';
     }
+    if ($selectedShopShowId > 0 && $user && $isShopAppContext) {
+        if (user_has_permission($user, 'admin.access')) {
+            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+            $shopShowAccess->execute([$selectedShopShowId]);
+        } else {
+            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL LIMIT 1');
+            $shopShowAccess->execute([$selectedShopShowId, (int) $user['id']]);
+        }
+        if (!$shopShowAccess->fetchColumn()) {
+            $selectedShopShowId = 0;
+        }
+    }
     $activeLogoLightPath = $logoLightPath;
     $activeLogoDarkPath = $logoDarkPath;
     if ($isLxContext) {
@@ -74,6 +86,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
 <body class="<?= e($bodyRouteClass) ?>">
 <div id="global-preloader" class="preloader-backdrop">
     <div class="preloader-spinner" role="status" aria-label="Loading"></div>
+    <div id="global-preloader-text" class="preloader-text">Loading…</div>
 </div>
 <div class="page">
     <header class="navbar navbar-expand-md d-print-none">
