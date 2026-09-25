@@ -59,9 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 render_page('Profile', function () use ($user): void {
     ?>
-    <div class="row row-cards justify-content-center">
-        <div class="col-lg-7">
-            <div class="card">
+    <div class="row row-cards">
+        <div class="col-lg-4">
+            <div class="card profile-sticky-card">
                 <div class="card-body text-center">
                     <span class="avatar avatar-xl rounded-3 mb-3" style="background-image:url(https://api.dicebear.com/9.x/thumbs/svg?seed=<?= urlencode((string) $user['email']) ?>)"></span>
                     <h3 class="mb-1"><?= e($user['name']) ?></h3>
@@ -69,47 +69,51 @@ render_page('Profile', function () use ($user): void {
                 </div>
             </div>
         </div>
-        <div class="col-lg-7">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Edit Profile</h3></div>
-                <div class="card-body">
-                    <form method="post">
-                        <?= csrf_input() ?>
-                        <input type="hidden" name="action" value="update_name">
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input class="form-control" value="<?= e($user['email']) ?>" disabled>
+        <div class="col-lg-8">
+            <div class="row row-cards">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">Edit Profile</h3></div>
+                        <div class="card-body">
+                            <form method="post">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="update_name">
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input class="form-control" value="<?= e($user['email']) ?>" disabled>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input class="form-control" name="name" value="<?= e($user['name']) ?>" required>
+                                </div>
+                                <button class="btn btn-primary">Save Profile</button>
+                            </form>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Name</label>
-                            <input class="form-control" name="name" value="<?= e($user['name']) ?>" required>
-                        </div>
-                        <button class="btn btn-primary">Save Profile</button>
-                    </form>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-lg-7">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Change Password</h3></div>
-                <div class="card-body">
-                    <form method="post" autocomplete="off">
-                        <?= csrf_input() ?>
-                        <input type="hidden" name="action" value="change_password">
-                        <div class="mb-3">
-                            <label class="form-label">Current Password</label>
-                            <input class="form-control" type="password" name="current_password" required>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">Change Password</h3></div>
+                        <div class="card-body">
+                            <form method="post" autocomplete="off">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="change_password">
+                                <div class="mb-3">
+                                    <label class="form-label">Current Password</label>
+                                    <input class="form-control" type="password" name="current_password" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">New Password</label>
+                                    <input class="form-control" type="password" name="new_password" minlength="12" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Confirm New Password</label>
+                                    <input class="form-control" type="password" name="confirm_password" minlength="12" required>
+                                </div>
+                                <button class="btn btn-primary">Update Password</button>
+                            </form>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">New Password</label>
-                            <input class="form-control" type="password" name="new_password" minlength="12" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Confirm New Password</label>
-                            <input class="form-control" type="password" name="confirm_password" minlength="12" required>
-                        </div>
-                        <button class="btn btn-primary">Update Password</button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>

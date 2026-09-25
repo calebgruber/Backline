@@ -21,13 +21,32 @@ render_page('Dashboard', function () use ($user): void {
     <div class="row row-cards">
         <div class="col-12">
             <div class="card show-context"><div class="card-body">
-                <h3 class="card-title">Welcome to Backline</h3>
-                <p class="text-secondary mb-0">Use the admin area to configure inventory, shows, settings, and migrations.</p>
+                <h3 class="card-title">Welcome back, <?= e($user['name']) ?></h3>
+                <p class="text-secondary mb-0">Use your available tools below to continue your shop-order workflow.</p>
             </div></div>
         </div>
+        <?php if (user_has_permission($user, 'admin.access')): ?>
         <div class="col-md-4"><a href="/admin/settings" class="card card-link"><div class="card-body"><strong>System Settings</strong><p class="text-secondary mb-0">Migrations, branding, DB operations.</p></div></a></div>
+        <?php endif; ?>
+        <?php if (user_has_permission($user, 'inventory.manage')): ?>
         <div class="col-md-4"><a href="/admin/inventory" class="card card-link"><div class="card-body"><strong>Inventory</strong><p class="text-secondary mb-0">Manage LX and SND items.</p></div></a></div>
-        <div class="col-md-4"><a href="/resources" class="card card-link"><div class="card-body"><strong>Resources</strong><p class="text-secondary mb-0">Lighting, Sound, Backline Manuals.</p></div></a></div>
+        <?php endif; ?>
+        <?php if (user_has_permission($user, 'categories.manage')): ?>
+        <div class="col-md-4"><a href="/admin/categories" class="card card-link"><div class="card-body"><strong>Categories</strong><p class="text-secondary mb-0">Manage and organize shop categories.</p></div></a></div>
+        <?php endif; ?>
+        <?php if (user_has_permission($user, 'users.manage')): ?>
+        <div class="col-md-4"><a href="/admin/users" class="card card-link"><div class="card-body"><strong>Users</strong><p class="text-secondary mb-0">Manage user invites and permissions.</p></div></a></div>
+        <?php endif; ?>
+        <?php if (user_has_permission($user, 'resources.manage')): ?>
+        <div class="col-md-4"><a href="/admin/resources" class="card card-link"><div class="card-body"><strong>Resources Admin</strong><p class="text-secondary mb-0">Manage resources folders and files.</p></div></a></div>
+        <?php endif; ?>
+        <div class="col-md-4"><a href="/resources" class="card card-link"><div class="card-body"><strong>Resources</strong><p class="text-secondary mb-0">Browse Lighting, Sound, Backline Manuals.</p></div></a></div>
+        <?php if (user_has_permission($user, 'lx.access')): ?>
+        <div class="col-md-4"><a href="/lx" class="card card-link"><div class="card-body"><strong>LX App</strong><p class="text-secondary mb-0">Lighting shop order workspace.</p></div></a></div>
+        <?php endif; ?>
+        <?php if (user_has_permission($user, 'snd.access')): ?>
+        <div class="col-md-4"><a href="/snd" class="card card-link"><div class="card-body"><strong>SND App</strong><p class="text-secondary mb-0">Sound shop order workspace.</p></div></a></div>
+        <?php endif; ?>
     </div>
     <?php
 }, $user);

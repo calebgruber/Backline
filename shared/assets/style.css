@@ -11,6 +11,7 @@ html[data-bs-theme="dark"] .preloader-backdrop { background: rgba(15, 23, 42, .9
 .preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
 .theme-toggle-btn { border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .theme-toggle-btn:hover, .theme-toggle-btn:focus { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.profile-sticky-card { position: sticky; top: 1rem; }
 .show-context { border-left: 4px solid var(--tblr-primary); }
 .order-action-add { background: #d1f5e0; }
 .order-action-return { background: #ffd9d9; }
