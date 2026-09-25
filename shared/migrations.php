@@ -43,7 +43,14 @@ function apply_pending_migrations(): array
     }
 
     try {
-        foreach (pending_migrations() as $file) {
+        $applied = $pdo->query('SELECT migration FROM schema_migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $appliedMap = array_flip($applied);
+        $pendingFiles = array_values(array_filter(
+            migration_files(),
+            static fn (string $file): bool => !isset($appliedMap[basename($file)])
+        ));
+
+        foreach ($pendingFiles as $file) {
             $name = basename($file);
             $sql = trim((string) file_get_contents($file));
             if ($sql === '') {

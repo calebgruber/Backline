@@ -34,10 +34,9 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
     exit;
 }
 
-$mime = mime_content_type($file) ?: 'application/octet-stream';
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], basename($file));
 $encodedFilename = rawurlencode(basename($file));
-header('Content-Type: ' . $mime);
+header('Content-Type: application/octet-stream');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');

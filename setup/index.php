@@ -72,6 +72,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             try {
+                if (is_setup_complete()) {
+                    throw new RuntimeException('Setup has already been completed.');
+                }
+
                 $pdo->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     migration VARCHAR(255) NOT NULL UNIQUE,
