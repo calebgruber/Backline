@@ -6,12 +6,23 @@ require_once __DIR__ . '/config.php';
 
 function nav_items(): array
 {
-    return [
-        'Admin' => 'admin/dash',
-        'Lighting' => 'lx',
-        'Sound' => 'snd',
-        'Resources' => 'resources',
-    ];
+    $user = $_SESSION['user'] ?? null;
+    if (!$user) {
+        return [];
+    }
+
+    $items = ['Resources' => 'resources'];
+    if (($user['role'] ?? '') === 'admin') {
+        $items = ['Admin' => 'admin/dash'] + $items;
+    }
+    if (in_array('lx', $user['concentrations'] ?? [], true)) {
+        $items['Lighting'] = 'lx';
+    }
+    if (in_array('snd', $user['concentrations'] ?? [], true)) {
+        $items['Sound'] = 'snd';
+    }
+
+    return $items;
 }
 
 function render_page(string $title, callable $content): void
@@ -41,7 +52,7 @@ function render_page(string $title, callable $content): void
     .muted{color:var(--muted);font-size:12px}
     @media(max-width:860px){.grid.two{grid-template-columns:1fr}}
     </style></head><body>';
-    echo '<div id="preloader" class="preloader"><div class="spinner" aria-hidden="true"></div></div>';
+    echo '<div id="preloader" class="preloader" role="status" aria-live="polite" aria-label="Loading page"><div class="spinner" aria-hidden="true"></div><span class="muted">Loading…</span></div>';
     echo '<header><div class="brand">';
     if ($logo !== '') {
         echo '<img src="' . htmlspecialchars($logo) . '" alt="Branding logo">';

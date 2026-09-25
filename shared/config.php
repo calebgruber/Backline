@@ -57,7 +57,9 @@ function save_settings(array $settings): bool
 
 function app_url(string $path = ''): string
 {
-    $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
+    $base = defined('APP_BASE_PATH')
+        ? (string) APP_BASE_PATH
+        : rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
     $base = $base === '' ? '' : $base;
     return $base . '/' . ltrim($path, '/');
 }

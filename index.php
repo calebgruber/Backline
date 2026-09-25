@@ -8,6 +8,9 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
+if (!defined('APP_BASE_PATH')) {
+    define('APP_BASE_PATH', $basePath);
+}
 if ($basePath !== '' && $basePath !== '/' && str_starts_with($requestPath, $basePath)) {
     $requestPath = substr($requestPath, strlen($basePath)) ?: '/';
 }
