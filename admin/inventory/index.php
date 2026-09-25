@@ -2,12 +2,25 @@
 
 declare(strict_types=1);
 
+if (!function_exists('app_config')) {
+    $bootstrapRoot = __DIR__;
+    while (!file_exists($bootstrapRoot . '/shared/bootstrap.php')) {
+        $parent = dirname($bootstrapRoot);
+        if ($parent === $bootstrapRoot) {
+            break;
+        }
+        $bootstrapRoot = $parent;
+    }
+    require_once $bootstrapRoot . '/shared/bootstrap.php';
+}
+
 $user = require_permission('inventory.manage');
 
 function parse_import_rows(string $shop, string $text): array
 {
     $lines = preg_split('/
-||
+|
+|
 /', trim($text));
     if (!$lines || count($lines) < 2) return [];
 
