@@ -51,6 +51,8 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
     justify-content: center;
     padding: 1.25rem;
 }
+.launch-overlay-lx { background: rgba(4, 41, 84, 0.9); }
+.launch-overlay-snd { background: rgba(44, 24, 70, 0.9); }
 
 .launch-overlay-card {
     max-width: 460px;

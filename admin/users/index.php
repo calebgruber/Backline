@@ -20,8 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
     $isSuperAdmin = (int) ($user['is_super_admin'] ?? 0) === 1;
+    $canManageAllPerms = $isSuperAdmin || user_has_permission($user, 'admin.access');
     $actorPerms = [];
-    if (!$isSuperAdmin) {
+    if (!$canManageAllPerms) {
         $actorPermRows = db()->prepare('SELECT p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ?');
         $actorPermRows->execute([(int) $user['id']]);
         foreach ($actorPermRows->fetchAll() as $permRow) {
@@ -47,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!isset($_POST['perm_' . $perm])) {
                 continue;
             }
-            if (!$isSuperAdmin && !in_array($perm, $actorPerms, true)) {
+            if (!$canManageAllPerms && !in_array($perm, $actorPerms, true)) {
                 continue;
             }
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
@@ -115,29 +116,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $selectedPerms[] = substr((string) $key, 5);
             }
         }
-        if (!$isSuperAdmin) {
+        if (!$canManageAllPerms) {
             $selectedPerms = array_values(array_intersect($selectedPerms, $actorPerms));
         }
 
         db()->beginTransaction();
-        $stmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ?');
-        $stmt->execute([$target]);
+        try {
+            $stmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ?');
+            $stmt->execute([$target]);
 
-        if (!empty($selectedPerms)) {
-            $placeholders = implode(',', array_fill(0, count($selectedPerms), '?'));
-            $permStmt = db()->prepare('SELECT id, key_name FROM permissions WHERE key_name IN (' . $placeholders . ')');
-            $permStmt->execute($selectedPerms);
-            $permRows = $permStmt->fetchAll();
+            if (!empty($selectedPerms)) {
+                $placeholders = implode(',', array_fill(0, count($selectedPerms), '?'));
+                $permStmt = db()->prepare('SELECT id, key_name FROM permissions WHERE key_name IN (' . $placeholders . ')');
+                $permStmt->execute($selectedPerms);
+                $permRows = $permStmt->fetchAll();
 
-            $ins = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) VALUES (?, ?, NOW())');
-            foreach ($permRows as $permRow) {
-                $ins->execute([$target, (int) $permRow['id']]);
+                $ins = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) VALUES (?, ?, NOW())');
+                foreach ($permRows as $permRow) {
+                    $ins->execute([$target, (int) $permRow['id']]);
+                }
             }
+            db()->commit();
+            flash_set('success', 'User permissions updated.');
+            audit_log((int) $user['id'], 'user', 'permissions_update', $target, ['permissions' => $selectedPerms]);
+        } catch (Throwable) {
+            if (db()->inTransaction()) {
+                db()->rollBack();
+            }
+            flash_set('danger', 'Could not update permissions. Please retry.');
         }
-
-        db()->commit();
-        flash_set('success', 'User permissions updated.');
-        audit_log((int) $user['id'], 'user', 'permissions_update', $target, ['permissions' => $selectedPerms]);
     }
 
     redirect('/admin/users');

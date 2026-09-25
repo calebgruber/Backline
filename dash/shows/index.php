@@ -128,8 +128,8 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="ald_name" placeholder="ALD" value="<?= e((string) $value('ald_name')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_name" placeholder="Assistant SND Designer PE" value="<?= e((string) $value('assistant_snd_designer_name')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Shop Manager" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_name" placeholder="Assistant LX / Assistant Sound" value="<?= e((string) $value('assistant_snd_designer_name')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Production Electrician / Production Audio" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
                         </div>
                         <h4 class="mb-2">Optional</h4>
                         <div class="row g-2">
@@ -137,10 +137,10 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="lead_designer_phone" placeholder="LD/SND Phone" value="<?= e((string) $value('lead_designer_phone')) ?>"></div>
                             <div class="col-md-6"><input class="form-control" name="ald_email" placeholder="ALD Email" value="<?= e((string) $value('ald_email')) ?>"></div>
                             <div class="col-md-6"><input class="form-control" name="ald_phone" placeholder="ALD Phone" value="<?= e((string) $value('ald_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_email" placeholder="Assistant SND Email" value="<?= e((string) $value('assistant_snd_designer_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_phone" placeholder="Assistant SND Phone" value="<?= e((string) $value('assistant_snd_designer_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_email" placeholder="Shop Manager Email" value="<?= e((string) $value('shop_manager_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Shop Manager Phone" value="<?= e((string) $value('shop_manager_phone')) ?>"></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_email" placeholder="Assistant LX/Sound Email" value="<?= e((string) $value('assistant_snd_designer_email')) ?>"></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_phone" placeholder="Assistant LX/Sound Phone" value="<?= e((string) $value('assistant_snd_designer_phone')) ?>"></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_email" placeholder="Production Electrician/Audio Email" value="<?= e((string) $value('shop_manager_email')) ?>"></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Production Electrician/Audio Phone" value="<?= e((string) $value('shop_manager_phone')) ?>"></div>
                             <div class="col-md-6"><label class="form-label mb-1">Pull Date</label><input class="form-control" type="date" name="pull_date" value="<?= e((string) $value('pull_date')) ?>"></div>
                             <div class="col-md-6"><label class="form-label mb-1">Return Date</label><input class="form-control" type="date" name="return_date" value="<?= e((string) $value('return_date')) ?>"></div>
                             <div class="col-md-6"><label class="form-label mb-1">Strike Date</label><input class="form-control" type="date" name="strike_date" value="<?= e((string) $value('strike_date')) ?>"></div>
@@ -197,4 +197,3 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
     </div>
     <?php
 }, $user);
-
