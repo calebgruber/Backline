@@ -122,36 +122,15 @@ CREATE TABLE IF NOT EXISTS revision_items (
 
 CREATE TABLE IF NOT EXISTS paperwork_settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    scope ENUM('global','show') NOT NULL DEFAULT 'global',
     show_id BIGINT UNSIGNED NULL,
     show_scope_id BIGINT UNSIGNED AS (IFNULL(show_id, 0)) STORED,
     setting_key VARCHAR(190) NOT NULL,
     setting_value TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_show_setting (show_scope_id, setting_key),
+    UNIQUE KEY uniq_show_setting (scope, show_scope_id, setting_key),
     CONSTRAINT fk_paperwork_show FOREIGN KEY (show_id) REFERENCES shows(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS resource_folders (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    parent_id BIGINT UNSIGNED NULL,
-    name VARCHAR(255) NOT NULL,
-    root ENUM('Lighting','Sound','Backline Manuals') NOT NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_resource_parent FOREIGN KEY (parent_id) REFERENCES resource_folders(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS resource_files (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    folder_id BIGINT UNSIGNED NOT NULL,
-    file_name VARCHAR(255) NOT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    mime_type VARCHAR(120) NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_resource_files_folder FOREIGN KEY (folder_id) REFERENCES resource_folders(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS inventory_rules (

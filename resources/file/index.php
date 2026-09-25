@@ -36,5 +36,6 @@ if ($base === false || $file === false || !str_starts_with($file, $base . DIRECT
 $mime = mime_content_type($file) ?: 'application/octet-stream';
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], basename($file));
 header('Content-Type: ' . $mime);
-header('Content-Disposition: inline; filename="' . $safeFilename . '"');
+header('X-Content-Type-Options: nosniff');
+header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
 readfile($file);

@@ -33,8 +33,10 @@ function require_any_access(array $concentrations): void
         $loginUrl = app_url('auth/login');
         if (!headers_sent()) {
             header('Location: ' . $loginUrl);
+            exit;
         } else {
-            echo '<script>window.location.href=' . json_encode($loginUrl) . ';</script>';
+            http_response_code(401);
+            echo '<p>Authentication required. <a href="' . htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8') . '">Go to login</a>.</p>';
         }
         exit;
     }
