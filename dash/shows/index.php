@@ -23,6 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save') {
         $showId = (int) post('show_id', '0');
+        $assistantCombinedName = post('assistant_combined_name');
+        $assistantCombinedEmail = post('assistant_combined_email', '');
+        $assistantCombinedPhone = post('assistant_combined_phone', '');
         $assistantShopManager = [
             'name' => post('assistant_shop_manager_name', ''),
             'email' => post('assistant_shop_manager_email', ''),
@@ -31,8 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $assistantsJson = json_encode(['assistant_shop_manager' => $assistantShopManager], JSON_UNESCAPED_UNICODE);
 
         $requiredChecks = [
-            'assistant_snd_designer_email' => post('assistant_snd_designer_email', ''),
-            'assistant_snd_designer_phone' => post('assistant_snd_designer_phone', ''),
+            'lead_designer_email' => post('lead_designer_email', ''),
+            'lead_designer_phone' => post('lead_designer_phone', ''),
+            'assistant_combined_name' => $assistantCombinedName,
+            'assistant_combined_email' => $assistantCombinedEmail,
+            'assistant_combined_phone' => $assistantCombinedPhone,
             'shop_manager_email' => post('shop_manager_email', ''),
             'shop_manager_phone' => post('shop_manager_phone', ''),
             'assistant_shop_manager_name' => $assistantShopManager['name'],
@@ -56,12 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             post('lead_designer_name'),
             post('lead_designer_email', ''),
             post('lead_designer_phone', ''),
-            post('ald_name'),
-            post('ald_email', ''),
-            post('ald_phone', ''),
-            post('assistant_snd_designer_name'),
-            post('assistant_snd_designer_email', ''),
-            post('assistant_snd_designer_phone', ''),
+            $assistantCombinedName,
+            $assistantCombinedEmail,
+            $assistantCombinedPhone,
+            $assistantCombinedName,
+            $assistantCombinedEmail,
+            $assistantCombinedPhone,
             post('shop_manager_name'),
             post('shop_manager_email', ''),
             post('shop_manager_phone', ''),
@@ -137,6 +143,15 @@ foreach ($shows as $show) {
 
 render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
+    $assistantCombinedName = trim((string) ($editingShow['assistant_snd_designer_name'] ?? '')) !== ''
+        ? (string) ($editingShow['assistant_snd_designer_name'] ?? '')
+        : (string) ($editingShow['ald_name'] ?? '');
+    $assistantCombinedEmail = trim((string) ($editingShow['assistant_snd_designer_email'] ?? '')) !== ''
+        ? (string) ($editingShow['assistant_snd_designer_email'] ?? '')
+        : (string) ($editingShow['ald_email'] ?? '');
+    $assistantCombinedPhone = trim((string) ($editingShow['assistant_snd_designer_phone'] ?? '')) !== ''
+        ? (string) ($editingShow['assistant_snd_designer_phone'] ?? '')
+        : (string) ($editingShow['ald_phone'] ?? '');
     $assistantShopManager = ['name' => '', 'email' => '', 'phone' => ''];
     $assistantsRaw = (string) ($editingShow['assistants_json'] ?? '');
     if ($assistantsRaw !== '') {
@@ -165,18 +180,15 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="theatre_name" placeholder="Theatre Name" value="<?= e((string) $value('theatre_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="ald_name" placeholder="ALD" value="<?= e((string) $value('ald_name')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_name" placeholder="Assistant LX / Assistant Sound" value="<?= e((string) $value('assistant_snd_designer_name')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_combined_name" placeholder="Assistant LD / Assistant Sound Designer" value="<?= e($assistantCombinedName) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Production Electrician / Production Audio" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
                         </div>
                         <h4 class="mb-2">Required Contacts + Key Dates</h4>
                         <div class="row g-2">
-                            <div class="col-md-6"><input class="form-control" name="lead_designer_email" placeholder="LD/SND Email" value="<?= e((string) $value('lead_designer_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="lead_designer_phone" placeholder="LD/SND Phone" value="<?= e((string) $value('lead_designer_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="ald_email" placeholder="ALD Email" value="<?= e((string) $value('ald_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="ald_phone" placeholder="ALD Phone" value="<?= e((string) $value('ald_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" type="email" name="assistant_snd_designer_email" placeholder="Assistant LX/Sound Email" value="<?= e((string) $value('assistant_snd_designer_email')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_phone" placeholder="Assistant LX/Sound Phone" value="<?= e((string) $value('assistant_snd_designer_phone')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="lead_designer_email" placeholder="LD/SND Email" value="<?= e((string) $value('lead_designer_email')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="lead_designer_phone" placeholder="LD/SND Phone" value="<?= e((string) $value('lead_designer_phone')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="assistant_combined_email" placeholder="Assistant LD/Sound Email" value="<?= e($assistantCombinedEmail) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_combined_phone" placeholder="Assistant LD/Sound Phone" value="<?= e($assistantCombinedPhone) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" type="email" name="shop_manager_email" placeholder="Production Electrician/Audio Email" value="<?= e((string) $value('shop_manager_email')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Production Electrician/Audio Phone" value="<?= e((string) $value('shop_manager_phone')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_shop_manager_name" placeholder="Assistant Shop Manager" value="<?= e($assistantShopManager['name']) ?>" required></div>

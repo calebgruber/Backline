@@ -14,11 +14,9 @@ if (!function_exists('app_config')) {
     require_once $bootstrapRoot . '/shared/bootstrap.php';
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    redirect('/');
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
-} else {
+} elseif ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo 'Method Not Allowed';
     exit;
