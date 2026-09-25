@@ -19,6 +19,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $hasDarkLogo = $logoDarkFile !== null;
     $hasFavicon = $faviconFile !== null;
     $theme = ($_COOKIE['theme_preference'] ?? 'light') === 'dark' ? 'dark' : 'light';
+    $isLxContext = path_starts_with($path, '/lx');
+    $isSndContext = path_starts_with($path, '/snd');
+    $appContextLabel = $isLxContext ? 'Backline LX App' : ($isSndContext ? 'Backline SND App' : '');
     ?>
 <!doctype html>
 <html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $hasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $hasLightLogo ? '1' : '0' ?>">
@@ -54,6 +57,10 @@ function render_page(string $title, callable $body, ?array $user = null): void
             </h1>
             <?php if ($user): ?>
             <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
+                <?php if ($appContextLabel !== ''): ?>
+                <span class="badge bg-blue-lt app-context-badge"><?= e($appContextLabel) ?></span>
+                <a href="/dash/home" class="btn btn-outline-secondary btn-sm"><i class="ti ti-arrow-left me-1"></i>Back to Dash</a>
+                <?php endif; ?>
                 <button type="button" class="btn btn-icon theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
                     <i class="ti ti-sun"></i>
                 </button>

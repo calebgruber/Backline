@@ -24,3 +24,30 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
 .order-action-return { background: #ffd9d9; }
 .order-action-exchange { background: #fff4cc; }
 .order-action-notes { background: #d7e8ff; }
+
+.app-context-badge {
+    font-size: .78rem;
+    letter-spacing: .01em;
+    border: 1px solid rgba(32, 107, 196, 0.32);
+}
+
+.launch-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(8, 19, 51, 0.86);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.launch-overlay-card {
+    max-width: 460px;
+    width: 100%;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    border-radius: 1rem;
+    background: var(--tblr-bg-surface);
+    box-shadow: 0 20px 48px rgba(9, 20, 46, .32);
+}

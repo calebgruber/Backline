@@ -10,7 +10,16 @@ function route_path(): string
 
 function path_starts_with(string $path, string $prefix): bool
 {
-    return strncmp($path, $prefix, strlen($prefix)) === 0;
+    $normalizedPrefix = rtrim($prefix, '/') ?: '/';
+    $normalizedPath = rtrim($path, '/') ?: '/';
+    if ($normalizedPath === $normalizedPrefix) {
+        return true;
+    }
+    if ($normalizedPrefix === '/') {
+        return true;
+    }
+    $segmentPrefix = $normalizedPrefix . '/';
+    return strncmp($normalizedPath, $segmentPrefix, strlen($segmentPrefix)) === 0;
 }
 
 function redirect(string $path): never

@@ -17,5 +17,6 @@ if (!function_exists('app_config')) {
 $user = require_permission('snd.access');
 
 render_page('Launch SND', function (): void {
-    echo '<div class="card show-context"><div class="card-body text-center py-5"><h2 class="mb-2">Launching Backline SND</h2><p class="text-secondary mb-4">Prepare your sound workflow and open the application.</p><a href="/snd/app" class="btn btn-primary btn-lg">Open Backline SND</a></div></div>';
+    echo '<div class="launch-overlay" id="snd-launch-overlay"><div class="launch-overlay-card"><div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div><h2 class="mb-2">Launching Backline SND</h2><p class="text-secondary mb-3">Preparing your sound workspace…</p><p class="small text-secondary mb-0">If redirect does not start, <a href="/snd/app">open SND manually</a>.</p></div></div>';
+    echo '<script>window.setTimeout(function(){window.location.href="/snd/app";}, 900);</script>';
 }, $user);

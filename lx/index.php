@@ -17,5 +17,6 @@ if (!function_exists('app_config')) {
 $user = require_permission('lx.access');
 
 render_page('Launch LX', function (): void {
-    echo '<div class="card show-context"><div class="card-body text-center py-5"><h2 class="mb-2">Launching Backline LX</h2><p class="text-secondary mb-4">Prepare your lighting workflow and open the application.</p><a href="/lx/app" class="btn btn-primary btn-lg">Open Backline LX</a></div></div>';
+    echo '<div class="launch-overlay" id="lx-launch-overlay"><div class="launch-overlay-card"><div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div><h2 class="mb-2">Launching Backline LX</h2><p class="text-secondary mb-3">Preparing your lighting workspace…</p><p class="small text-secondary mb-0">If redirect does not start, <a href="/lx/app">open LX manually</a>.</p></div></div>';
+    echo '<script>window.setTimeout(function(){window.location.href="/lx/app";}, 900);</script>';
 }, $user);
