@@ -35,12 +35,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
         $stmt->execute([json_encode($appName), json_encode($madeIn)]);
 
-        if (!empty($_FILES['logo']['tmp_name'] ?? null)) {
+        if (!empty($_FILES['logo_light']['tmp_name'] ?? null)) {
             $dir = __DIR__ . '/../../uploads/branding';
             if (!is_dir($dir)) {
                 mkdir($dir, 0775, true);
             }
-            move_uploaded_file($_FILES['logo']['tmp_name'], $dir . '/logo-light.png');
+            move_uploaded_file($_FILES['logo_light']['tmp_name'], $dir . '/logo-light.png');
+        }
+
+        if (!empty($_FILES['logo_dark']['tmp_name'] ?? null)) {
+            $dir = __DIR__ . '/../../uploads/branding';
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            move_uploaded_file($_FILES['logo_dark']['tmp_name'], $dir . '/logo-dark.png');
+        }
+
+        if (!empty($_FILES['favicon']['tmp_name'] ?? null)) {
+            $dir = __DIR__ . '/../../uploads/branding';
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            $name = (string) ($_FILES['favicon']['name'] ?? '');
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            $target = $ext === 'png' ? 'favicon.png' : 'favicon.ico';
+            move_uploaded_file($_FILES['favicon']['tmp_name'], $dir . '/' . $target);
         }
 
         flash_set('success', 'Branding saved.');
@@ -70,7 +89,9 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn): void 
                         <input type="hidden" name="action" value="save_branding">
                         <div class="mb-3"><label class="form-label">App Name</label><input class="form-control" name="app_name" value="<?= e($appName) ?>"></div>
                         <div class="mb-3"><label class="form-label">Made In</label><input class="form-control" name="made_in" value="<?= e($madeIn) ?>"></div>
-                        <div class="mb-3"><label class="form-label">Logo</label><input class="form-control" type="file" name="logo" accept="image/*"></div>
+                        <div class="mb-3"><label class="form-label">Light Logo</label><input class="form-control" type="file" name="logo_light" accept="image/*"></div>
+                        <div class="mb-3"><label class="form-label">Dark Logo</label><input class="form-control" type="file" name="logo_dark" accept="image/*"></div>
+                        <div class="mb-3"><label class="form-label">Favicon (.ico or .png)</label><input class="form-control" type="file" name="favicon" accept=".ico,image/png,image/x-icon"></div>
                         <button class="btn btn-primary">Save branding</button>
                     </form>
                 </div>

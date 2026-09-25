@@ -14,8 +14,10 @@ Backline is a pure-PHP, Tabler-based theatre shop order platform for LX and SND 
 4. Login at `/auth/login`.
 
 ## Routing
+- `/` (marketing homepage)
 - `/admin/dash`
 - `/auth/login`
+- `/profile`
 - `/lx`
 - `/snd`
 - `/resources`

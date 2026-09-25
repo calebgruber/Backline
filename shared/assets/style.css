@@ -1,6 +1,10 @@
 body { font-family: Inter, system-ui, sans-serif; }
 .app-wordmark { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 1.125rem; }
 .app-logo { max-height: 38px; width: auto; }
+.logo-dark { display: none; }
+html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-light { display: none; }
+html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-dark { display: inline-block; }
+html[data-bs-theme="light"] .logo-dark { display: none; }
 .preloader-backdrop { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: grid; place-items: center; z-index: 2000; transition: opacity .25s ease; }
 .preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
 .show-context { border-left: 4px solid var(--tblr-primary); }

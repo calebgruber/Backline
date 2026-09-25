@@ -15,7 +15,7 @@ if (app_is_installed() && path_starts_with($path, '/setup')) {
 }
 
 $routes = [
-    '/' => __DIR__ . '/auth/login/index.php',
+    '/' => __DIR__ . '/home/index.php',
     '/auth/login' => __DIR__ . '/auth/login/index.php',
     '/auth/logout' => __DIR__ . '/auth/logout/index.php',
     '/auth/forgot' => __DIR__ . '/auth/forgot/index.php',
@@ -29,6 +29,7 @@ $routes = [
     '/admin/categories' => __DIR__ . '/admin/categories/index.php',
     '/admin/resources' => __DIR__ . '/admin/resources/index.php',
     '/admin/shows' => __DIR__ . '/admin/shows/index.php',
+    '/profile' => __DIR__ . '/profile/index.php',
     '/lx' => __DIR__ . '/lx/index.php',
     '/snd' => __DIR__ . '/snd/index.php',
     '/resources' => __DIR__ . '/resources/index.php',
