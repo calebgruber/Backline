@@ -31,7 +31,6 @@ $csrfToken = (string) $_SESSION['setup_csrf_token'];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $settingsBackup = is_file(settings_file()) ? file_get_contents(settings_file()) : null;
-    $setupAppliedMigrations = [];
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         $errors[] = 'Invalid request token.';
@@ -98,9 +97,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     throw new RuntimeException('Setup has already been completed.');
                 }
                 foreach (apply_pending_migrations_with_pdo($pdo, 'backline_setup_migrations') as $result) {
-                    if (($result['status'] ?? '') === 'applied' && !empty($result['migration'])) {
-                        $setupAppliedMigrations[] = (string) $result['migration'];
-                    }
                     if (($result['status'] ?? '') === 'failed') {
                         throw new RuntimeException((string) ($result['migration'] ?? 'migration') . ': ' . (string) ($result['message'] ?? 'Failed'));
                     }
@@ -159,12 +155,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
             } else {
                 @unlink(settings_file());
-            }
-            if (isset($pdo) && $pdo instanceof PDO && $setupAppliedMigrations !== []) {
-                $deleteMigration = $pdo->prepare('DELETE FROM schema_migrations WHERE migration = ?');
-                foreach ($setupAppliedMigrations as $migrationName) {
-                    $deleteMigration->execute([$migrationName]);
-                }
             }
             error_log('Setup failed: ' . $error->getMessage());
             $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';

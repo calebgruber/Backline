@@ -57,8 +57,10 @@ function render_page(string $title, callable $content): void
 
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<title>' . htmlspecialchars($title) . ' · Backline</title>';
+    echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
+    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">';
     echo '<style>
-    @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Montserrat:wght@400;500;600&display=swap");
     :root{--bg:#0b1020;--card:#121a32;--line:#2d3a66;--text:#eef2ff;--muted:#9fb0e8;--accent:#5aa8ff}
     *{box-sizing:border-box}body{margin:0;font:500 14px/1.45 "Montserrat","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#070b18,#0b1020);color:var(--text)}
     h1,h2,h3,header,.brand{font-family:"JetBrains Mono",ui-monospace,monospace}
@@ -86,8 +88,10 @@ function render_page(string $title, callable $content): void
 
     echo '</div><nav>';
     foreach (nav_items() as $label => $href) {
-        $active = ($path === $href || str_starts_with($path, $href . '/')) ? 'active' : '';
-        echo '<a class="' . $active . '" href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
+        $isActive = ($path === $href || str_starts_with($path, $href . '/'));
+        $active = $isActive ? 'active' : '';
+        $ariaCurrent = $isActive ? ' aria-current="page"' : '';
+        echo '<a class="' . $active . '"' . $ariaCurrent . ' href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
     }
     if ($user) {
         $destination = user_home_route($user);
