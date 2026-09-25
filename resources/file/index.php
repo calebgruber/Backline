@@ -49,7 +49,7 @@ $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $d
 $encodedFilename = rawurlencode($downloadName);
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'");
+header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'none'; script-src 'none'");
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');

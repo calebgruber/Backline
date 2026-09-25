@@ -25,5 +25,13 @@ assert_true(
     normalized_session_concentrations(['snd', 'other', 'lx', 'snd']) === ['snd', 'lx'],
     'concentrations should keep only supported values in source order without duplicates'
 );
+assert_true(
+    normalized_session_concentrations([]) === [],
+    'empty concentrations should remain empty'
+);
+assert_true(
+    normalized_session_concentrations(['foo', 'bar']) === [],
+    'unsupported concentrations should be removed'
+);
 
 fwrite(STDOUT, "login_security_test: OK\n");

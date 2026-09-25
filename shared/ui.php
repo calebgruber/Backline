@@ -36,6 +36,18 @@ function nav_items(): array
     return $items;
 }
 
+function top_nav_items(): array
+{
+    $items = [];
+    foreach (nav_items() as $item) {
+        if (!isset($item['section'])) {
+            $items[] = $item;
+        }
+    }
+
+    return $items;
+}
+
 function safe_logo_src(string $logo): string
 {
     if ($logo === '') {
@@ -47,6 +59,9 @@ function safe_logo_src(string $logo): string
     $scheme = parse_url($logo, PHP_URL_SCHEME);
     if (in_array(strtolower((string) $scheme), ['https'], true)) {
         return $logo;
+    }
+    if ($scheme === null && !str_contains($logo, '..') && !str_contains($logo, '\\') && !str_starts_with($logo, '//')) {
+        return app_url(ltrim($logo, '/'));
     }
 
     return '';
@@ -182,6 +197,7 @@ function render_page(string $title, callable $content): void
     $logoDark = safe_logo_src(trim((string) ($settings['branding_logo_dark'] ?? '')));
     $appName = (string) ($settings['app_name'] ?? 'Backline');
     $homeRoute = $user ? user_home_route($user) : 'auth/login';
+    $logoutRoute = app_url('auth/logout');
 
     echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<meta name="robots" content="noindex,nofollow">';
@@ -195,47 +211,39 @@ function render_page(string $title, callable $content): void
     echo '</head><body><div id="page-loader"></div><div class="app">';
 
     echo '<div class="topbar">';
-    echo '<button id="mobile-menu-btn" class="topbar-btn mobile-menu-btn" title="Menu" aria-label="Open navigation menu"><span class="material-symbols-outlined">menu</span></button>';
-    echo '<a href="' . htmlspecialchars(app_url($homeRoute)) . '" class="topbar-launcher"><span class="material-symbols-outlined">home</span>Launcher</a>';
-    echo '<span class="topbar-sep">›</span>';
-    echo '<span class="topbar-app"><span class="material-symbols-outlined">dashboard</span>' . htmlspecialchars($title) . '</span>';
+    echo '<a href="' . htmlspecialchars(app_url($homeRoute)) . '" class="topbar-brand">';
+    if ($logo !== '') {
+        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light topbar-logo-image">';
+        if ($logoDark !== '') {
+            echo '<img src="' . htmlspecialchars($logoDark) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-dark topbar-logo-image">';
+        }
+    } else {
+        echo '<span class="material-symbols-outlined topbar-logo-icon">dashboard</span>';
+    }
+    echo '<span class="topbar-brand-text">' . htmlspecialchars($appName) . '</span></a>';
+
+    if ($user) {
+        echo '<nav class="topbar-nav" aria-label="Primary">';
+        foreach (top_nav_items() as $item) {
+            $href = (string) ($item['href'] ?? '#');
+            $active = is_active_nav($href) ? ' active' : '';
+            echo '<a href="' . htmlspecialchars($href) . '" class="topbar-link' . $active . '">';
+            echo '<span class="material-symbols-outlined">' . htmlspecialchars((string) ($item['icon'] ?? 'circle')) . '</span>';
+            echo '<span>' . htmlspecialchars((string) ($item['label'] ?? '')) . '</span></a>';
+        }
+        echo '</nav>';
+    }
+
     echo '<div class="topbar-right">';
     echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme" aria-label="Toggle theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
     if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        echo '<span class="topbar-user"><div class="topbar-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div></span>';
+        echo '<span class="topbar-user"><span class="topbar-username">' . htmlspecialchars($displayName) . '</span><div class="topbar-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div></span>';
+        echo '<a href="' . htmlspecialchars($logoutRoute) . '" class="topbar-btn topbar-logout" title="Logout" aria-label="Logout"><span class="material-symbols-outlined">logout</span></a>';
     }
     echo '</div></div>';
 
-    echo '<div id="sidebar-overlay" class="hidden sidebar-overlay"></div>';
-    echo '<aside class="sidebar"><div class="sidebar-header"><h2>';
-    if ($logo !== '') {
-        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light">';
-        if ($logoDark !== '') {
-            echo '<img src="' . htmlspecialchars($logoDark) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-dark">';
-        }
-    } else {
-        echo '<span class="material-symbols-outlined app-logo">dashboard</span>' . htmlspecialchars($appName);
-    }
-    echo '</h2></div><nav>';
-
-    foreach (nav_items() as $item) {
-        if (isset($item['section'])) {
-            echo '<div class="sidebar-section">' . htmlspecialchars((string) $item['section']) . '</div>';
-            continue;
-        }
-        $href = (string) ($item['href'] ?? '#');
-        $active = is_active_nav($href) ? ' active' : '';
-        echo '<a href="' . htmlspecialchars($href) . '" class="nav-item' . $active . '"><span class="material-symbols-outlined">' . htmlspecialchars((string) ($item['icon'] ?? 'circle')) . '</span>' . htmlspecialchars((string) ($item['label'] ?? '')) . '</a>';
-    }
-    echo '</nav>';
-
-    if ($user) {
-        $displayName = (string) ($user['email'] ?? 'Account');
-        echo '<div class="sidebar-footer"><div class="user-info"><div class="user-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div><div class="user-details"><div class="user-name truncate">' . htmlspecialchars($displayName) . '</div><div class="user-role">' . htmlspecialchars(ucfirst((string) ($user['role'] ?? 'user'))) . '</div></div></div></div>';
-    }
-
-    echo '</aside><main class="content"><div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div><div class="page-body">';
+    echo '<main class="content"><div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div><div class="page-body">';
     $content();
     echo '</div></main></div><script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script></body></html>';
 }
