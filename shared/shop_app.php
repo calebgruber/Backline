@@ -21,10 +21,10 @@ if (!function_exists('render_shop_app_page')) {
     {
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
-            ? db()->query('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
-            : (function () use ($user) {
-                $stmt = db()->prepare('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY show_name');
-                $stmt->execute([(int) $user['id']]);
+            ? db()->query('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
+            : (function () use ($user, $shopType) {
+                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
+                $stmt->execute([(int) $user['id'], $shopType]);
                 return $stmt;
             })();
         $shows = $showListStmt->fetchAll();
@@ -44,7 +44,7 @@ if (!function_exists('render_shop_app_page')) {
             $selectedShowId = 0;
         }
 
-        $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'];
+        $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'] . ' AND COALESCE(s.show_scope, "both") IN ("both", ' . db()->quote($shopType) . ')';
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         if (!in_array($currentTab, $allowedTabs, true)) {
@@ -174,6 +174,9 @@ if (!function_exists('render_shop_app_page')) {
             if ($action === 'export_latest' && $selectedShowId > 0) {
                 flash_set('info', 'Paperwork export is not wired yet.');
             }
+            if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
+                flash_set('info', 'Label printing is not wired yet.');
+            }
 
             redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
         }
@@ -267,6 +270,27 @@ if (!function_exists('render_shop_app_page')) {
                 <div class="card mb-3">
                     <div class="card-header d-flex align-items-center justify-content-between gap-2">
                         <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
+                        <?php if ($selectedShow): ?>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-outline-secondary btn-sm" href="/<?= e($shopType) ?>/app">Exit Show</a>
+                                <form method="post" class="d-inline-block">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="export_latest">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
+                                </form>
+                                <?php if ($shopType === 'snd'): ?>
+                                    <form method="post" class="d-inline-block">
+                                        <?= csrf_input() ?>
+                                        <input type="hidden" name="action" value="print_labels">
+                                        <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                        <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                        <button class="btn btn-outline-primary btn-sm" type="submit">Print Labels</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body">
                         <?php if (!$showFirstNav): ?>
@@ -351,14 +375,7 @@ if (!function_exists('render_shop_app_page')) {
                     </div>
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
                     <div class="card"><div class="card-body text-secondary">
-                        <p class="mb-3">Paperwork views are coming next. Use export to generate the latest paperwork when enabled.</p>
-                        <form method="post" class="d-inline-block">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="action" value="export_latest">
-                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                            <input type="hidden" name="current_tab" value="paperwork">
-                            <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
-                        </form>
+                        <p class="mb-0">Paperwork views are coming next. Use the show actions above to export latest paperwork.</p>
                     </div></div>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">

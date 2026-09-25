@@ -46,8 +46,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
             $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL LIMIT 1');
             $shopShowAccess->execute([$selectedShopShowId]);
         } else {
-            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL LIMIT 1');
-            $shopShowAccess->execute([$selectedShopShowId, (int) $user['id']]);
+            $shopScope = $isLxAppContext ? 'lx' : 'snd';
+            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) LIMIT 1');
+            $shopShowAccess->execute([$selectedShopShowId, (int) $user['id'], $shopScope]);
         }
         if (!$shopShowAccess->fetchColumn()) {
             $selectedShopShowId = 0;

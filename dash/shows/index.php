@@ -23,6 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save') {
         $showId = (int) post('show_id', '0');
+        $showScope = strtolower(trim((string) post('show_scope', 'both')));
+        if (!in_array($showScope, ['lx', 'snd', 'both'], true)) {
+            $showScope = 'both';
+        }
         $assistantCombinedName = post('assistant_combined_name');
         $assistantCombinedEmail = post('assistant_combined_email', '');
         $assistantCombinedPhone = post('assistant_combined_phone', '');
@@ -59,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             post('show_name'),
             post('theatre_name'),
             post('shop_name'),
+            $showScope,
             post('lead_designer_name'),
             post('lead_designer_email', ''),
             post('lead_designer_phone', ''),
@@ -84,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($showId > 0) {
             if ($isAdmin) {
                 $stmt = db()->prepare('UPDATE shows SET
-                    show_name = ?, theatre_name = ?, shop_name = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
+                    show_name = ?, theatre_name = ?, shop_name = ?, show_scope = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
                     ald_name = ?, ald_email = ?, ald_phone = ?, assistant_snd_designer_name = ?, assistant_snd_designer_email = ?, assistant_snd_designer_phone = ?,
                     shop_manager_name = ?, shop_manager_email = ?, shop_manager_phone = ?, assistants_json = ?, pull_date = NULLIF(?, ""), return_date = NULLIF(?, ""),
                     strike_date = NULLIF(?, ""), opening_date = NULLIF(?, ""), closing_date = NULLIF(?, ""), theatre_address = ?, shop_address = ?, updated_at = NOW()
@@ -92,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([...$payload, $showId]);
             } else {
                 $stmt = db()->prepare('UPDATE shows SET
-                    show_name = ?, theatre_name = ?, shop_name = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
+                    show_name = ?, theatre_name = ?, shop_name = ?, show_scope = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
                     ald_name = ?, ald_email = ?, ald_phone = ?, assistant_snd_designer_name = ?, assistant_snd_designer_email = ?, assistant_snd_designer_phone = ?,
                     shop_manager_name = ?, shop_manager_email = ?, shop_manager_phone = ?, assistants_json = ?, pull_date = NULLIF(?, ""), return_date = NULLIF(?, ""),
                     strike_date = NULLIF(?, ""), opening_date = NULLIF(?, ""), closing_date = NULLIF(?, ""), theatre_address = ?, shop_address = ?, updated_at = NOW()
@@ -102,12 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('success', 'Show updated.');
         } else {
             $stmt = db()->prepare('INSERT INTO shows (
-                owner_user_id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone,
+                owner_user_id, show_name, theatre_name, shop_name, show_scope, lead_designer_name, lead_designer_email, lead_designer_phone,
                 ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone,
                 shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date,
                 opening_date, closing_date, theatre_address, shop_address, created_at, updated_at
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ""), NULLIF(?, ""), NULLIF(?, ""),
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ""), NULLIF(?, ""), NULLIF(?, ""),
                 NULLIF(?, ""), NULLIF(?, ""), ?, ?, NOW(), NOW()
             )');
             $stmt->execute([(int) $user['id'], ...$payload]);
@@ -143,6 +148,10 @@ foreach ($shows as $show) {
 
 render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
+    $showScopeValue = strtolower(trim((string) $value('show_scope')));
+    if (!in_array($showScopeValue, ['lx', 'snd', 'both'], true)) {
+        $showScopeValue = 'both';
+    }
     $assistantCombinedName = trim((string) ($editingShow['assistant_snd_designer_name'] ?? '')) !== ''
         ? (string) ($editingShow['assistant_snd_designer_name'] ?? '')
         : (string) ($editingShow['ald_name'] ?? '');
@@ -179,6 +188,13 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="show_name" placeholder="Show Name" value="<?= e((string) $value('show_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="theatre_name" placeholder="Theatre Name" value="<?= e((string) $value('theatre_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
+                            <div class="col-md-6">
+                                <select class="form-select" name="show_scope" required>
+                                    <option value="both" <?= $showScopeValue === 'both' ? 'selected' : '' ?>>Both LX + SND</option>
+                                    <option value="lx" <?= $showScopeValue === 'lx' ? 'selected' : '' ?>>LX only</option>
+                                    <option value="snd" <?= $showScopeValue === 'snd' ? 'selected' : '' ?>>SND only</option>
+                                </select>
+                            </div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_combined_name" placeholder="Assistant LD / Assistant Sound Designer" value="<?= e($assistantCombinedName) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Production Electrician / Production Audio" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
@@ -218,16 +234,22 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                 <div class="card-header"><h3 class="card-title">Shows</h3></div>
                 <div class="table-responsive">
                     <table class="table table-vcenter">
-                        <thead><tr><th>Show</th><th>Owner</th><th class="text-end">Actions</th></tr></thead>
+                        <thead><tr><th>Show</th><th>Scope</th><th>Owner</th><th class="text-end">Actions</th></tr></thead>
                         <tbody>
                         <?php if (!$shows): ?>
-                            <tr><td colspan="3" class="text-secondary">No shows yet. Add one using the form.</td></tr>
+                            <tr><td colspan="4" class="text-secondary">No shows yet. Add one using the form.</td></tr>
                         <?php else: ?>
                             <?php foreach ($shows as $show): ?>
                                 <tr>
                                     <td>
                                         <strong><?= e($show['show_name']) ?></strong>
                                         <div class="small text-secondary"><?= e($show['theatre_name']) ?> · <?= e($show['shop_name']) ?></div>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $scope = strtolower((string) ($show['show_scope'] ?? 'both'));
+                                        echo e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'SND only' : 'Both'));
+                                        ?>
                                     </td>
                                     <td><?= e($show['owner_email']) ?></td>
                                     <td class="text-end">
