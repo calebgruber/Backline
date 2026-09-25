@@ -56,7 +56,7 @@ while (ob_get_level() > 0) {
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
 if ($safeInline) {
-    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob:; sandbox");
+    header("Content-Security-Policy: default-src 'none'; img-src data: blob:; sandbox");
 } else {
     header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
 }

@@ -39,8 +39,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $errors[] = 'Database connection is unavailable.';
     } else {
         try {
-            $stmt = db()->prepare('SELECT id, email, role, password_hash FROM users WHERE email = ? AND password_hash IS NOT NULL AND password_hash <> ? LIMIT 1');
-            $stmt->execute([$email, '']);
+            $stmt = db()->prepare('SELECT id, email, role, password_hash FROM users WHERE email = ? LIMIT 1');
+            $stmt->execute([$email]);
             $userRow = $stmt->fetch();
 
             $valid = verify_login_credentials($userRow ?: null, $password);

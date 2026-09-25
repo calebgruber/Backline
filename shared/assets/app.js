@@ -21,8 +21,13 @@
   }
 
   function initTheme() {
-    const saved = localStorage.getItem(THEME_KEY) ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    let saved = null;
+    try {
+      saved = localStorage.getItem(THEME_KEY);
+    } catch (e) {
+      saved = null;
+    }
+    saved = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(saved);
   }
 
@@ -143,6 +148,7 @@
         const template  = container.querySelector('[data-row-template]');
         if (!template) return;
         const clone = template.cloneNode(true);
+        const cloneSuffix = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         clone.removeAttribute('data-row-template');
         clone.removeAttribute('hidden');
         clone.removeAttribute('aria-hidden');
@@ -150,12 +156,12 @@
         const idMap = new Map();
         clone.querySelectorAll('[id]').forEach(function (el, index) {
           const oldId = el.id;
-          const newId = oldId + '-clone-' + Date.now() + '-' + index;
+          const newId = oldId + '-clone-' + cloneSuffix + '-' + index;
           idMap.set(oldId, newId);
           el.id = newId;
         });
-        clone.querySelectorAll('[for],[aria-describedby],[aria-labelledby],[list]').forEach(function (el) {
-          ['for', 'aria-describedby', 'aria-labelledby', 'list'].forEach(function (attr) {
+        clone.querySelectorAll('[for],[aria-describedby],[aria-labelledby]').forEach(function (el) {
+          ['for', 'aria-describedby', 'aria-labelledby'].forEach(function (attr) {
             const value = el.getAttribute(attr);
             if (!value) return;
             const remapped = value
@@ -164,6 +170,11 @@
               .join(' ');
             el.setAttribute(attr, remapped);
           });
+        });
+        clone.querySelectorAll('[list]').forEach(function (el) {
+          const value = el.getAttribute('list');
+          if (!value) return;
+          el.setAttribute('list', idMap.get(value) || value);
         });
         clone.querySelectorAll('input, select, textarea').forEach(function (el) {
           if (el instanceof HTMLInputElement) {

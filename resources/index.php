@@ -78,14 +78,14 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
         ui_alert('warning', 'Requested resource path was not found.');
     }
     echo '<div class="row g-3">';
-    echo '<div class="col-md-4"><h3>Folders</h3><ul class="list-group">';
+    echo '<div class="col-md-4"><h3>Folders</h3><div class="list-group">';
     foreach ($roots as $root) {
         $href = app_url('resources') . '?' . http_build_query(['folder' => $root]);
         $isActiveRoot = $root === $selected;
         $linkClasses = 'list-group-item list-group-item-action' . ($isActiveRoot ? ' active' : '');
         echo '<a class="' . $linkClasses . '" ' . ($isActiveRoot ? 'aria-current="page" ' : '') . 'href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a>';
     }
-    echo '</ul></div><div class="col-md-8"><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul class="list-group">';
+    echo '</div></div><div class="col-md-8"><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul class="list-group">';
     if ($relativePath !== '') {
         $parts = explode('/', $relativePath);
         array_pop($parts);
