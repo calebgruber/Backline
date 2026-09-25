@@ -43,3 +43,26 @@ return " . $export . ";
 ";
     return (bool) file_put_contents($path, $content, LOCK_EX);
 }
+
+function app_setting(string $key, mixed $default = null): mixed
+{
+    static $cache = null;
+
+    if (!app_is_installed()) {
+        return $default;
+    }
+
+    if ($cache === null) {
+        $cache = [];
+        try {
+            $rows = db()->query('SELECT key_name, value_json FROM app_settings')->fetchAll();
+            foreach ($rows as $row) {
+                $cache[(string) $row['key_name']] = json_decode((string) $row['value_json'], true);
+            }
+        } catch (Throwable) {
+            return $default;
+        }
+    }
+
+    return array_key_exists($key, $cache) ? $cache[$key] : $default;
+}
