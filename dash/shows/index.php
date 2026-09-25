@@ -23,6 +23,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save') {
         $showId = (int) post('show_id', '0');
+        $assistantShopManager = [
+            'name' => post('assistant_shop_manager_name', ''),
+            'email' => post('assistant_shop_manager_email', ''),
+            'phone' => post('assistant_shop_manager_phone', ''),
+        ];
+        $assistantsJson = json_encode(['assistant_shop_manager' => $assistantShopManager], JSON_UNESCAPED_UNICODE);
+
+        $requiredChecks = [
+            'assistant_snd_designer_email' => post('assistant_snd_designer_email', ''),
+            'assistant_snd_designer_phone' => post('assistant_snd_designer_phone', ''),
+            'shop_manager_email' => post('shop_manager_email', ''),
+            'shop_manager_phone' => post('shop_manager_phone', ''),
+            'assistant_shop_manager_name' => $assistantShopManager['name'],
+            'assistant_shop_manager_email' => $assistantShopManager['email'],
+            'assistant_shop_manager_phone' => $assistantShopManager['phone'],
+            'pull_date' => post('pull_date', ''),
+            'opening_date' => post('opening_date', ''),
+            'closing_date' => post('closing_date', ''),
+        ];
+        foreach ($requiredChecks as $field => $val) {
+            if (trim((string) $val) === '') {
+                flash_set('danger', 'Please complete all required assistant/production contact fields and opening/closing/pull dates.');
+                redirect('/dash/shows' . ($showId > 0 ? '?edit=' . $showId : ''));
+            }
+        }
+
         $payload = [
             post('show_name'),
             post('theatre_name'),
@@ -39,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             post('shop_manager_name'),
             post('shop_manager_email', ''),
             post('shop_manager_phone', ''),
-            post('assistants_json', ''),
+            $assistantsJson,
             post('pull_date', ''),
             post('return_date', ''),
             post('strike_date', ''),
@@ -111,6 +137,18 @@ foreach ($shows as $show) {
 
 render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
+    $assistantShopManager = ['name' => '', 'email' => '', 'phone' => ''];
+    $assistantsRaw = (string) ($editingShow['assistants_json'] ?? '');
+    if ($assistantsRaw !== '') {
+        $decoded = json_decode($assistantsRaw, true);
+        if (is_array($decoded) && isset($decoded['assistant_shop_manager']) && is_array($decoded['assistant_shop_manager'])) {
+            $assistantShopManager['name'] = (string) ($decoded['assistant_shop_manager']['name'] ?? '');
+            $assistantShopManager['email'] = (string) ($decoded['assistant_shop_manager']['email'] ?? '');
+            $assistantShopManager['phone'] = (string) ($decoded['assistant_shop_manager']['phone'] ?? '');
+        } elseif (!is_array($decoded)) {
+            $assistantShopManager['name'] = $assistantsRaw;
+        }
+    }
     ?>
     <div class="row row-cards">
         <div class="col-xl-6">
@@ -131,22 +169,27 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_name" placeholder="Assistant LX / Assistant Sound" value="<?= e((string) $value('assistant_snd_designer_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Production Electrician / Production Audio" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
                         </div>
-                        <h4 class="mb-2">Optional</h4>
+                        <h4 class="mb-2">Required Contacts + Key Dates</h4>
                         <div class="row g-2">
                             <div class="col-md-6"><input class="form-control" name="lead_designer_email" placeholder="LD/SND Email" value="<?= e((string) $value('lead_designer_email')) ?>"></div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_phone" placeholder="LD/SND Phone" value="<?= e((string) $value('lead_designer_phone')) ?>"></div>
                             <div class="col-md-6"><input class="form-control" name="ald_email" placeholder="ALD Email" value="<?= e((string) $value('ald_email')) ?>"></div>
                             <div class="col-md-6"><input class="form-control" name="ald_phone" placeholder="ALD Phone" value="<?= e((string) $value('ald_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_email" placeholder="Assistant LX/Sound Email" value="<?= e((string) $value('assistant_snd_designer_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_phone" placeholder="Assistant LX/Sound Phone" value="<?= e((string) $value('assistant_snd_designer_phone')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_email" placeholder="Production Electrician/Audio Email" value="<?= e((string) $value('shop_manager_email')) ?>"></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Production Electrician/Audio Phone" value="<?= e((string) $value('shop_manager_phone')) ?>"></div>
-                            <div class="col-md-6"><label class="form-label mb-1">Pull Date</label><input class="form-control" type="date" name="pull_date" value="<?= e((string) $value('pull_date')) ?>"></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="assistant_snd_designer_email" placeholder="Assistant LX/Sound Email" value="<?= e((string) $value('assistant_snd_designer_email')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_snd_designer_phone" placeholder="Assistant LX/Sound Phone" value="<?= e((string) $value('assistant_snd_designer_phone')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="shop_manager_email" placeholder="Production Electrician/Audio Email" value="<?= e((string) $value('shop_manager_email')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Production Electrician/Audio Phone" value="<?= e((string) $value('shop_manager_phone')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_shop_manager_name" placeholder="Assistant Shop Manager" value="<?= e($assistantShopManager['name']) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="assistant_shop_manager_email" placeholder="Assistant Shop Manager Email" value="<?= e($assistantShopManager['email']) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="assistant_shop_manager_phone" placeholder="Assistant Shop Manager Phone" value="<?= e($assistantShopManager['phone']) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label mb-1">Pull Date</label><input class="form-control" type="date" name="pull_date" value="<?= e((string) $value('pull_date')) ?>" required></div>
                             <div class="col-md-6"><label class="form-label mb-1">Return Date</label><input class="form-control" type="date" name="return_date" value="<?= e((string) $value('return_date')) ?>"></div>
                             <div class="col-md-6"><label class="form-label mb-1">Strike Date</label><input class="form-control" type="date" name="strike_date" value="<?= e((string) $value('strike_date')) ?>"></div>
-                            <div class="col-md-6"><label class="form-label mb-1">Opening Date</label><input class="form-control" type="date" name="opening_date" value="<?= e((string) $value('opening_date')) ?>"></div>
-                            <div class="col-md-6"><label class="form-label mb-1">Closing Date</label><input class="form-control" type="date" name="closing_date" value="<?= e((string) $value('closing_date')) ?>"></div>
-                            <div class="col-12"><textarea class="form-control" name="assistants_json" rows="2" placeholder="Assist Shop Managers (one per line or JSON)"><?= e((string) $value('assistants_json')) ?></textarea></div>
+                            <div class="col-md-6"><label class="form-label mb-1">Opening Date</label><input class="form-control" type="date" name="opening_date" value="<?= e((string) $value('opening_date')) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label mb-1">Closing Date</label><input class="form-control" type="date" name="closing_date" value="<?= e((string) $value('closing_date')) ?>" required></div>
+                        </div>
+                        <h4 class="mb-2 mt-3">Optional</h4>
+                        <div class="row g-2">
                             <div class="col-md-6"><textarea class="form-control" name="theatre_address" rows="2" placeholder="Theatre Address"><?= e((string) $value('theatre_address')) ?></textarea></div>
                             <div class="col-md-6"><textarea class="form-control" name="shop_address" rows="2" placeholder="Shop Address"><?= e((string) $value('shop_address')) ?></textarea></div>
                         </div>
