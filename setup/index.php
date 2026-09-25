@@ -234,21 +234,21 @@ render_page('Setup', function () use ($csrfToken, $errors, $form): void {
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
 
     echo '<h3>Application</h3>';
-    echo '<label>Application Name<input name="app_name" value="' . htmlspecialchars($form['app_name']) . '" required></label>';
+    echo '<div class="mb-3"><label class="form-label">Application Name</label><input class="form-control" name="app_name" value="' . htmlspecialchars($form['app_name']) . '" required></div>';
 
-    echo '<h3>Database</h3><div class="form-row">';
-    echo '<label>Host<input name="db_host" value="' . htmlspecialchars($form['db_host']) . '" required></label>';
-    echo '<label>Port<input name="db_port" value="' . htmlspecialchars($form['db_port']) . '" required></label>';
-    echo '<label>Database<input name="db_name" value="' . htmlspecialchars($form['db_name']) . '" required></label>';
-    echo '<label>User<input name="db_user" value="' . htmlspecialchars($form['db_user']) . '" required></label>';
-    echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
-    echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars($form['db_charset']) . '" required></label>';
+    echo '<h3>Database</h3><div class="row g-3">';
+    echo '<div class="col-md-6"><label class="form-label">Host</label><input class="form-control" name="db_host" value="' . htmlspecialchars($form['db_host']) . '" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">Port</label><input class="form-control" name="db_port" value="' . htmlspecialchars($form['db_port']) . '" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">Database</label><input class="form-control" name="db_name" value="' . htmlspecialchars($form['db_name']) . '" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">User</label><input class="form-control" name="db_user" value="' . htmlspecialchars($form['db_user']) . '" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">Password</label><input class="form-control" type="password" name="db_pass" value="" autocomplete="new-password"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Charset</label><input class="form-control" name="db_charset" value="' . htmlspecialchars($form['db_charset']) . '" required></div>';
     echo '</div>';
 
-    echo '<h3>Initial Admin Account</h3><div class="form-row">';
-    echo '<label>Admin Email<input type="email" name="admin_email" value="' . htmlspecialchars($form['admin_email']) . '" required></label>';
-    echo '<label>Admin Password<input type="password" name="admin_password" required></label>';
-    echo '<label>Confirm Password<input type="password" name="admin_password_confirm" required></label>';
+    echo '<h3 class="mt-4">Initial Admin Account</h3><div class="row g-3">';
+    echo '<div class="col-md-6"><label class="form-label">Admin Email</label><input class="form-control" type="email" name="admin_email" value="' . htmlspecialchars($form['admin_email']) . '" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">Admin Password</label><input class="form-control" type="password" name="admin_password" required></div>';
+    echo '<div class="col-md-6"><label class="form-label">Confirm Password</label><input class="form-control" type="password" name="admin_password_confirm" required></div>';
     echo '</div>';
 
     echo '<button class="btn btn-primary" type="submit">Complete Setup</button>';

@@ -77,21 +77,21 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
     } elseif ($missingPath) {
         ui_alert('warning', 'Requested resource path was not found.');
     }
-    echo '<div class="form-row">';
-    echo '<div><h3>Folders</h3><ul>';
+    echo '<div class="row g-3">';
+    echo '<div class="col-md-4"><h3>Folders</h3><ul class="list-group">';
     foreach ($roots as $root) {
         $href = app_url('resources') . '?' . http_build_query(['folder' => $root]);
-        echo '<li><a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a></li>';
+        echo '<li class="list-group-item"><a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a></li>';
     }
-    echo '</ul></div><div><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul>';
+    echo '</ul></div><div class="col-md-8"><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul class="list-group">';
     if ($relativePath !== '') {
         $parts = explode('/', $relativePath);
         array_pop($parts);
         $upPath = implode('/', $parts);
-        echo '<li><a href="' . htmlspecialchars(app_url('resources') . '?' . http_build_query(['folder' => $selected, 'path' => $upPath])) . '">.. (Up)</a></li>';
+        echo '<li class="list-group-item"><a href="' . htmlspecialchars(app_url('resources') . '?' . http_build_query(['folder' => $selected, 'path' => $upPath])) . '">.. (Up)</a></li>';
     }
     foreach ($items as $item) {
-        echo '<li>';
+        echo '<li class="list-group-item">';
         if ($item['is_dir']) {
             echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . ' <span class="text-muted">(folder)</span></a>';
         } else {

@@ -120,21 +120,19 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
 
     echo '<form method="post">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
-    echo '<div class="form-row">';
-    echo '<label>System name<input name="app_name" value="' . htmlspecialchars((string) $settings['app_name']) . '"></label>';
-    echo '<label>Logo URL<input name="branding_logo" value="' . htmlspecialchars((string) $settings['branding_logo']) . '"></label>';
-    echo '<label>Dark Logo URL<input name="branding_logo_dark" value="' . htmlspecialchars((string) $settings['branding_logo_dark']) . '"></label>';
-    echo '<label>Footer “Made in” text<input name="branding_footer_made_in" value="' . htmlspecialchars((string) $settings['branding_footer_made_in']) . '"></label>';
-    echo '</div><h3>MySQL</h3><div class="form-row">';
-    echo '<label>Host<input name="db_host" value="' . htmlspecialchars((string) $settings['db']['host']) . '"></label>';
-    echo '<label>Port<input name="db_port" value="' . htmlspecialchars((string) $settings['db']['port']) . '"></label>';
-    echo '<label>Database<input name="db_name" value="' . htmlspecialchars((string) $settings['db']['name']) . '"></label>';
-    echo '<label>User<input name="db_user" value="' . htmlspecialchars((string) $settings['db']['user']) . '"></label>';
-    echo '<fieldset><legend>Password update</legend>';
-    echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
-    echo '<label><input type="checkbox" name="keep_db_pass" value="1"' . ($keepDbPasswordChecked ? ' checked' : '') . '> Keep existing password when password field is blank</label>';
-    echo '</fieldset>';
-    echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars((string) $settings['db']['charset']) . '"></label>';
+    echo '<div class="row g-3">';
+    echo '<div class="col-md-6"><label class="form-label">System name</label><input class="form-control" name="app_name" value="' . htmlspecialchars((string) $settings['app_name']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Logo URL</label><input class="form-control" name="branding_logo" value="' . htmlspecialchars((string) $settings['branding_logo']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Dark Logo URL</label><input class="form-control" name="branding_logo_dark" value="' . htmlspecialchars((string) $settings['branding_logo_dark']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Footer “Made in” text</label><input class="form-control" name="branding_footer_made_in" value="' . htmlspecialchars((string) $settings['branding_footer_made_in']) . '"></div>';
+    echo '</div><h3 class="mt-4">MySQL</h3><div class="row g-3">';
+    echo '<div class="col-md-6"><label class="form-label">Host</label><input class="form-control" name="db_host" value="' . htmlspecialchars((string) $settings['db']['host']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Port</label><input class="form-control" name="db_port" value="' . htmlspecialchars((string) $settings['db']['port']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Database</label><input class="form-control" name="db_name" value="' . htmlspecialchars((string) $settings['db']['name']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">User</label><input class="form-control" name="db_user" value="' . htmlspecialchars((string) $settings['db']['user']) . '"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Password</label><input class="form-control" type="password" name="db_pass" value="" autocomplete="new-password"></div>';
+    echo '<div class="col-md-6"><label class="form-label">Charset</label><input class="form-control" name="db_charset" value="' . htmlspecialchars((string) $settings['db']['charset']) . '"></div>';
+    echo '<div class="col-12"><label class="form-check"><input class="form-check-input" type="checkbox" name="keep_db_pass" value="1"' . ($keepDbPasswordChecked ? ' checked' : '') . '><span class="form-check-label">Keep existing password when password field is blank</span></label></div>';
     echo '</div><button class="btn btn-primary" type="submit" name="save_settings" value="1">Save settings</button></form>';
 
     echo '<h3>Database migrations</h3>';

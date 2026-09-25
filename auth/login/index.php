@@ -84,8 +84,8 @@ render_page('Login', function () use ($csrfToken, $errors, $submittedEmail): voi
 
     echo '<form method="post">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
-    echo '<label>Email<input type="email" name="email" value="' . htmlspecialchars($submittedEmail) . '" required></label>';
-    echo '<label>Password<input type="password" name="password" required></label>';
+    echo '<div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="' . htmlspecialchars($submittedEmail) . '" required></div>';
+    echo '<div class="mb-3"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>';
     echo '<button class="btn btn-primary" type="submit">Sign In</button>';
     echo '</form>';
     ui_card_close();
