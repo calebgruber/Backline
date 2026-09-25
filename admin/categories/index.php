@@ -34,8 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'delete') {
-        $stmt = db()->prepare('DELETE FROM inventory_categories WHERE id = ?');
-        $stmt->execute([(int) post('id')]);
+        $stmt = db()->prepare('DELETE FROM inventory_categories WHERE id = ? AND shop_type = ?');
+        $stmt->execute([(int) post('id'), $shop]);
         flash_set('warning', 'Category deleted.');
     }
 

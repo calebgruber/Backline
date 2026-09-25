@@ -41,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         db_test_connection($local['db']);
         write_local_config($local);
+        app_config_clear_cache();
+        db_clear_cache();
+        app_setting_clear_cache();
 
         run_pending_migrations();
 

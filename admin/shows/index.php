@@ -25,8 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('success', 'Show created.');
     }
     if (post('action') === 'delete' && user_has_permission($user, 'shows.delete')) {
-        $stmt = db()->prepare('UPDATE shows SET deleted_at = NOW() WHERE id = ?');
-        $stmt->execute([(int) post('show_id')]);
+        if (user_has_permission($user, 'admin.access')) {
+            $stmt = db()->prepare('UPDATE shows SET deleted_at = NOW() WHERE id = ?');
+            $stmt->execute([(int) post('show_id')]);
+        } else {
+            $stmt = db()->prepare('UPDATE shows SET deleted_at = NOW() WHERE id = ? AND owner_user_id = ?');
+            $stmt->execute([(int) post('show_id'), (int) $user['id']]);
+        }
         flash_set('warning', 'Show deleted.');
     }
     redirect('/admin/shows');

@@ -23,6 +23,7 @@ function auth_login(string $email, string $password): bool
         return false;
     }
 
+    session_regenerate_id(true);
     $_SESSION['user_id'] = (int) $user['id'];
     return true;
 }
@@ -30,6 +31,7 @@ function auth_login(string $email, string $password): bool
 function auth_logout(): void
 {
     unset($_SESSION['user_id']);
+    session_regenerate_id(true);
 }
 
 function require_auth(): array

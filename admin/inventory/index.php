@@ -98,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'delete_item') {
-        $stmt = db()->prepare('DELETE FROM inventory_items WHERE id = ?');
-        $stmt->execute([(int) post('id')]);
+        $stmt = db()->prepare('DELETE FROM inventory_items WHERE id = ? AND shop_type = ?');
+        $stmt->execute([(int) post('id'), $shop]);
         flash_set('warning', 'Item deleted.');
     }
 

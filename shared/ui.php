@@ -98,7 +98,10 @@ function render_page(string $title, callable $body, ?array $user = null): void
                         </div>
                     </a>
                 </div>
-                <a href="/auth/logout" class="btn btn-outline-secondary">Logout</a>
+                <form method="post" action="/auth/logout" class="m-0">
+                    <?= csrf_input() ?>
+                    <button class="btn btn-outline-secondary" type="submit">Logout</button>
+                </form>
             </div>
             <?php else: ?>
             <div class="navbar-nav flex-row order-md-last align-items-center gap-2">

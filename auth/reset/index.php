@@ -28,20 +28,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tokenHash = hash('sha256', $token);
     $password = post('password');
 
-    $stmt = db()->prepare('SELECT * FROM password_tokens WHERE token_hash = ? AND token_type IN ("reset", "invite") AND used_at IS NULL AND expires_at >= NOW() LIMIT 1');
-    $stmt->execute([$tokenHash]);
-    $row = $stmt->fetch();
-    if (!$row) {
-        $error = 'Invalid or expired token.';
+    if (mb_strlen($password) < 12) {
+        $error = 'Password must be at least 12 characters.';
     } else {
         db()->beginTransaction();
-        $stmt = db()->prepare('UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?');
-        $stmt->execute([password_hash($password, PASSWORD_DEFAULT), (int) $row['user_id']]);
-        $stmt = db()->prepare('UPDATE password_tokens SET used_at = NOW() WHERE id = ?');
-        $stmt->execute([(int) $row['id']]);
-        db()->commit();
-        flash_set('success', 'Password has been set. You can login now.');
-        redirect('/auth/login');
+        try {
+            $stmt = db()->prepare('SELECT * FROM password_tokens WHERE token_hash = ? AND token_type IN ("reset", "invite") AND used_at IS NULL AND expires_at >= NOW() LIMIT 1 FOR UPDATE');
+            $stmt->execute([$tokenHash]);
+            $row = $stmt->fetch();
+            if (!$row) {
+                db()->rollBack();
+                $error = 'Invalid or expired token.';
+            } else {
+                $stmt = db()->prepare('UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?');
+                $stmt->execute([password_hash($password, PASSWORD_DEFAULT), (int) $row['user_id']]);
+                $stmt = db()->prepare('UPDATE password_tokens SET used_at = NOW() WHERE id = ? AND used_at IS NULL');
+                $stmt->execute([(int) $row['id']]);
+                db()->commit();
+                flash_set('success', 'Password has been set. You can login now.');
+                redirect('/auth/login');
+            }
+        } catch (Throwable $e) {
+            if (db()->inTransaction()) {
+                db()->rollBack();
+            }
+            $error = 'Unable to reset password right now.';
+        }
     }
 }
 

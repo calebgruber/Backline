@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 function db(): PDO
 {
-    static $pdo;
+    if (!array_key_exists('__db_pdo_cache', $GLOBALS)) {
+        $GLOBALS['__db_pdo_cache'] = null;
+    }
+    $pdo = $GLOBALS['__db_pdo_cache'];
     if ($pdo instanceof PDO) {
         return $pdo;
     }
@@ -22,6 +25,7 @@ function db(): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
+    $GLOBALS['__db_pdo_cache'] = $pdo;
 
     return $pdo;
 }
@@ -39,4 +43,9 @@ function db_test_connection(array $db): bool
     $pdo = new PDO($dsn, (string) ($db['user'] ?? ''), (string) ($db['pass'] ?? ''));
     $pdo->query('SELECT 1');
     return true;
+}
+
+function db_clear_cache(): void
+{
+    $GLOBALS['__db_pdo_cache'] = null;
 }

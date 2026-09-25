@@ -20,12 +20,17 @@ $roots = config('resources_roots', ['Lighting', 'Sound', 'Backline Manuals']);
 $rows = db()->query('SELECT * FROM resource_nodes WHERE deleted_at IS NULL ORDER BY parent_id, sort_order, name')->fetchAll();
 
 $byParent = [];
+$rootNodesByName = [];
 foreach ($rows as $row) {
-    $byParent[(int) ($row['parent_id'] ?? 0)][] = $row;
+    $parentKey = $row['parent_id'] === null ? 'root' : (string) (int) $row['parent_id'];
+    $byParent[$parentKey][] = $row;
+    if ($row['parent_id'] === null) {
+        $rootNodesByName[(string) $row['root_name']][] = $row;
+    }
 }
 
-$renderTree = function ($parentId = 0, $level = 0) use (&$renderTree, $byParent): void {
-    foreach ($byParent[$parentId] ?? [] as $node) {
+$renderTree = function (string $parentKey, int $level = 0) use (&$renderTree, $byParent): void {
+    foreach ($byParent[$parentKey] ?? [] as $node) {
         echo '<div style="padding-left:' . (int) ($level * 20) . 'px" class="py-1">';
         if ($node['node_type'] === 'file') {
             echo '<i class="ti ti-file-text"></i> <a href="' . e((string) $node['path_or_url']) . '" target="_blank" rel="noopener">' . e($node['name']) . '</a>';
@@ -33,15 +38,22 @@ $renderTree = function ($parentId = 0, $level = 0) use (&$renderTree, $byParent)
             echo '<i class="ti ti-folder"></i> <strong>' . e($node['name']) . '</strong>';
         }
         echo '</div>';
-        $renderTree((int) $node['id'], $level + 1);
+        $renderTree((string) (int) $node['id'], $level + 1);
     }
 };
 
-render_page('Resources', function () use ($roots, $renderTree): void {
+render_page('Resources', function () use ($roots, $renderTree, $rootNodesByName): void {
     echo '<div class="card"><div class="card-header"><h3 class="card-title">Resources</h3></div><div class="card-body">';
     foreach ($roots as $root) {
         echo '<h4 class="mt-3">' . e($root) . '</h4>';
+        $rendered = false;
+        foreach ($rootNodesByName[(string) $root] ?? [] as $rootNode) {
+            $rendered = true;
+            $renderTree((string) (int) $rootNode['id'], 0);
+        }
+        if (!$rendered) {
+            echo '<div class="text-secondary small">No resources yet.</div>';
+        }
     }
-    $renderTree(0, 0);
     echo '</div></div>';
 }, $user);

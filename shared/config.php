@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 function app_config(): array
 {
-    static $config;
+    if (!array_key_exists('__app_config_cache', $GLOBALS)) {
+        $GLOBALS['__app_config_cache'] = null;
+    }
+    $config = $GLOBALS['__app_config_cache'];
     if ($config !== null) {
         return $config;
     }
@@ -13,6 +16,7 @@ function app_config(): array
     $localPath = __DIR__ . '/../config/local.php';
     $local = file_exists($localPath) ? require $localPath : [];
     $config = array_replace_recursive($app, $local);
+    $GLOBALS['__app_config_cache'] = $config;
     return $config;
 }
 
@@ -74,4 +78,9 @@ function app_setting(string $key, mixed $default = null): mixed
 function app_setting_clear_cache(): void
 {
     $GLOBALS['__app_settings_cache'] = null;
+}
+
+function app_config_clear_cache(): void
+{
+    $GLOBALS['__app_config_cache'] = null;
 }

@@ -19,16 +19,35 @@ $user = require_permission('users.manage');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
+    $isSuperAdmin = (int) ($user['is_super_admin'] ?? 0) === 1;
+    $actorPerms = [];
+    if (!$isSuperAdmin) {
+        $actorPermRows = db()->prepare('SELECT p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ?');
+        $actorPermRows->execute([(int) $user['id']]);
+        foreach ($actorPermRows->fetchAll() as $permRow) {
+            $actorPerms[] = (string) $permRow['key_name'];
+        }
+    }
 
     if ($action === 'invite') {
         $name = post('name');
         $email = mb_strtolower(post('email'));
+        $existingUserStmt = db()->prepare('SELECT id, deleted_at FROM users WHERE email = ? LIMIT 1');
+        $existingUserStmt->execute([$email]);
+        $existingUser = $existingUserStmt->fetch();
+        if ($existingUser) {
+            flash_set('warning', 'A user with that email already exists.');
+            redirect('/admin/users');
+        }
         $stmt = db()->prepare('INSERT INTO users (name, email, password_hash, is_super_admin, created_at, updated_at) VALUES (?, ?, ?, 0, NOW(), NOW())');
         $stmt->execute([$name, $email, password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT)]);
         $newUserId = (int) db()->lastInsertId();
 
         foreach (['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'] as $perm) {
             if (!isset($_POST['perm_' . $perm])) {
+                continue;
+            }
+            if (!$isSuperAdmin && !in_array($perm, $actorPerms, true)) {
                 continue;
             }
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
@@ -52,6 +71,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete') {
         $target = (int) post('user_id');
+        if ($target === (int) $user['id']) {
+            flash_set('danger', 'You cannot delete your own account.');
+            redirect('/admin/users');
+        }
+        $targetStmt = db()->prepare('SELECT id, is_super_admin FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+        $targetStmt->execute([$target]);
+        $targetUser = $targetStmt->fetch();
+        if (!$targetUser) {
+            flash_set('warning', 'User not found.');
+            redirect('/admin/users');
+        }
+        if ((int) $targetUser['is_super_admin'] === 1 && !$isSuperAdmin) {
+            flash_set('danger', 'Only super admins can delete super admin accounts.');
+            redirect('/admin/users');
+        }
         $stmt = db()->prepare('UPDATE users SET deleted_at = NOW() WHERE id = ?');
         $stmt->execute([$target]);
         flash_set('warning', 'User deleted.');
@@ -60,11 +94,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_permissions') {
         $target = (int) post('user_id');
+        if ($target === (int) $user['id']) {
+            flash_set('danger', 'You cannot change your own permissions.');
+            redirect('/admin/users');
+        }
+        $targetStmt = db()->prepare('SELECT id, is_super_admin FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+        $targetStmt->execute([$target]);
+        $targetUser = $targetStmt->fetch();
+        if (!$targetUser) {
+            flash_set('warning', 'User not found.');
+            redirect('/admin/users');
+        }
+        if ((int) $targetUser['is_super_admin'] === 1 && !$isSuperAdmin) {
+            flash_set('danger', 'Only super admins can edit super admin permissions.');
+            redirect('/admin/users');
+        }
         $selectedPerms = [];
         foreach (array_keys($_POST) as $key) {
             if (str_starts_with((string) $key, 'perm_')) {
                 $selectedPerms[] = substr((string) $key, 5);
             }
+        }
+        if (!$isSuperAdmin) {
+            $selectedPerms = array_values(array_intersect($selectedPerms, $actorPerms));
         }
 
         db()->beginTransaction();
@@ -113,7 +165,7 @@ render_page('Users', function () use ($users, $permissionRows, $userPermMap): vo
                     <div class="mb-3">
                         <label class="form-label">Permissions</label>
                         <?php foreach ($perms as $perm): ?>
-                            <label class="form-check"><input class="form-check-input" type="checkbox" name="perm_<?= e($perm) ?>" checked><span class="form-check-label"><?= e($perm) ?></span></label>
+                            <label class="form-check"><input class="form-check-input" type="checkbox" name="perm_<?= e($perm) ?>"><span class="form-check-label"><?= e($perm) ?></span></label>
                         <?php endforeach; ?>
                     </div>
                     <button class="btn btn-primary">Send invite</button>
