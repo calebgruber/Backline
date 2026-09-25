@@ -28,6 +28,23 @@ function user_home_route(array $user): string
     return 'auth/login';
 }
 
+function allowed_resource_roots(array $user): array
+{
+    if (($user['role'] ?? '') === 'admin') {
+        return ['Lighting', 'Sound', 'Backline Manuals'];
+    }
+
+    $roots = ['Backline Manuals'];
+    if (in_array('lx', $user['concentrations'] ?? [], true)) {
+        $roots[] = 'Lighting';
+    }
+    if (in_array('snd', $user['concentrations'] ?? [], true)) {
+        $roots[] = 'Sound';
+    }
+
+    return array_values(array_unique($roots));
+}
+
 function require_role(string $role): void
 {
     $user = current_user();

@@ -10,7 +10,8 @@ if (!current_user()) {
     exit;
 }
 
-$roots = ['Lighting', 'Sound', 'Backline Manuals'];
+$user = current_user();
+$roots = $user ? allowed_resource_roots($user) : ['Backline Manuals'];
 $selected = $_GET['folder'] ?? $roots[0];
 if (!in_array($selected, $roots, true)) {
     $selected = $roots[0];

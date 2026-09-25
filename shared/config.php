@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 function storage_path(string $path = ''): string
 {
-    $base = dirname(__DIR__) . '/storage';
+    $configured = trim((string) getenv('BACKLINE_STORAGE_PATH'));
+    $base = $configured !== '' ? $configured : dirname(dirname(__DIR__)) . '/backline-storage';
     return $path === '' ? $base : $base . '/' . ltrim($path, '/');
 }
 
@@ -59,7 +60,7 @@ function app_url(string $path = ''): string
 {
     $base = defined('APP_BASE_PATH')
         ? (string) APP_BASE_PATH
-        : rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
+        : rtrim(trim((string) getenv('BACKLINE_BASE_PATH')), '/');
     $base = ($base === '' || $base === '/') ? '' : $base;
     return $base . '/' . ltrim($path, '/');
 }

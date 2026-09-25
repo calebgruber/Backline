@@ -10,7 +10,7 @@ if (!current_user()) {
     exit;
 }
 
-$roots = ['Lighting', 'Sound', 'Backline Manuals'];
+$roots = allowed_resource_roots((array) current_user());
 $folder = (string) ($_GET['folder'] ?? '');
 $name = (string) ($_GET['name'] ?? '');
 $relativePath = trim((string) ($_GET['path'] ?? ''), '/');

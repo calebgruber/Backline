@@ -34,6 +34,7 @@ function pending_migrations(): array
 
 function apply_pending_migrations(): array
 {
+    ensure_migrations_table();
     $results = [];
     foreach (pending_migrations() as $file) {
         $name = basename($file);
