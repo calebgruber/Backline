@@ -81,7 +81,8 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
     echo '<div class="col-md-4"><h3>Folders</h3><ul class="list-group">';
     foreach ($roots as $root) {
         $href = app_url('resources') . '?' . http_build_query(['folder' => $root]);
-        echo '<li class="list-group-item"><a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a></li>';
+        $isActiveRoot = $root === $selected;
+        echo '<li class="list-group-item' . ($isActiveRoot ? ' active' : '') . '"><a class="' . ($isActiveRoot ? 'text-white' : '') . '" ' . ($isActiveRoot ? 'aria-current="page" ' : '') . 'href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a></li>';
     }
     echo '</ul></div><div class="col-md-8"><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul class="list-group">';
     if ($relativePath !== '') {

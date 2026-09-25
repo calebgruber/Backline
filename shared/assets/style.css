@@ -1,34 +1,9 @@
-/* Backline UI on Tabler CDN with CG-Internal-inspired cards */
-
-:root {
-  --cg-card-bg: #fff;
-  --cg-card-border: #dce5ef;
-  --cg-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-  --cg-navbar-bg: #0b1120;
-}
-
-[data-bs-theme="dark"] {
-  --cg-card-bg: #1f2937;
-  --cg-card-border: #334155;
-  --cg-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
-  --cg-navbar-bg: #0f172a;
-}
-
-.backline-body {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: var(--tblr-bg-surface-secondary);
-  padding-top: 3.75rem;
-}
-
-.backline-navbar {
-  background: var(--cg-navbar-bg) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
+/* Base Tabler shell helpers. Put project-specific UI changes in custom.css */
 .brand-logo {
   height: 26px;
   width: auto;
   object-fit: contain;
+  max-width: 220px;
 }
 
 .brand-logo-dark { display: none; }
@@ -36,27 +11,9 @@
 [data-bs-theme="dark"] .brand-logo-dark { display: inline-block; }
 
 .navbar-brand-text {
-  color: #e2e8f0;
+  color: inherit;
   font-weight: 600;
   font-size: .95rem;
-}
-
-.backline-user {
-  color: #cbd5e1 !important;
-  opacity: 1 !important;
-}
-
-.backline-avatar {
-  width: 1.85rem;
-  height: 1.85rem;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .72rem;
-  font-weight: 700;
-  color: #fff;
-  background: #3b82f6;
 }
 
 .page-title {
@@ -65,93 +22,7 @@
 }
 
 .backline-card {
-  background: var(--cg-card-bg);
-  border: 1px solid var(--cg-card-border);
-  border-left: 3px solid var(--cg-card-accent, #3b82f6);
-  border-radius: 8px;
-  box-shadow: var(--cg-shadow);
-}
-
-.backline-card-header {
-  border-bottom: 1px solid var(--cg-card-border);
-  background: rgba(59, 130, 246, 0.08);
-}
-
-.backline-card-dot {
-  width: .55rem;
-  height: .55rem;
-  border-radius: 9999px;
-  display: inline-block;
-  margin-right: .5rem;
-  background: var(--cg-card-accent, #3b82f6);
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-}
-
-.card-grid-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-label {
-  display: block;
-  margin-bottom: .75rem;
-  font-size: .82rem;
-  font-weight: 600;
-}
-
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  display: block;
-  width: 100%;
-  margin-top: .35rem;
-}
-
-.backline-body .text-muted { color: var(--tblr-secondary) !important; }
-
-.backline-nav-toggle {
-  font-size: 1.1rem;
-  line-height: 1;
-  color: #e2e8f0;
-}
-
-.tabs {
-  display: flex;
-  gap: .35rem;
-  flex-wrap: wrap;
-}
-
-.tab {
-  border: 1px solid var(--cg-card-border);
-  border-radius: 6px;
-  padding: .35rem .6rem;
-  font-size: .8rem;
-}
-
-.tab.active {
-  border-color: var(--tblr-primary);
-  color: var(--tblr-primary);
-  background: rgba(32, 107, 196, 0.12);
-}
-
-@supports (background: color-mix(in oklab, red 50%, white)) {
-  .backline-card-header {
-    background: color-mix(in oklab, var(--cg-card-accent, #3b82f6) 11%, var(--cg-card-bg));
-  }
-
-  .tab.active {
-    background: color-mix(in oklab, var(--tblr-primary) 12%, transparent);
-  }
+  border-left: 3px solid var(--tblr-primary);
 }
 
 #page-loader {
@@ -176,10 +47,4 @@ textarea {
 @keyframes backline-loader {
   from { width: 0%; }
   to { width: 88%; }
-}
-
-@media (max-width: 992px) {
-  .form-row { grid-template-columns: 1fr; }
-  .card-grid { grid-template-columns: 1fr; }
-  .card-grid-3 { grid-template-columns: 1fr; }
 }

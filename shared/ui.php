@@ -104,31 +104,6 @@ function user_avatar_text(string $value): string
     return strtoupper(substr($trimmed, 0, 2));
 }
 
-function card_accent_color(string $icon): string
-{
-    static $map = [
-        'dashboard' => '#6366f1',
-        'settings' => '#6366f1',
-        'group' => '#10b981',
-        'theater_comedy' => '#8b5cf6',
-        'inventory_2' => '#3b82f6',
-        'folder' => '#f59e0b',
-        'folder_open' => '#f59e0b',
-        'lightbulb' => '#f59e0b',
-        'graphic_eq' => '#ef4444',
-        'lock' => '#3b82f6',
-        'widgets' => '#3b82f6',
-        'palette' => '#8b5cf6',
-        'smart_button' => '#3b82f6',
-        'notification_important' => '#ef4444',
-        'edit_square' => '#10b981',
-        'insights' => '#6366f1',
-        'table_chart' => '#f59e0b',
-    ];
-
-    return $map[$icon] ?? '#3b82f6';
-}
-
 function ui_alert(string $type, string $message): void
 {
     $map = [
@@ -144,10 +119,9 @@ function ui_alert(string $type, string $message): void
 
 function ui_card_open(string $icon, string $title): void
 {
-    $accent = card_accent_color($icon);
-    echo '<section class="card backline-card mb-3" style="--cg-card-accent:' . htmlspecialchars($accent) . '">';
-    echo '<div class="card-header backline-card-header">';
-    echo '<h3 class="card-title mb-0"><span class="backline-card-dot" aria-hidden="true"></span>' . htmlspecialchars($title) . '</h3>';
+    echo '<section class="card mb-3 backline-card">';
+    echo '<div class="card-header">';
+    echo '<h3 class="card-title mb-0">' . htmlspecialchars($title) . '</h3>';
     echo '</div><div class="card-body">';
 }
 
@@ -176,13 +150,13 @@ function render_page(string $title, callable $content): void
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">';
-    echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">';
+    echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/custom.css')) . '">';
     echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
-    echo '</head><body class="backline-body">';
+    echo '</head><body>';
 
-    echo '<header class="navbar navbar-expand-lg navbar-dark fixed-top backline-navbar"><div class="container-fluid">';
+    echo '<header class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top"><div class="container-xl">';
     echo '<a class="navbar-brand d-flex align-items-center gap-2" href="' . htmlspecialchars(app_url($homeRoute)) . '">';
     if ($logo !== '') {
         echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light">';
@@ -192,7 +166,7 @@ function render_page(string $title, callable $content): void
     }
     echo '<span class="navbar-brand-text">' . htmlspecialchars($appName) . '</span></a>';
 
-    echo '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#backline-top-nav" aria-controls="backline-top-nav" aria-expanded="false" aria-label="Toggle navigation"><span class="backline-nav-toggle" aria-hidden="true">☰</span></button>';
+    echo '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#backline-top-nav" aria-controls="backline-top-nav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>';
     echo '<div class="collapse navbar-collapse" id="backline-top-nav">';
 
     if ($user) {
@@ -207,8 +181,8 @@ function render_page(string $title, callable $content): void
         $displayName = (string) ($user['email'] ?? 'Account');
         echo '<div class="navbar-nav ms-auto align-items-center gap-2">';
         echo '<button type="button" id="theme-toggle" class="btn btn-ghost-secondary btn-icon" aria-label="Toggle theme" aria-pressed="false">🌓</button>';
-        echo '<span class="nav-link disabled backline-user">' . htmlspecialchars($displayName) . '</span>';
-        echo '<span class="backline-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</span>';
+        echo '<span class="nav-link disabled text-secondary">' . htmlspecialchars($displayName) . '</span>';
+        echo '<span class="avatar avatar-sm">' . htmlspecialchars(user_avatar_text($displayName)) . '</span>';
         echo '<form method="post" action="' . htmlspecialchars($logoutRoute) . '" class="d-inline-block m-0">';
         echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($logoutCsrf) . '">';
         echo '<button class="btn btn-outline-light btn-sm" type="submit">Logout</button>';
@@ -218,12 +192,12 @@ function render_page(string $title, callable $content): void
 
     echo '</div></div></header>';
 
-    echo '<main class="page-wrapper"><div class="container-xl py-4">';
+    echo '<main class="page-wrapper"><div class="page-body"><div class="container-xl py-4">';
     echo '<div class="d-flex align-items-center justify-content-between mb-3"><h1 class="page-title mb-0">' . htmlspecialchars($title) . '</h1></div>';
     $content();
-    echo '</div></main>';
+    echo '</div></div></main>';
 
-    echo '<script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>';
+    echo '<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>';
     echo '<script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script>';
     echo '</body></html>';
 }
