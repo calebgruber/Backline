@@ -38,6 +38,9 @@ function require_any_access(array $concentrations): void
         }
         exit;
     }
+    if (($user['role'] ?? '') === 'admin') {
+        return;
+    }
 
     $grants = $user['concentrations'] ?? [];
     foreach ($concentrations as $area) {

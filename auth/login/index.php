@@ -7,7 +7,8 @@ require_once dirname(__DIR__, 2) . '/shared/ui.php';
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($requestMethod === 'POST') {
     $email = trim((string) ($_POST['email'] ?? ''));
-    $role = ($_POST['role'] ?? '') === 'admin' ? 'admin' : 'user';
+    $bootstrapAdminEmail = trim((string) getenv('BACKLINE_BOOTSTRAP_ADMIN_EMAIL'));
+    $role = ($bootstrapAdminEmail !== '' && strcasecmp($bootstrapAdminEmail, $email) === 0) ? 'admin' : 'user';
     $concentrations = $_POST['concentrations'] ?? [];
     $_SESSION['user'] = [
         'email' => $email,
@@ -28,7 +29,7 @@ render_page('Login', function (): void {
     echo '<section class="panel"><h1>Login</h1><p class="muted">Starter auth flow (invite/reset plumbing comes next).</p>';
     echo '<form method="post" class="grid"><div class="grid two">';
     echo '<label>Email<input type="email" name="email" required></label>';
-    echo '<label>Role<select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label>';
+    echo '<div class="muted">Admin bootstrap uses the BACKLINE_BOOTSTRAP_ADMIN_EMAIL environment variable.</div>';
     echo '</div><div class="grid two">';
     echo '<label><input type="checkbox" name="concentrations[]" value="lx" checked> Lighting access</label>';
     echo '<label><input type="checkbox" name="concentrations[]" value="snd"> Sound access</label>';

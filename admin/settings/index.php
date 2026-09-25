@@ -12,8 +12,16 @@ $messages = [];
 $errors = [];
 $settings = app_settings();
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = (string) $_SESSION['csrf_token'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['save_settings'])) {
+    $submittedToken = (string) ($_POST['csrf_token'] ?? '');
+    if (!hash_equals($csrfToken, $submittedToken)) {
+        $errors[] = 'Invalid CSRF token.';
+    } elseif (isset($_POST['save_settings'])) {
         $settings['app_name'] = trim((string) ($_POST['app_name'] ?? 'Backline'));
         $settings['branding_logo'] = trim((string) ($_POST['branding_logo'] ?? ''));
         $settings['branding_logo_dark'] = trim((string) ($_POST['branding_logo_dark'] ?? ''));
@@ -33,9 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $errors[] = 'Failed to write settings file.';
         }
-    }
-
-    if (isset($_POST['run_migrations'])) {
+    } elseif (isset($_POST['run_migrations'])) {
         try {
             foreach (apply_pending_migrations() as $result) {
                 if (($result['status'] ?? '') === 'applied') {
@@ -59,7 +65,7 @@ try {
     $errors[] = 'Migration metadata unavailable: ' . $error->getMessage();
 }
 
-render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending): void {
+render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending, $csrfToken): void {
     echo '<section class="panel"><h1>System Settings</h1>';
     foreach ($messages as $message) {
         echo '<p>' . htmlspecialchars($message) . '</p>';
@@ -69,6 +75,7 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
     }
 
     echo '<form method="post" class="grid">';
+    echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
     echo '<div class="grid two">';
     echo '<label>System name<input name="app_name" value="' . htmlspecialchars((string) $settings['app_name']) . '"></label>';
     echo '<label>Logo URL<input name="branding_logo" value="' . htmlspecialchars((string) $settings['branding_logo']) . '"></label>';
@@ -92,6 +99,6 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
     foreach ($pending as $migrationFile) {
         echo '<li>🕒 ' . htmlspecialchars(basename((string) $migrationFile)) . '</li>';
     }
-    echo '</ul><form method="post"><button type="submit" name="run_migrations" value="1">Apply pending migrations</button></form>';
+    echo '</ul><form method="post"><input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '"><button type="submit" name="run_migrations" value="1">Apply pending migrations</button></form>';
     echo '</section>';
 });

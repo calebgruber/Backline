@@ -61,7 +61,7 @@ function render_page(string $title, callable $content): void
     }
     echo '</div><nav>';
     foreach (nav_items() as $label => $href) {
-        $active = str_starts_with($path, $href) ? 'active' : '';
+        $active = ($path === $href || str_starts_with($path, $href . '/')) ? 'active' : '';
         echo '<a class="' . $active . '" href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
     }
     if ($user) {

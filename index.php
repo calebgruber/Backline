@@ -15,7 +15,15 @@ if ($basePath !== '' && $basePath !== '/' && str_starts_with($requestPath, $base
     $requestPath = substr($requestPath, strlen($basePath)) ?: '/';
 }
 
-$route = trim($requestPath, '/');
+$routeSegments = array_values(array_filter(explode('/', trim($requestPath, '/')), static fn (string $segment): bool => $segment !== ''));
+$safeSegments = [];
+foreach ($routeSegments as $segment) {
+    if ($segment === '.' || $segment === '..') {
+        continue;
+    }
+    $safeSegments[] = $segment;
+}
+$route = implode('/', $safeSegments);
 $route = $route === '' ? 'auth/login' : $route;
 $routeFile = __DIR__ . '/' . $route . '/index.php';
 
