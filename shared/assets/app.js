@@ -148,8 +148,10 @@
     });
 
     document.addEventListener('click', function (e) {
-      if (e.target.closest('[data-remove-row]')) {
-        const row = e.target.closest('[data-remove-row]').closest('[data-row]');
+      const removeTrigger = e.target.closest('[data-remove-row]');
+      if (removeTrigger) {
+        e.preventDefault();
+        const row = removeTrigger.closest('[data-row]');
         if (row) row.remove();
       }
     });
