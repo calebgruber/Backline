@@ -16,7 +16,7 @@ if ($requestMethod === 'POST') {
     $bootstrapToken = trim((string) getenv('BACKLINE_BOOTSTRAP_LOGIN_TOKEN'));
     $email = trim((string) ($_POST['email'] ?? ''));
     $allowedEmails = array_values(array_filter(array_map('trim', explode(',', (string) getenv('BACKLINE_ALLOWED_EMAILS')))));
-    $isAllowedEmail = $allowedEmails !== [] && in_array(strtolower($email), array_map('strtolower', $allowedEmails), true);
+    $isAllowedEmail = $allowedEmails === [] || in_array(strtolower($email), array_map('strtolower', $allowedEmails), true);
     if (!hash_equals($csrfToken, $submittedToken)) {
         $errors[] = 'Invalid request token.';
     } elseif ($bootstrapToken === '' || !hash_equals($bootstrapToken, (string) ($_POST['bootstrap_token'] ?? ''))) {
@@ -55,13 +55,7 @@ if ($requestMethod === 'POST') {
         'role' => $role,
         'concentrations' => $concentrations,
     ];
-    $destination = 'lx';
-    if ($role === 'admin') {
-        $destination = 'admin/dash';
-    } elseif (in_array('snd', $_SESSION['user']['concentrations'], true) && !in_array('lx', $_SESSION['user']['concentrations'], true)) {
-        $destination = 'snd';
-    }
-    header('Location: ' . app_url($destination));
+    header('Location: ' . app_url(user_home_route($_SESSION['user'])));
     exit;
 }
 

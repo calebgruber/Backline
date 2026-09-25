@@ -38,4 +38,5 @@ $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], ba
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
 header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
+header('Content-Length: ' . (string) filesize($file));
 readfile($file);

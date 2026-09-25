@@ -13,6 +13,21 @@ function current_user(): ?array
     return $_SESSION['user'] ?? null;
 }
 
+function user_home_route(array $user): string
+{
+    if (($user['role'] ?? '') === 'admin') {
+        return 'admin/dash';
+    }
+    if (in_array('lx', $user['concentrations'] ?? [], true)) {
+        return 'lx';
+    }
+    if (in_array('snd', $user['concentrations'] ?? [], true)) {
+        return 'snd';
+    }
+
+    return 'auth/login';
+}
+
 function require_role(string $role): void
 {
     $user = current_user();

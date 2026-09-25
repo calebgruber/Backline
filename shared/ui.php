@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth.php';
 
 function nav_items(): array
 {
@@ -65,7 +66,7 @@ function render_page(string $title, callable $content): void
         echo '<a class="' . $active . '" href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
     }
     if ($user) {
-        $destination = ($user['role'] ?? '') === 'admin' ? 'admin/dash' : ((in_array('snd', $user['concentrations'] ?? [], true) ? 'snd' : 'lx'));
+        $destination = user_home_route($user);
         echo '<a href="' . htmlspecialchars(app_url($destination)) . '">' . htmlspecialchars((string) ($user['email'] ?? 'Account')) . '</a>';
     } else {
         echo '<a href="' . htmlspecialchars(app_url('auth/login')) . '">Login</a>';

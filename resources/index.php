@@ -35,11 +35,12 @@ if ($resolvedBase !== false && is_dir($resolvedBase)) {
             continue;
         }
         $fullPath = $resolvedBase . '/' . $item;
+        $isDirectory = is_dir($fullPath);
         $nextPath = ltrim($relativePath . '/' . $item, '/');
         $items[] = [
             'name' => $item,
-            'is_dir' => is_dir($fullPath),
-            'url' => is_dir($fullPath)
+            'is_dir' => $isDirectory,
+            'url' => $isDirectory
                 ? app_url('resources') . '?' . http_build_query(['folder' => $selected, 'path' => $nextPath])
                 : app_url('resources/file') . '?' . http_build_query(['folder' => $selected, 'path' => $relativePath, 'name' => $item]),
         ];
