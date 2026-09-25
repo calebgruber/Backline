@@ -40,7 +40,7 @@ render_page('Admin Components', function (): void {
     echo '</form></section>';
 
     echo '<section class="panel"><h2>Tabs + KPIs</h2>';
-    echo '<div class="tabs"><a class="active" href="#">Overview</a><a href="#">Inventory</a><a href="#">Orders</a><a href="#">Revisions</a></div>';
+    echo '<div class="tabs"><span class="active" role="tab" aria-selected="true">Overview</span><span role="tab" aria-selected="false">Inventory</span><span role="tab" aria-selected="false">Orders</span><span role="tab" aria-selected="false">Revisions</span></div>';
     echo '<div class="divider"></div><div class="grid three">';
     echo '<div class="kpi"><div class="muted">Shows</div><div class="value">12</div></div>';
     echo '<div class="kpi"><div class="muted">Orders</div><div class="value">38</div></div>';

@@ -147,7 +147,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $pdo->commit();
 
                 if (!save_settings($candidateSettings)) {
-                    $cleanupAdmin($pdo, $adminId);
+                    $pdo->beginTransaction();
+                    try {
+                        $cleanupAdmin($pdo, $adminId);
+                        $pdo->commit();
+                    } catch (Throwable) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                    }
                     throw new RuntimeException('Could not save setup settings file.');
                 }
                 if (!mark_setup_complete()) {
@@ -156,7 +164,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     } else {
                         @unlink(settings_file());
                     }
-                    $cleanupAdmin($pdo, $adminId);
+                    $pdo->beginTransaction();
+                    try {
+                        $cleanupAdmin($pdo, $adminId);
+                        $pdo->commit();
+                    } catch (Throwable) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                    }
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
             } finally {

@@ -11,6 +11,7 @@ require_role('admin');
 $messages = [];
 $errors = [];
 $settings = app_settings();
+$keepDbPasswordChecked = true;
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $candidateSettings['branding_footer_made_in'] = trim((string) ($_POST['branding_footer_made_in'] ?? ''));
         $dbPassInput = (string) ($_POST['db_pass'] ?? '');
         $keepDbPassword = isset($_POST['keep_db_pass']) && $_POST['keep_db_pass'] === '1';
+        $keepDbPasswordChecked = $keepDbPassword;
         $candidateSettings['db'] = [
             'host' => trim((string) ($_POST['db_host'] ?? '127.0.0.1')),
             'port' => trim((string) ($_POST['db_port'] ?? '3306')),
@@ -92,7 +94,7 @@ try {
     $errors[] = 'Migration metadata unavailable: ' . $error->getMessage();
 }
 
-render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending, $csrfToken): void {
+render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending, $csrfToken, $keepDbPasswordChecked): void {
     echo '<section class="panel"><h1>System Settings</h1>';
     foreach ($messages as $message) {
         echo '<p>' . htmlspecialchars($message) . '</p>';
@@ -114,7 +116,7 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
     echo '<label>Database<input name="db_name" value="' . htmlspecialchars((string) $settings['db']['name']) . '"></label>';
     echo '<label>User<input name="db_user" value="' . htmlspecialchars((string) $settings['db']['user']) . '"></label>';
     echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
-    echo '<label><input type="checkbox" name="keep_db_pass" value="1" checked> Keep existing password when password field is blank</label>';
+    echo '<label><input type="checkbox" name="keep_db_pass" value="1"' . ($keepDbPasswordChecked ? ' checked' : '') . '> Keep existing password when password field is blank</label>';
     echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars((string) $settings['db']['charset']) . '"></label>';
     echo '</div><button type="submit" name="save_settings" value="1">Save settings</button></form>';
 

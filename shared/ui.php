@@ -84,7 +84,7 @@ function render_page(string $title, callable $content): void
     .badge.success{background:#123d2a}.badge.warning{background:#4d3e12}.badge.danger{background:#4d1c1c}
     .alert{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1d3f}
     .alert.success{border-color:#2c7a57;background:#103225}.alert.warning{border-color:#927120;background:#3b310f}.alert.error{border-color:#8a2f2f;background:#3c1515}
-    .tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs a{padding:7px 10px;border-radius:8px;border:1px solid var(--line);text-decoration:none;color:var(--muted)}.tabs a.active{color:var(--text);background:#13244d}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs a,.tabs span{padding:7px 10px;border-radius:8px;border:1px solid var(--line);text-decoration:none;color:var(--muted);display:inline-block}.tabs a.active,.tabs span.active{color:var(--text);background:#13244d}
     .kpi{padding:12px;border-radius:10px;border:1px solid var(--line);background:#0d1735}.kpi .value{font:600 22px/1 "JetBrains Mono",ui-monospace,monospace}
     .stack{display:flex;flex-wrap:wrap;gap:8px}.list-reset{list-style:none;padding:0;margin:0}
     .divider{height:1px;background:var(--line);margin:12px 0}
@@ -107,7 +107,10 @@ function render_page(string $title, callable $content): void
     }
     if ($user) {
         $destination = user_home_route($user);
-        echo '<a href="' . htmlspecialchars(app_url($destination)) . '">' . htmlspecialchars((string) ($user['email'] ?? 'Account')) . '</a>';
+        $isAccountActive = ($path === $destination || str_starts_with($path, $destination . '/'));
+        $accountClass = $isAccountActive ? 'active' : '';
+        $accountAria = $isAccountActive ? ' aria-current="page"' : '';
+        echo '<a class="' . $accountClass . '"' . $accountAria . ' href="' . htmlspecialchars(app_url($destination)) . '">' . htmlspecialchars((string) ($user['email'] ?? 'Account')) . '</a>';
     } else {
         echo '<a href="' . htmlspecialchars(app_url('auth/login')) . '">Login</a>';
     }

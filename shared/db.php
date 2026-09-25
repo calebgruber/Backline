@@ -14,7 +14,12 @@ function db(): PDO
     $settings = app_settings();
     $defaults = default_settings();
     $cfg = array_replace($defaults['db'] ?? [], is_array($settings['db'] ?? null) ? $settings['db'] : []);
-    $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $cfg['charset']);
+    $allowedCharsets = ['utf8mb4', 'utf8', 'latin1', 'ascii'];
+    $charset = strtolower((string) ($cfg['charset'] ?? 'utf8mb4'));
+    if (!in_array($charset, $allowedCharsets, true)) {
+        $charset = 'utf8mb4';
+    }
+    $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $charset);
 
     $GLOBALS['backline_pdo'] = new PDO($dsn, (string) $cfg['user'], (string) $cfg['pass'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
