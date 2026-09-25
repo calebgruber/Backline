@@ -17,7 +17,7 @@ if (!function_exists('shop_revision_label')) {
 }
 
 if (!function_exists('render_shop_app_page')) {
-    function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy): void
+    function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
@@ -39,9 +39,24 @@ if (!function_exists('render_shop_app_page')) {
         }
 
         $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'];
+        $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
+        $currentTab = (string) ($_GET['tab'] ?? 'info');
+        if (!in_array($currentTab, $allowedTabs, true)) {
+            $currentTab = 'info';
+        }
+
+        if (isset($_GET['export']) && $_GET['export'] === 'latest' && $selectedShowId > 0) {
+            flash_set('info', 'Paperwork export is not wired yet.');
+            redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=paperwork');
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             csrf_verify_or_fail();
             $action = post('action');
+            $postedTab = (string) post('current_tab', $currentTab);
+            if (!in_array($postedTab, $allowedTabs, true)) {
+                $postedTab = 'info';
+            }
 
             if ($selectedShowId <= 0) {
                 flash_set('warning', 'Select a show first.');
@@ -155,7 +170,7 @@ if (!function_exists('render_shop_app_page')) {
                 }
             }
 
-            redirect('/' . $shopType . '/app?show=' . $selectedShowId);
+            redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
         }
 
         $order = null;
@@ -174,6 +189,18 @@ if (!function_exists('render_shop_app_page')) {
                 $revisions = $revStmt->fetchAll();
                 if ($selectedRevisionId <= 0 && !empty($revisions)) {
                     $selectedRevisionId = (int) $revisions[0]['id'];
+                }
+                if ($currentTab === 'initial' && !empty($revisions)) {
+                    $initialRevision = null;
+                    foreach ($revisions as $candidateRevision) {
+                        if ((int) ($candidateRevision['revision_number'] ?? 0) === 1) {
+                            $initialRevision = $candidateRevision;
+                            break;
+                        }
+                    }
+                    if ($initialRevision !== null) {
+                        $selectedRevisionId = (int) $initialRevision['id'];
+                    }
                 }
 
                 if ($selectedRevisionId > 0) {
@@ -205,7 +232,7 @@ if (!function_exists('render_shop_app_page')) {
             }
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav): void {
             ?>
             <div class="card show-context mb-3">
                 <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -214,100 +241,199 @@ if (!function_exists('render_shop_app_page')) {
                 </div>
             </div>
 
-            <div class="card mb-3">
-                <div class="card-header"><h3 class="card-title">Show + Revisions</h3></div>
-                <div class="card-body">
-                    <form method="get" class="row g-2 align-items-end">
-                        <div class="col-md-12">
-                            <label class="form-label">Show</label>
-                            <select class="form-select" name="show" onchange="this.form.submit()">
-                                <option value="">Select show</option>
-                                <?php foreach ($shows as $show): ?>
-                                    <option value="<?= (int) $show['id'] ?>" <?= ((int) $show['id'] === (int) $selectedShowId) ? 'selected' : '' ?>><?= e($show['show_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+            <?php if ($showFirstNav && !$selectedShow): ?>
+                <div class="row row-cards">
+                    <?php foreach ($shows as $show): ?>
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
+                                    <div class="mt-auto">
+                                        <a class="btn btn-primary btn-sm" href="/<?= e($shopType) ?>/app?show=<?= (int) $show['id'] ?>&tab=info">Open Show</a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </form>
-                    <?php if ($selectedShow): ?>
-                        <div class="mt-3 text-md-end">
-                            <?php if (!$order): ?>
-                                <form method="post" class="d-inline-block">
-                                    <?= csrf_input() ?>
-                                    <input type="hidden" name="action" value="create_initial">
-                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                    <button class="btn btn-primary">Create Initial Order</button>
-                                </form>
-                            <?php else: ?>
-                                <form method="post" class="d-inline-block">
-                                    <?= csrf_input() ?>
-                                    <input type="hidden" name="action" value="create_revision">
-                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                                    <button class="btn btn-outline-primary">Add Revision</button>
-                                </form>
-                            <?php endif; ?>
-                        </div>
+                    <?php endforeach; ?>
+                    <?php if (!$shows): ?>
+                        <div class="col-12"><div class="card"><div class="card-body text-secondary">No shows available.</div></div></div>
                     <?php endif; ?>
-                    <?php if (!empty($revisions) && $order): ?>
-                        <div class="mt-3 d-flex flex-wrap gap-2">
+                </div>
+            <?php else: ?>
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                        <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
+                        <?php if ($showFirstNav): ?>
+                            <a class="btn btn-outline-secondary btn-sm" href="/<?= e($shopType) ?>/app">All Shows</a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!$showFirstNav): ?>
+                            <form method="get" class="row g-2 align-items-end">
+                                <div class="col-md-12">
+                                    <label class="form-label">Show</label>
+                                    <select class="form-select" name="show" onchange="this.form.submit()">
+                                        <option value="">Select show</option>
+                                        <?php foreach ($shows as $show): ?>
+                                            <option value="<?= (int) $show['id'] ?>" <?= ((int) $show['id'] === (int) $selectedShowId) ? 'selected' : '' ?>><?= e((string) $show['show_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </form>
+                        <?php endif; ?>
+                        <?php if ($selectedShow): ?>
+                            <ul class="nav nav-pills mt-2">
+                                <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
+                                    <li class="nav-item">
+                                        <a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <div class="mt-3">
+                                <a class="btn btn-outline-primary btn-sm" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=paperwork&export=latest">Export Latest Paperwork</a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if ($selectedShow && $currentTab === 'info'): ?>
+                    <div class="card"><div class="card-body text-secondary">Show information is managed in <a href="/dash/shows">Shows</a>.</div></div>
+                <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
+                    <div class="card"><div class="card-body text-secondary">Paperwork views are coming next. Use “Export Latest Paperwork” to start export flow when enabled.</div></div>
+                <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
+                    <div class="card mb-3">
+                        <div class="card-header"><h3 class="card-title">Revisions</h3></div>
+                        <div class="card-body d-flex flex-wrap gap-2">
+                            <form method="post" class="d-inline-block me-2">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="create_revision">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                                <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                <button class="btn btn-outline-primary btn-sm">Add Revision</button>
+                            </form>
                             <?php foreach ($revisions as $rev): ?>
-                                <a class="btn btn-sm <?= ((int) $rev['id'] === (int) $selectedRevisionId) ? 'btn-primary' : 'btn-outline-primary' ?>" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&revision=<?= (int) $rev['id'] ?>">
-                                    <?= e($rev['revision_label']) ?>
+                                <a class="btn btn-sm <?= ((int) $rev['id'] === (int) $selectedRevisionId) ? 'btn-primary' : 'btn-outline-primary' ?>" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=revisions&revision=<?= (int) $rev['id'] ?>">
+                                    <?= e((string) $rev['revision_label']) ?>
                                 </a>
                             <?php endforeach; ?>
                         </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <?php if ($order && $selectedRevisionId > 0): ?>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Revision Lines</h3></div>
-                    <div class="card-body p-0">
-                        <form method="post">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="action" value="save_lines">
-                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                            <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                            <input type="hidden" name="revision_id" value="<?= (int) $selectedRevisionId ?>">
-                            <div class="table-responsive">
-                                <table class="table table-vcenter">
-                                    <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Spares</th><th>Action</th><th>Pull Date</th><th>Note</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($linesByCategory as $category => $lines): ?>
-                                        <tr class="category-header-row"><td colspan="7"><strong><?= e($category) ?></strong></td></tr>
-                                        <?php foreach ($lines as $line): ?>
-                                            <tr>
-                                                <td><?= e($category) ?></td>
-                                                <td><?= e($line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
-                                                <td>
-                                                    <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
-                                                    <input class="form-control" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
-                                                </td>
-                                                <td><input class="form-control" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
-                                                <td>
-                                                    <select class="form-select" name="action_code[]">
-                                                        <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
-                                                            <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </td>
-                                                <td><input class="form-control" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>"></td>
-                                                <td><input class="form-control" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="card-body border-top">
-                                <button class="btn btn-primary">Save Revision</button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            <?php else: ?>
-                <div class="card"><div class="card-body text-secondary"><?= e($scaffoldCopy) ?></div></div>
+                    <?php if ($selectedRevisionId > 0): ?>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Revision Lines</h3></div>
+                            <div class="card-body p-0">
+                                <form method="post">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="save_lines">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                                    <input type="hidden" name="revision_id" value="<?= (int) $selectedRevisionId ?>">
+                                    <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <div class="table-responsive">
+                                        <table class="table table-vcenter">
+                                            <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Spares</th><th>Action</th><th>Pull Date</th><th>Note</th></tr></thead>
+                                            <tbody>
+                                            <?php foreach ($linesByCategory as $category => $lines): ?>
+                                                <tr class="category-header-row"><td colspan="7"><strong><?= e($category) ?></strong></td></tr>
+                                                <?php foreach ($lines as $line): ?>
+                                                    <tr>
+                                                        <td><?= e($category) ?></td>
+                                                        <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
+                                                        <td>
+                                                            <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
+                                                            <input class="form-control" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                        </td>
+                                                        <td><input class="form-control" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td>
+                                                            <select class="form-select" name="action_code[]">
+                                                                <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
+                                                                    <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </td>
+                                                        <td><input class="form-control" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>"></td>
+                                                        <td><input class="form-control" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="card-body border-top">
+                                        <button class="btn btn-primary">Save Revision</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="card"><div class="card-body text-secondary">No revisions yet.</div></div>
+                    <?php endif; ?>
+                <?php elseif ($selectedShow && $currentTab === 'initial'): ?>
+                    <?php if (!$order): ?>
+                        <div class="card"><div class="card-body">
+                            <p class="text-secondary mb-3"><?= e($scaffoldCopy) ?></p>
+                            <form method="post">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="create_initial">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                <button class="btn btn-primary">Create Initial Order</button>
+                            </form>
+                        </div></div>
+                    <?php elseif ($selectedRevisionId > 0): ?>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Initial Order</h3></div>
+                            <div class="card-body p-0">
+                                <form method="post">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="save_lines">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                                    <input type="hidden" name="revision_id" value="<?= (int) $selectedRevisionId ?>">
+                                    <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <div class="table-responsive">
+                                        <table class="table table-vcenter">
+                                            <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Spares</th><th>Action</th><th>Pull Date</th><th>Note</th></tr></thead>
+                                            <tbody>
+                                            <?php foreach ($linesByCategory as $category => $lines): ?>
+                                                <tr class="category-header-row"><td colspan="7"><strong><?= e($category) ?></strong></td></tr>
+                                                <?php foreach ($lines as $line): ?>
+                                                    <tr>
+                                                        <td><?= e($category) ?></td>
+                                                        <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
+                                                        <td>
+                                                            <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
+                                                            <input class="form-control" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                        </td>
+                                                        <td><input class="form-control" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td>
+                                                            <select class="form-select" name="action_code[]">
+                                                                <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
+                                                                    <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </td>
+                                                        <td><input class="form-control" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>"></td>
+                                                        <td><input class="form-control" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="card-body border-top">
+                                        <button class="btn btn-primary">Save Initial Order</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="card"><div class="card-body text-secondary">Initial order is not available yet.</div></div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="card"><div class="card-body text-secondary"><?= e($scaffoldCopy) ?></div></div>
+                <?php endif; ?>
             <?php endif; ?>
             <?php
         }, $user);

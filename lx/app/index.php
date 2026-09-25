@@ -17,4 +17,4 @@ if (!function_exists('app_config')) {
 $user = require_permission('lx.access');
 require_once __DIR__ . '/../../shared/shop_app.php';
 
-render_shop_app_page($user, 'lx', 'Lighting', 'Backline LX', 'Create an initial order to start LX revision tracking.');
+render_shop_app_page($user, 'lx', 'Lighting', 'Backline LX', 'Create an initial order to start LX revision tracking.', true);
