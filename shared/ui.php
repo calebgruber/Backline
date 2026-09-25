@@ -50,7 +50,7 @@ function safe_logo_src(string $logo): string
         return $logo;
     }
     $scheme = parse_url($logo, PHP_URL_SCHEME);
-    if (in_array(strtolower((string) $scheme), ['https'], true)) {
+    if (in_array(strtolower((string) $scheme), ['https', 'http'], true)) {
         return $logo;
     }
     if ($scheme === null && !str_contains($logo, '..') && !str_contains($logo, '\\') && !str_starts_with($logo, '//')) {
@@ -119,9 +119,10 @@ function ui_alert(string $type, string $message): void
 
 function ui_card_open(string $icon, string $title): void
 {
+    $iconLabel = strtoupper(str_replace('_', ' ', trim($icon)));
     echo '<section class="card mb-3 backline-card">';
     echo '<div class="card-header">';
-    echo '<h3 class="card-title mb-0">' . htmlspecialchars($title) . '</h3>';
+    echo '<h3 class="card-title mb-0"><span class="badge bg-primary-lt text-primary me-2">' . htmlspecialchars($iconLabel) . '</span>' . htmlspecialchars($title) . '</h3>';
     echo '</div><div class="card-body">';
 }
 
@@ -155,6 +156,7 @@ function render_page(string $title, callable $content): void
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/custom.css')) . '">';
     echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
     echo '</head><body>';
+    echo '<div id="page-loader" aria-hidden="true"></div>';
 
     echo '<header class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top"><div class="container-xl">';
     echo '<a class="navbar-brand d-flex align-items-center gap-2" href="' . htmlspecialchars(app_url($homeRoute)) . '">';
