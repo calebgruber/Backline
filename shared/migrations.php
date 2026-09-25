@@ -90,9 +90,7 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
                 if (!$isLikelyDdl) {
                     $pdo->beginTransaction();
                 }
-                foreach (migration_statements($sql) as $statement) {
-                    $pdo->exec($statement);
-                }
+                $pdo->exec($sql);
                 $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
                 $stmt->execute([$name]);
                 if (!$isLikelyDdl && $pdo->inTransaction()) {
@@ -114,18 +112,4 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
     }
 
     return $results;
-}
-
-function migration_statements(string $sql): array
-{
-    $segments = preg_split('/;\\s*(?:\\r?\\n|$)/', $sql) ?: [];
-    $statements = [];
-    foreach ($segments as $segment) {
-        $statement = trim($segment);
-        if ($statement !== '') {
-            $statements[] = $statement;
-        }
-    }
-
-    return $statements;
 }

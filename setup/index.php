@@ -82,11 +82,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         'name' => $dbName,
         'user' => $dbUser,
         'pass' => $dbPass,
-        'charset' => $dbCharset,
+        'charset' => $safeCharset,
     ];
 
     if ($errors === []) {
         $setupLockHandle = null;
+        $restoreSettings = static function (?string $settingsBackupContent): void {
+            if (is_string($settingsBackupContent)) {
+                if (file_put_contents(settings_file(), $settingsBackupContent, LOCK_EX) === false) {
+                    error_log('Setup rollback warning: failed restoring settings backup file.');
+                }
+            } else {
+                if (is_file(settings_file()) && !@unlink(settings_file())) {
+                    error_log('Setup rollback warning: failed removing settings file.');
+                }
+            }
+            @unlink(setup_state_file());
+        };
         try {
             if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
                 throw new RuntimeException('Could not prepare setup storage directory.');
@@ -103,6 +115,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $pdo = new PDO($dsn, $dbUser, $dbPass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::MYSQL_ATTR_MULTI_STATEMENTS => true,
             ]);
             $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
             $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
@@ -113,18 +126,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$lockAcquired) {
                 throw new RuntimeException('Could not acquire setup lock.');
             }
-            $restoreSettings = static function (?string $settingsBackupContent): void {
-                if (is_string($settingsBackupContent)) {
-                    if (file_put_contents(settings_file(), $settingsBackupContent, LOCK_EX) === false) {
-                        error_log('Setup rollback warning: failed restoring settings backup file.');
-                    }
-                } else {
-                    if (is_file(settings_file()) && !@unlink(settings_file())) {
-                        error_log('Setup rollback warning: failed removing settings file.');
-                    }
-                }
-                @unlink(setup_state_file());
-            };
             $cleanupAdmin = static function (PDO $pdoConnection, int $userId): void {
                 $cleanupConcentrations = $pdoConnection->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
                 $cleanupConcentrations->execute([$userId]);
@@ -189,7 +190,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     $rollbackSetupWithAdmin('Could not write setup completion marker.');
                 }
             } finally {
-                $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
+                if ($lockAcquired) {
+                    $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
+                }
             }
 
             reset_db_connection();

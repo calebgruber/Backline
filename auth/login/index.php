@@ -52,12 +52,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $dbConcentrations = $grantsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
                 session_regenerate_id(true);
+                $_SESSION = [];
                 $_SESSION['user'] = [
                     'id' => (int) $userRow['id'],
                     'email' => (string) $userRow['email'],
                     'role' => (string) $userRow['role'],
                     'concentrations' => normalized_session_concentrations($dbConcentrations),
                 ];
+                $_SESSION['logout_csrf_token'] = bin2hex(random_bytes(32));
 
                 header('Location: ' . app_url(user_home_route($_SESSION['user'])));
                 exit;

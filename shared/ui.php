@@ -38,14 +38,7 @@ function nav_items(): array
 
 function top_nav_items(): array
 {
-    $items = [];
-    foreach (nav_items() as $item) {
-        if (!isset($item['section'])) {
-            $items[] = $item;
-        }
-    }
-
-    return $items;
+    return array_values(array_filter(nav_items(), static fn (array $item): bool => !isset($item['section'])));
 }
 
 function safe_logo_src(string $logo): string
@@ -80,6 +73,24 @@ function current_path(): string
     return $path === '' ? 'auth/login' : $path;
 }
 
+function is_active_nav(string $target): bool
+{
+    $path = current_path();
+    if ($target === '' || $target === '#' || str_starts_with($target, '#')) {
+        return false;
+    }
+
+    $targetPath = parse_url($target, PHP_URL_PATH) ?: $target;
+    $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
+    $basePrefix = $basePath === '' || $basePath === '/' ? '' : rtrim($basePath, '/') . '/';
+    if ($basePath !== '' && $basePath !== '/' && ($targetPath === $basePath || str_starts_with($targetPath, $basePrefix))) {
+        $targetPath = substr($targetPath, strlen($basePath)) ?: '/';
+    }
+
+    $target = trim($targetPath, '/');
+    return $target !== '' && ($path === $target || str_starts_with($path, $target . '/'));
+}
+
 function user_avatar_text(string $value): string
 {
     $trimmed = trim($value);
@@ -91,26 +102,6 @@ function user_avatar_text(string $value): string
     }
 
     return strtoupper(substr($trimmed, 0, 2));
-}
-
-function is_active_nav(string $target): bool
-{
-    $path = current_path();
-    if ($target === '' || $target === '#' || str_starts_with($target, '#')) {
-        return false;
-    }
-    $targetPath = parse_url($target, PHP_URL_PATH) ?: $target;
-    $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
-    $basePrefix = $basePath === '' || $basePath === '/' ? '' : rtrim($basePath, '/') . '/';
-    if ($basePath !== '' && $basePath !== '/' && ($targetPath === $basePath || str_starts_with($targetPath, $basePrefix))) {
-        $targetPath = substr($targetPath, strlen($basePath)) ?: '/';
-    }
-    $target = trim($targetPath, '/');
-    if ($target === '') {
-        return false;
-    }
-
-    return $path === $target || str_starts_with($path, $target . '/');
 }
 
 function card_accent_color(string $icon): string
@@ -127,61 +118,37 @@ function card_accent_color(string $icon): string
         'graphic_eq' => '#ef4444',
         'lock' => '#3b82f6',
         'widgets' => '#3b82f6',
+        'palette' => '#8b5cf6',
+        'smart_button' => '#3b82f6',
+        'notification_important' => '#ef4444',
+        'edit_square' => '#10b981',
+        'insights' => '#6366f1',
+        'table_chart' => '#f59e0b',
     ];
-    return $map[$icon] ?? '#3b82f6';
-}
 
-function hex_to_rgb_and_text(string $hex): array
-{
-    $hex = ltrim($hex, '#');
-    if (strlen($hex) === 3) {
-        $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
-    }
-    $r = hexdec(substr($hex, 0, 2));
-    $g = hexdec(substr($hex, 2, 2));
-    $b = hexdec(substr($hex, 4, 2));
-    $lum = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
-    return [$r . ',' . $g . ',' . $b, $lum > 0.55 ? '#000000' : '#ffffff'];
+    return $map[$icon] ?? '#3b82f6';
 }
 
 function ui_alert(string $type, string $message): void
 {
-    $type = in_array($type, ['info', 'success', 'warning', 'danger'], true) ? $type : 'info';
-    $icons = [
+    $map = [
         'info' => 'info',
-        'success' => 'check_circle',
+        'success' => 'success',
         'warning' => 'warning',
-        'danger' => 'error',
+        'danger' => 'danger',
     ];
-    $accents = [
-        'info' => ['#3b82f6', '59,130,246', '#ffffff'],
-        'success' => ['#10b981', '16,185,129', '#ffffff'],
-        'warning' => ['#f59e0b', '245,158,11', '#000000'],
-        'danger' => ['#ef4444', '239,68,68', '#ffffff'],
-    ];
-    [$color, $rgb, $textOn] = $accents[$type] ?? $accents['info'];
+    $class = $map[$type] ?? 'info';
 
-    echo '<div class="alert alert-' . htmlspecialchars($type) . '" style="--alert-accent:' . htmlspecialchars($color) . ';--alert-accent-rgb:' . htmlspecialchars($rgb) . ';--alert-text-on-solid:' . htmlspecialchars($textOn) . '">';
-    echo '<span class="material-symbols-outlined">' . htmlspecialchars($icons[$type]) . '</span>';
-    echo '<span class="alert-text">' . htmlspecialchars($message) . '</span>';
-    echo '</div>';
+    echo '<div class="alert alert-' . htmlspecialchars($class) . '" role="alert">' . htmlspecialchars($message) . '</div>';
 }
 
 function ui_card_open(string $icon, string $title): void
 {
     $accent = card_accent_color($icon);
-    [$rgb, $textOn] = hex_to_rgb_and_text($accent);
-    $style = 'border-left:3px solid ' . $accent
-        . ';--card-accent:' . $accent
-        . ';--card-accent-rgb:' . $rgb
-        . ';--card-text-on-solid:' . $textOn;
-
-    echo '<section class="card" style="' . htmlspecialchars($style) . '">';
-    echo '<div class="card-top"><div class="card-tab">';
-    echo '<span class="material-symbols-outlined">' . htmlspecialchars($icon) . '</span>';
-    echo '<h3>' . htmlspecialchars($title) . '</h3>';
-    echo '</div></div>';
-    echo '<div class="card-body">';
+    echo '<section class="card backline-card mb-3" style="--cg-card-accent:' . htmlspecialchars($accent) . '">';
+    echo '<div class="card-header backline-card-header">';
+    echo '<h3 class="card-title mb-0"><span class="backline-card-dot" aria-hidden="true"></span>' . htmlspecialchars($title) . '</h3>';
+    echo '</div><div class="card-body">';
 }
 
 function ui_card_close(): void
@@ -198,52 +165,64 @@ function render_page(string $title, callable $content): void
     $appName = (string) ($settings['app_name'] ?? 'Backline');
     $homeRoute = $user ? user_home_route($user) : 'auth/login';
     $logoutRoute = app_url('auth/logout');
+    if ($user && empty($_SESSION['logout_csrf_token'])) {
+        $_SESSION['logout_csrf_token'] = bin2hex(random_bytes(32));
+    }
+    $logoutCsrf = (string) ($_SESSION['logout_csrf_token'] ?? '');
 
-    echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<meta name="robots" content="noindex,nofollow">';
     echo '<title>' . htmlspecialchars($title) . ' | ' . htmlspecialchars($appName) . '</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">';
-    echo '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">';
+    echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
-    echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("page-loader");if(l)l.classList.add("pg-done");});</script>';
-    echo '</head><body><div id="page-loader"></div><div class="app">';
+    echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
+    echo '</head><body class="backline-body">';
 
-    echo '<div class="topbar">';
-    echo '<a href="' . htmlspecialchars(app_url($homeRoute)) . '" class="topbar-brand">';
+    echo '<header class="navbar navbar-expand-lg navbar-dark fixed-top backline-navbar"><div class="container-fluid">';
+    echo '<a class="navbar-brand d-flex align-items-center gap-2" href="' . htmlspecialchars(app_url($homeRoute)) . '">';
     if ($logo !== '') {
-        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light topbar-logo-image">';
+        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light">';
         if ($logoDark !== '') {
-            echo '<img src="' . htmlspecialchars($logoDark) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-dark topbar-logo-image">';
+            echo '<img src="' . htmlspecialchars($logoDark) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-dark">';
         }
-    } else {
-        echo '<span class="material-symbols-outlined topbar-logo-icon">dashboard</span>';
     }
-    echo '<span class="topbar-brand-text">' . htmlspecialchars($appName) . '</span></a>';
+    echo '<span class="navbar-brand-text">' . htmlspecialchars($appName) . '</span></a>';
+
+    echo '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#backline-top-nav" aria-controls="backline-top-nav" aria-expanded="false" aria-label="Toggle navigation"><span class="backline-nav-toggle" aria-hidden="true">☰</span></button>';
+    echo '<div class="collapse navbar-collapse" id="backline-top-nav">';
 
     if ($user) {
-        echo '<nav class="topbar-nav" aria-label="Primary">';
+        echo '<ul class="navbar-nav me-auto">';
         foreach (top_nav_items() as $item) {
             $href = (string) ($item['href'] ?? '#');
             $active = is_active_nav($href) ? ' active' : '';
-            echo '<a href="' . htmlspecialchars($href) . '" class="topbar-link' . $active . '">';
-            echo '<span class="material-symbols-outlined">' . htmlspecialchars((string) ($item['icon'] ?? 'circle')) . '</span>';
-            echo '<span>' . htmlspecialchars((string) ($item['label'] ?? '')) . '</span></a>';
+            echo '<li class="nav-item"><a class="nav-link' . $active . '" href="' . htmlspecialchars($href) . '">' . htmlspecialchars((string) ($item['label'] ?? '')) . '</a></li>';
         }
-        echo '</nav>';
-    }
+        echo '</ul>';
 
-    echo '<div class="topbar-right">';
-    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme" aria-label="Toggle theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
-    if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        echo '<span class="topbar-user"><span class="topbar-username">' . htmlspecialchars($displayName) . '</span><div class="topbar-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div></span>';
-        echo '<a href="' . htmlspecialchars($logoutRoute) . '" class="topbar-btn topbar-logout" title="Logout" aria-label="Logout"><span class="material-symbols-outlined">logout</span></a>';
+        echo '<div class="navbar-nav ms-auto align-items-center gap-2">';
+        echo '<button type="button" id="theme-toggle" class="btn btn-ghost-secondary btn-icon" aria-label="Toggle theme" aria-pressed="false">🌓</button>';
+        echo '<span class="nav-link disabled backline-user">' . htmlspecialchars($displayName) . '</span>';
+        echo '<span class="backline-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</span>';
+        echo '<form method="post" action="' . htmlspecialchars($logoutRoute) . '" class="d-inline-block m-0">';
+        echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($logoutCsrf) . '">';
+        echo '<button class="btn btn-outline-light btn-sm" type="submit">Logout</button>';
+        echo '</form>';
+        echo '</div>';
     }
-    echo '</div></div>';
 
-    echo '<main class="content"><div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div><div class="page-body">';
+    echo '</div></div></header>';
+
+    echo '<main class="page-wrapper"><div class="container-xl py-4">';
+    echo '<div class="d-flex align-items-center justify-content-between mb-3"><h1 class="page-title mb-0">' . htmlspecialchars($title) . '</h1></div>';
     $content();
-    echo '</div></main></div><script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script></body></html>';
+    echo '</div></main>';
+
+    echo '<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/js/tabler.min.js"></script>';
+    echo '<script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script>';
+    echo '</body></html>';
 }

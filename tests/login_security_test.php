@@ -21,6 +21,7 @@ assert_true(verify_login_credentials($validUser, $validPassword) === true, 'vali
 assert_true(verify_login_credentials($validUser, 'WrongPass123!') === false, 'wrong password should fail');
 assert_true(verify_login_credentials(null, $validPassword) === false, 'missing user should fail while still executing verify path');
 assert_true(verify_login_credentials(['password_hash' => ''], $validPassword) === false, 'user without usable hash should fail');
+assert_true(verify_login_credentials(['password_hash' => 'not-a-valid-hash'], $validPassword) === false, 'user with malformed hash should fail');
 assert_true(
     normalized_session_concentrations(['snd', 'other', 'lx', 'snd']) === ['snd', 'lx'],
     'concentrations should keep only supported values in source order without duplicates'

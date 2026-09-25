@@ -1,4 +1,4 @@
-/* global app.js – shared across all CG Internal pages */
+/* global app.js – shared across all Backline pages */
 
 (function () {
   'use strict';
@@ -7,10 +7,13 @@
   const THEME_KEY = 'cg-theme';
 
   function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
-    const icon = document.getElementById('theme-icon');
-    if (icon) icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+      btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+      btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    }
   }
 
   function initTheme() {
@@ -20,7 +23,7 @@
   }
 
   function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const current = document.documentElement.getAttribute('data-bs-theme') || 'light';
     applyTheme(current === 'dark' ? 'light' : 'dark');
   }
 
@@ -165,10 +168,7 @@
       loader.style.animation = '';
     }
 
-    // Intercept same-origin link clicks
-    document.addEventListener('click', function (e) {
-      if (typeof e.button === 'number' && e.button !== 0) return;
-      var link = e.target.closest('a[href]');
+    function maybeStartForLink(link, event) {
       if (!link) return;
       var href = link.getAttribute('href') || '';
       if (href === '' || href.charAt(0) === '#') return;
@@ -179,16 +179,33 @@
         return;
       }
       if (!/^https?:$/.test(parsed.protocol) || parsed.origin !== window.location.origin) return;
-      if ((link.target && link.target.toLowerCase() !== '_self') || e.ctrlKey || e.metaKey || e.shiftKey || link.hasAttribute('download')) return;
+      if ((link.target && link.target.toLowerCase() !== '_self') || link.hasAttribute('download')) return;
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
       var currentNoHash = window.location.origin + window.location.pathname + window.location.search;
       var targetNoHash = parsed.origin + parsed.pathname + parsed.search;
       if (currentNoHash === targetNoHash) return;
       startLoader();
+    }
+
+    // Intercept same-origin link clicks
+    document.addEventListener('click', function (e) {
+      if (typeof e.button === 'number' && e.button !== 0) return;
+      maybeStartForLink(e.target.closest('a[href]'), e);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      maybeStartForLink(e.target.closest('a[href]'), e);
     });
 
     // Intercept form submits
     document.addEventListener('submit', function (e) {
-      if (!e.defaultPrevented) startLoader();
+      if (e.defaultPrevented) return;
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      var target = (form.getAttribute('target') || '').trim().toLowerCase();
+      if (target !== '' && target !== '_self') return;
+      startLoader();
     });
   }
 

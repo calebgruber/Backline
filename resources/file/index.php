@@ -28,7 +28,10 @@ $root = realpath(dirname(__DIR__, 2) . '/uploads/resources/' . $folder);
 $base = realpath(dirname(__DIR__, 2) . '/uploads/resources/' . $folder . ($relativePath !== '' ? '/' . $relativePath : ''));
 $filePath = dirname(__DIR__, 2) . '/uploads/resources/' . $folder . ($relativePath !== '' ? '/' . $relativePath : '') . '/' . $name;
 $file = realpath($filePath);
-if ($root === false || $base === false || $file === false || !is_file($file) || !str_starts_with($file, $base . DIRECTORY_SEPARATOR) || !str_starts_with($file, $root . DIRECTORY_SEPARATOR)) {
+$fileDir = $file !== false ? dirname($file) : false;
+$inBase = $fileDir !== false && ($fileDir === $base || str_starts_with($fileDir, $base . DIRECTORY_SEPARATOR));
+$inRoot = $fileDir !== false && ($fileDir === $root || str_starts_with($fileDir, $root . DIRECTORY_SEPARATOR));
+if ($root === false || $base === false || $file === false || !is_file($file) || !$inBase || !$inRoot) {
     http_response_code(404);
     echo 'Not found';
     exit;
@@ -44,12 +47,14 @@ $inlineMimeAllowlist = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 $safeInline = !$isRisky && in_array($mime, $inlineMimeAllowlist, true);
 $contentType = $safeInline ? $detectedMime : 'application/octet-stream';
 $disposition = $safeInline ? 'inline' : 'attachment';
-$downloadName = $isRisky ? 'resource-download.bin' : $name;
+$downloadName = $name;
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $downloadName);
 $encodedFilename = rawurlencode($downloadName);
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'none'; script-src 'none'");
+if ($disposition === 'attachment') {
+    header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
+}
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
