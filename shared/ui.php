@@ -35,7 +35,7 @@ function safe_logo_src(string $logo): string
         return $logo;
     }
     $scheme = parse_url($logo, PHP_URL_SCHEME);
-    if (in_array(strtolower((string) $scheme), ['http', 'https'], true)) {
+    if (in_array(strtolower((string) $scheme), ['https'], true)) {
         return $logo;
     }
 

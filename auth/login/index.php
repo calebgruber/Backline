@@ -50,6 +50,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
                 session_regenerate_id(true);
                 $_SESSION['user'] = [
+                    'id' => (int) $userRow['id'],
                     'email' => (string) $userRow['email'],
                     'role' => (string) $userRow['role'],
                     'concentrations' => array_values(array_intersect(['lx', 'snd'], $dbConcentrations)),
