@@ -13,6 +13,16 @@ if (is_setup_complete()) {
 
 $errors = [];
 $settings = app_settings();
+$form = [
+    'app_name' => (string) ($settings['app_name'] ?? 'Backline'),
+    'db_host' => (string) ($settings['db']['host'] ?? '127.0.0.1'),
+    'db_port' => (string) ($settings['db']['port'] ?? '3306'),
+    'db_name' => (string) ($settings['db']['name'] ?? 'backline'),
+    'db_user' => (string) ($settings['db']['user'] ?? 'root'),
+    'db_pass' => '',
+    'db_charset' => (string) ($settings['db']['charset'] ?? 'utf8mb4'),
+    'admin_email' => '',
+];
 
 if (empty($_SESSION['setup_csrf_token'])) {
     $_SESSION['setup_csrf_token'] = bin2hex(random_bytes(32));
@@ -20,6 +30,7 @@ if (empty($_SESSION['setup_csrf_token'])) {
 $csrfToken = (string) $_SESSION['setup_csrf_token'];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $settingsBackup = is_file(settings_file()) ? file_get_contents(settings_file()) : null;
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         $errors[] = 'Invalid request token.';
@@ -36,6 +47,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $dbUser = trim((string) ($_POST['db_user'] ?? 'root'));
     $dbPass = (string) ($_POST['db_pass'] ?? '');
     $dbCharset = trim((string) ($_POST['db_charset'] ?? 'utf8mb4'));
+    $form = [
+        'app_name' => $appName,
+        'db_host' => $dbHost,
+        'db_port' => $dbPort,
+        'db_name' => $dbName,
+        'db_user' => $dbUser,
+        'db_pass' => $dbPass,
+        'db_charset' => $dbCharset,
+        'admin_email' => $adminEmail,
+    ];
 
     if (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'A valid admin email is required.';
@@ -81,6 +102,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     }
                 }
 
+                $pdo->beginTransaction();
                 $existingUserCheck = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
                 $existingUserCheck->execute([$adminEmail]);
                 if ($existingUserCheck->fetchColumn()) {
@@ -101,19 +123,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
 
-                $existingSettingsContent = is_file(settings_file()) ? file_get_contents(settings_file()) : null;
                 if (!save_settings($candidateSettings)) {
                     throw new RuntimeException('Could not save setup settings file.');
                 }
 
                 if (!mark_setup_complete()) {
-                    if (is_string($existingSettingsContent)) {
-                        file_put_contents(settings_file(), $existingSettingsContent, LOCK_EX);
+                    if (is_string($settingsBackup)) {
+                        file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
                     } else {
                         @unlink(settings_file());
                     }
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
+                $pdo->commit();
             } finally {
                 $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
             }
@@ -122,13 +144,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             header('Location: ' . app_url('auth/login'));
             exit;
         } catch (Throwable $error) {
+            if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            @unlink(setup_state_file());
+            if (is_string($settingsBackup)) {
+                file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
+            } else {
+                @unlink(settings_file());
+            }
             error_log('Setup failed: ' . $error->getMessage());
             $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
         }
     }
 }
 
-render_page('Setup', function () use ($csrfToken, $errors, $settings): void {
+render_page('Setup', function () use ($csrfToken, $errors, $form): void {
     echo '<section class="panel"><h1>One-time Setup</h1><p class="muted">Configure DB + first admin account. This page is disabled after successful setup.</p>';
 
     foreach ($errors as $error) {
@@ -139,19 +170,19 @@ render_page('Setup', function () use ($csrfToken, $errors, $settings): void {
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
 
     echo '<h3>Application</h3>';
-    echo '<label>Application Name<input name="app_name" value="' . htmlspecialchars((string) ($settings['app_name'] ?? 'Backline')) . '" required></label>';
+    echo '<label>Application Name<input name="app_name" value="' . htmlspecialchars($form['app_name']) . '" required></label>';
 
     echo '<h3>Database</h3><div class="grid two">';
-    echo '<label>Host<input name="db_host" value="' . htmlspecialchars((string) ($settings['db']['host'] ?? '127.0.0.1')) . '" required></label>';
-    echo '<label>Port<input name="db_port" value="' . htmlspecialchars((string) ($settings['db']['port'] ?? '3306')) . '" required></label>';
-    echo '<label>Database<input name="db_name" value="' . htmlspecialchars((string) ($settings['db']['name'] ?? 'backline')) . '" required></label>';
-    echo '<label>User<input name="db_user" value="' . htmlspecialchars((string) ($settings['db']['user'] ?? 'root')) . '" required></label>';
-    echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
-    echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars((string) ($settings['db']['charset'] ?? 'utf8mb4')) . '" required></label>';
+    echo '<label>Host<input name="db_host" value="' . htmlspecialchars($form['db_host']) . '" required></label>';
+    echo '<label>Port<input name="db_port" value="' . htmlspecialchars($form['db_port']) . '" required></label>';
+    echo '<label>Database<input name="db_name" value="' . htmlspecialchars($form['db_name']) . '" required></label>';
+    echo '<label>User<input name="db_user" value="' . htmlspecialchars($form['db_user']) . '" required></label>';
+    echo '<label>Password<input type="password" name="db_pass" value="' . htmlspecialchars($form['db_pass']) . '" autocomplete="new-password"></label>';
+    echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars($form['db_charset']) . '" required></label>';
     echo '</div>';
 
     echo '<h3>Initial Admin Account</h3><div class="grid two">';
-    echo '<label>Admin Email<input type="email" name="admin_email" required></label>';
+    echo '<label>Admin Email<input type="email" name="admin_email" value="' . htmlspecialchars($form['admin_email']) . '" required></label>';
     echo '<label>Admin Password<input type="password" name="admin_password" required></label>';
     echo '<label>Confirm Password<input type="password" name="admin_password_confirm" required></label>';
     echo '</div>';

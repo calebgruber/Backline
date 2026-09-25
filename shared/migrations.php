@@ -70,11 +70,16 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
             }
 
             try {
+                $pdo->beginTransaction();
                 $pdo->exec($sql);
                 $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
                 $stmt->execute([$name]);
+                $pdo->commit();
                 $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
             } catch (Throwable $error) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];
                 break;
             }

@@ -36,11 +36,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'charset' => trim((string) ($_POST['db_charset'] ?? 'utf8mb4')),
         ];
 
-        if (save_settings($settings)) {
-            reset_db_connection();
-            $messages[] = 'Settings saved locally.';
-        } else {
-            $errors[] = 'Failed to write settings file.';
+        try {
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $settings['db']['host'], $settings['db']['port'], $settings['db']['name'], $settings['db']['charset']);
+            $validationPdo = new PDO($dsn, (string) $settings['db']['user'], (string) $settings['db']['pass'], [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+            $validationPdo->query('SELECT 1');
+
+            if (save_settings($settings)) {
+                reset_db_connection();
+                $messages[] = 'Settings saved locally.';
+            } else {
+                $errors[] = 'Failed to write settings file.';
+            }
+        } catch (Throwable) {
+            $errors[] = 'Database connection test failed; settings were not saved.';
         }
     } elseif (isset($_POST['run_migrations'])) {
         try {
