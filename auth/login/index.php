@@ -18,6 +18,7 @@ if (current_user()) {
 }
 
 $errors = [];
+$submittedEmail = '';
 if (empty($_SESSION['login_csrf_token'])) {
     $_SESSION['login_csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -26,6 +27,7 @@ $csrfToken = (string) $_SESSION['login_csrf_token'];
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+    $submittedEmail = $email;
     $password = (string) ($_POST['password'] ?? '');
 
     if (!hash_equals($csrfToken, $submittedToken)) {
@@ -70,7 +72,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-render_page('Login', function () use ($csrfToken, $errors): void {
+render_page('Login', function () use ($csrfToken, $errors, $submittedEmail): void {
     echo '<section class="panel"><h1>Login</h1><p class="muted">Sign in with your account.</p>';
     foreach ($errors as $error) {
         echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
@@ -78,7 +80,7 @@ render_page('Login', function () use ($csrfToken, $errors): void {
 
     echo '<form method="post" class="grid">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
-    echo '<label>Email<input type="email" name="email" required></label>';
+    echo '<label>Email<input type="email" name="email" value="' . htmlspecialchars($submittedEmail) . '" required></label>';
     echo '<label>Password<input type="password" name="password" required></label>';
     echo '<button type="submit">Sign In</button>';
     echo '</form></section>';

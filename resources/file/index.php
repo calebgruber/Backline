@@ -36,7 +36,7 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
 
 $detectedMime = mime_content_type($file) ?: 'application/octet-stream';
 $safeInline = in_array(strtolower($detectedMime), ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], true);
-$contentType = $safeInline ? $detectedMime : 'application/octet-stream';
+$contentType = strtolower($detectedMime) === 'image/svg+xml' ? 'application/octet-stream' : $detectedMime;
 $disposition = $safeInline ? 'inline' : 'attachment';
 $extension = strtolower((string) pathinfo($file, PATHINFO_EXTENSION));
 $isSvgLike = strtolower($detectedMime) === 'image/svg+xml' || $extension === 'svg';

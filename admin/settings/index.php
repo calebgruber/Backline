@@ -41,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         try {
+            if (!$keepDbPassword && $dbPassInput === '') {
+                throw new RuntimeException('Enter a new DB password or leave "keep existing password" checked.');
+            }
             $allowedCharsets = ['utf8mb4', 'utf8', 'latin1', 'ascii'];
             $safeCharset = strtolower((string) $candidateSettings['db']['charset']);
             if (!in_array($safeCharset, $allowedCharsets, true)) {
