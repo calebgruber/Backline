@@ -58,6 +58,8 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
 
 .card-title-enhanced .card-header {
     overflow: visible;
+    padding-top: 0;
+    padding-left: 0;
 }
 
 .card-title-enhanced .card-title-pill {
@@ -70,7 +72,7 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
 }
 
 .card-title-enhanced .card-header .card-title-pill {
-    margin-left: -1rem;
+    margin-left: 0;
     padding-left: calc(1rem + 5px);
 }
 
