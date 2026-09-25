@@ -1,1 +1,4 @@
 /* User overrides load last. */
+.alert {
+  border-left: 5px solid var(--tblr-alert-color)!important;
+}
