@@ -12,16 +12,26 @@ function nav_items(): array
         return [];
     }
 
-    $items = ['Resources' => 'resources'];
+    $items = [];
     if (($user['role'] ?? '') === 'admin') {
-        $items = ['Admin' => 'admin/dash'] + $items;
+        $items[] = ['section' => 'Admin'];
+        $items[] = ['icon' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('admin/dash')];
+        $items[] = ['icon' => 'widgets', 'label' => 'Components', 'href' => app_url('admin/components')];
+        $items[] = ['icon' => 'settings', 'label' => 'Settings', 'href' => app_url('admin/settings')];
+        $items[] = ['icon' => 'group', 'label' => 'Users', 'href' => app_url('admin/users')];
+        $items[] = ['icon' => 'theater_comedy', 'label' => 'Shows', 'href' => app_url('admin/shows')];
+        $items[] = ['icon' => 'inventory_2', 'label' => 'Inventory', 'href' => app_url('admin/inventory')];
+        $items[] = ['icon' => 'folder', 'label' => 'Resources Manager', 'href' => app_url('admin/resources')];
     }
-    if (in_array('lx', $user['concentrations'] ?? [], true)) {
-        $items['Lighting'] = 'lx';
+
+    $items[] = ['section' => 'Apps'];
+    if (in_array('lx', $user['concentrations'] ?? [], true) || ($user['role'] ?? '') === 'admin') {
+        $items[] = ['icon' => 'lightbulb', 'label' => 'Lighting', 'href' => app_url('lx')];
     }
-    if (in_array('snd', $user['concentrations'] ?? [], true)) {
-        $items['Sound'] = 'snd';
+    if (in_array('snd', $user['concentrations'] ?? [], true) || ($user['role'] ?? '') === 'admin') {
+        $items[] = ['icon' => 'graphic_eq', 'label' => 'Sound', 'href' => app_url('snd')];
     }
+    $items[] = ['icon' => 'folder_open', 'label' => 'Resources', 'href' => app_url('resources')];
 
     return $items;
 }
@@ -42,79 +52,91 @@ function safe_logo_src(string $logo): string
     return '';
 }
 
-function render_page(string $title, callable $content): void
+function current_path(): string
 {
-    $settings = app_settings();
-    $user = $_SESSION['user'] ?? null;
     $pathRaw = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
     $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
     if ($basePath !== '' && $basePath !== '/' && str_starts_with($pathRaw, $basePath)) {
         $pathRaw = substr($pathRaw, strlen($basePath)) ?: '/';
     }
+
     $path = trim($pathRaw, '/');
-    $path = $path === '' ? 'auth/login' : $path;
+    return $path === '' ? 'auth/login' : $path;
+}
+
+function is_active_nav(string $target): bool
+{
+    $path = current_path();
+    $targetPath = parse_url($target, PHP_URL_PATH) ?: $target;
+    $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
+    if ($basePath !== '' && $basePath !== '/' && str_starts_with($targetPath, $basePath)) {
+        $targetPath = substr($targetPath, strlen($basePath)) ?: '/';
+    }
+    $target = trim($targetPath, '/');
+    return $path === $target || str_starts_with($path, $target . '/');
+}
+
+function render_page(string $title, callable $content): void
+{
+    $settings = app_settings();
+    $user = $_SESSION['user'] ?? null;
     $logo = safe_logo_src(trim((string) ($settings['branding_logo'] ?? '')));
+    $appName = (string) ($settings['app_name'] ?? 'Backline');
+    $homeRoute = $user ? user_home_route($user) : 'auth/login';
 
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
-    echo '<title>' . htmlspecialchars($title) . ' · Backline</title>';
-    echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
-    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">';
-    echo '<style>
-    :root{--bg:#0b1020;--card:#121a32;--line:#2d3a66;--text:#eef2ff;--muted:#9fb0e8;--accent:#5aa8ff}
-    *{box-sizing:border-box}body{margin:0;font:500 14px/1.45 "Montserrat","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#070b18,#0b1020);color:var(--text)}
-    h1,h2,h3,.brand{font-family:"JetBrains Mono",ui-monospace,monospace}
-    .preloader{position:fixed;inset:0;display:grid;place-items:center;background:#050914;z-index:9999;transition:.2s opacity}
-    .spinner{width:52px;height:52px;border:4px solid #23305b;border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line);background:#0a1228;position:sticky;top:0;z-index:1000}
-    nav a{color:var(--muted);text-decoration:none;margin-right:14px}nav a.active,nav a:hover{color:var(--text)}
-    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-    .brand{font-size:18px;font-weight:600}.brand img{height:34px;display:block}
-    main{max-width:1100px;margin:22px auto;padding:0 18px 36px}
-    .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-    input:not([type="checkbox"]):not([type="radio"]),select,textarea{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#0a1228;color:var(--text)}
-    button{cursor:pointer;background:#173063;padding:9px 10px;border-radius:8px;border:1px solid var(--line);color:var(--text)}
-    .btn{display:inline-block;width:auto;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:#173063;color:var(--text);text-decoration:none}
-    .btn.secondary{background:#0f1f44}.btn.ghost{background:transparent}
-    .grid{display:grid;gap:12px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
-    table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
-    .muted{color:var(--muted);font-size:12px}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);background:#13244d}
-    .badge.success{background:#123d2a}.badge.warning{background:#4d3e12}.badge.danger{background:#4d1c1c}
-    .alert{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1d3f}
-    .alert.success{border-color:#2c7a57;background:#103225}.alert.warning{border-color:#927120;background:#3b310f}.alert.error{border-color:#8a2f2f;background:#3c1515}
-    .tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs a,.tabs span{padding:7px 10px;border-radius:8px;border:1px solid var(--line);text-decoration:none;color:var(--muted);display:inline-block}.tabs a.active,.tabs span.active{color:var(--text);background:#13244d}
-    .kpi{padding:12px;border-radius:10px;border:1px solid var(--line);background:#0d1735}.kpi .value{font:600 22px/1 "JetBrains Mono",ui-monospace,monospace}
-    .stack{display:flex;flex-wrap:wrap;gap:8px}.list-reset{list-style:none;padding:0;margin:0}
-    .divider{height:1px;background:var(--line);margin:12px 0}
-    @media(max-width:860px){.grid.two,.grid.three{grid-template-columns:1fr}}
-    </style></head><body>';
-    echo '<div id="preloader" class="preloader" aria-hidden="true"><div class="spinner" aria-hidden="true"></div></div>';
-    echo '<header><div class="brand">';
-    if ($logo !== '') {
-        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars((string) ($settings['app_name'] ?? 'Backline')) . '">';
-    } else {
-        echo htmlspecialchars((string) ($settings['app_name'] ?? 'Backline'));
-    }
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<meta name="robots" content="noindex,nofollow">';
+    echo '<title>' . htmlspecialchars($title) . ' | ' . htmlspecialchars($appName) . '</title>';
+    echo '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">';
+    echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
+    echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("page-loader");if(l)l.classList.add("pg-done");});</script>';
+    echo '</head><body><div id="page-loader"></div><div class="app">';
 
-    echo '</div><nav aria-label="Primary">';
-    foreach (nav_items() as $label => $href) {
-        $isActive = ($path === $href || str_starts_with($path, $href . '/'));
-        $active = $isActive ? 'active' : '';
-        $ariaCurrent = $isActive ? ' aria-current="page"' : '';
-        echo '<a class="' . $active . '"' . $ariaCurrent . ' href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
-    }
+    echo '<div class="topbar">';
+    echo '<button id="mobile-menu-btn" class="topbar-btn mobile-menu-btn" title="Menu"><span class="material-symbols-outlined">menu</span></button>';
+    echo '<a href="' . htmlspecialchars(app_url($homeRoute)) . '" class="topbar-launcher"><span class="material-symbols-outlined">home</span>Launcher</a>';
+    echo '<span class="topbar-sep">›</span>';
+    echo '<span class="topbar-app"><span class="material-symbols-outlined">dashboard</span>' . htmlspecialchars($title) . '</span>';
+    echo '<div class="topbar-right">';
+    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
     if ($user) {
-        $destination = user_home_route($user);
-        $isAccountActive = ($path === $destination || str_starts_with($path, $destination . '/'));
-        $accountClass = $isAccountActive ? 'active' : '';
-        $accountAria = $isAccountActive ? ' aria-current="page"' : '';
-        echo '<a class="' . $accountClass . '"' . $accountAria . ' href="' . htmlspecialchars(app_url($destination)) . '">' . htmlspecialchars((string) ($user['email'] ?? 'Account')) . '</a>';
-    } else {
-        echo '<a href="' . htmlspecialchars(app_url('auth/login')) . '">Login</a>';
+        $displayName = (string) ($user['email'] ?? 'Account');
+        $initials = strtoupper(substr($displayName, 0, 2));
+        echo '<span class="topbar-user"><div class="topbar-avatar">' . htmlspecialchars($initials) . '</div></span>';
     }
-    echo '</nav></header><main>';
+    echo '</div></div>';
+
+    echo '<div id="sidebar-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49;top:2.625rem;"></div>';
+    echo '<aside class="sidebar">';
+    echo '<div class="sidebar-header"><h2>';
+    if ($logo !== '') {
+        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" style="height:26px;max-width:100%;object-fit:contain;">';
+    } else {
+        echo '<span class="material-symbols-outlined app-logo">dashboard</span>' . htmlspecialchars($appName);
+    }
+    echo '</h2></div><nav>';
+
+    foreach (nav_items() as $item) {
+        if (isset($item['section'])) {
+            echo '<div class="sidebar-section">' . htmlspecialchars((string) $item['section']) . '</div>';
+            continue;
+        }
+        $href = (string) ($item['href'] ?? '#');
+        $active = is_active_nav($href) ? ' active' : '';
+        echo '<a href="' . htmlspecialchars($href) . '" class="nav-item' . $active . '"><span class="material-symbols-outlined">' . htmlspecialchars((string) ($item['icon'] ?? 'circle')) . '</span>' . htmlspecialchars((string) ($item['label'] ?? '')) . '</a>';
+    }
+    echo '</nav>';
+
+    if ($user) {
+        $displayName = (string) ($user['email'] ?? 'Account');
+        $initials = strtoupper(substr($displayName, 0, 2));
+        echo '<div class="sidebar-footer"><div class="user-info"><div class="user-avatar">' . htmlspecialchars($initials) . '</div><div class="user-details"><div class="user-name truncate">' . htmlspecialchars($displayName) . '</div><div class="user-role">' . htmlspecialchars(ucfirst((string) ($user['role'] ?? 'user'))) . '</div></div></div></div>';
+    }
+
+    echo '</aside><main class="content">';
+    echo '<div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div>';
+    echo '<div class="page-body">';
     $content();
-    echo '</main><script>window.addEventListener("load",()=>{const p=document.getElementById("preloader");if(p){p.style.opacity="0";setTimeout(()=>p.remove(),220);}});</script></body></html>';
+    echo '</div></main></div><script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script></body></html>';
 }
