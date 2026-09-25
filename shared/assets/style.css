@@ -1,0 +1,10 @@
+body { font-family: Inter, system-ui, sans-serif; }
+.app-wordmark { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 1.125rem; }
+.app-logo { max-height: 38px; width: auto; }
+.preloader-backdrop { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: grid; place-items: center; z-index: 2000; transition: opacity .25s ease; }
+.preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
+.show-context { border-left: 4px solid var(--tblr-primary); }
+.order-action-add { background: #d1f5e0; }
+.order-action-return { background: #ffd9d9; }
+.order-action-exchange { background: #fff4cc; }
+.order-action-notes { background: #d7e8ff; }
