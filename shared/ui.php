@@ -32,7 +32,7 @@ function render_page(string $title, callable $content): void
     $user = $_SESSION['user'] ?? null;
     $path = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
     $path = $path === '' ? 'auth/login' : $path;
-    $logo = trim((string) ($settings['branding_logo'] ?? ''));
+    $logo = safe_logo_src(trim((string) ($settings['branding_logo'] ?? '')));
 
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<title>' . htmlspecialchars($title) . ' · Backline</title>';
@@ -59,6 +59,22 @@ function render_page(string $title, callable $content): void
         echo '<img src="' . htmlspecialchars($logo) . '" alt="Branding logo">';
     } else {
         echo htmlspecialchars((string) ($settings['app_name'] ?? 'Backline'));
+    }
+
+    function safe_logo_src(string $logo): string
+    {
+        if ($logo === '') {
+            return '';
+        }
+        if (str_starts_with($logo, '/')) {
+            return $logo;
+        }
+        $scheme = parse_url($logo, PHP_URL_SCHEME);
+        if (in_array(strtolower((string) $scheme), ['http', 'https'], true)) {
+            return $logo;
+        }
+
+        return '';
     }
     echo '</div><nav>';
     foreach (nav_items() as $label => $href) {

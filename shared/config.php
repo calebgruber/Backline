@@ -5,7 +5,7 @@ declare(strict_types=1);
 function storage_path(string $path = ''): string
 {
     $configured = trim((string) getenv('BACKLINE_STORAGE_PATH'));
-    $base = $configured !== '' ? $configured : dirname(dirname(__DIR__)) . '/backline-storage';
+    $base = $configured !== '' ? $configured : dirname(__DIR__) . '/storage';
     return $path === '' ? $base : $base . '/' . ltrim($path, '/');
 }
 

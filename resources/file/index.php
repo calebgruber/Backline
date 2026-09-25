@@ -27,7 +27,7 @@ if (!in_array($folder, $roots, true) || $name === '' || str_contains($name, '/')
 $base = realpath(dirname(__DIR__, 2) . '/uploads/resources/' . $folder);
 $filePath = dirname(__DIR__, 2) . '/uploads/resources/' . $folder . ($relativePath !== '' ? '/' . $relativePath : '') . '/' . $name;
 $file = realpath($filePath);
-if ($base === false || $file === false || !str_starts_with($file, $base . DIRECTORY_SEPARATOR) || !is_file($file)) {
+if ($base === false || $file === false || !is_file($file) || !(dirname($file) === $base || str_starts_with($file, $base . DIRECTORY_SEPARATOR))) {
     http_response_code(404);
     echo 'Not found';
     exit;
