@@ -231,7 +231,8 @@
         return;
       }
       if (!/^https?:$/.test(parsed.protocol) || parsed.origin !== window.location.origin) return;
-      if ((link.target && link.target.toLowerCase() !== '_self') || link.hasAttribute('download')) return;
+      var targetAttr = (link.getAttribute('target') || '').trim().toLowerCase();
+      if ((targetAttr !== '' && targetAttr !== '_self') || link.hasAttribute('download')) return;
       if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
       var currentNoHash = window.location.origin + window.location.pathname + window.location.search;
       var targetNoHash = parsed.origin + parsed.pathname + parsed.search;

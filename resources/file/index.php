@@ -40,11 +40,15 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
 $detectedMime = mime_content_type($file) ?: 'application/octet-stream';
 $mime = strtolower($detectedMime);
 $extension = strtolower((string) pathinfo($file, PATHINFO_EXTENSION));
-$riskyMimeTypes = ['image/svg+xml', 'text/html', 'application/xhtml+xml'];
-$riskyExtensions = ['svg', 'html', 'htm', 'xhtml'];
-$isRisky = in_array($mime, $riskyMimeTypes, true) || in_array($extension, $riskyExtensions, true);
-$inlineMimeAllowlist = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-$safeInline = !$isRisky && in_array($mime, $inlineMimeAllowlist, true);
+$inlineAllowlist = [
+    'png' => 'image/png',
+    'jpg' => 'image/jpeg',
+    'jpeg' => 'image/jpeg',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+];
+$expectedMime = $inlineAllowlist[$extension] ?? null;
+$safeInline = $expectedMime !== null && $mime === $expectedMime;
 $contentType = $safeInline ? $detectedMime : 'application/octet-stream';
 $disposition = $safeInline ? 'inline' : 'attachment';
 $downloadName = $name;
