@@ -40,6 +40,9 @@ if (!function_exists('render_shop_app_page')) {
                 break;
             }
         }
+        if ($selectedShow === null) {
+            $selectedShowId = 0;
+        }
 
         $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'];
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
