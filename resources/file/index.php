@@ -55,7 +55,11 @@ while (ob_get_level() > 0) {
 }
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
+if ($safeInline) {
+    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob:; sandbox");
+} else {
+    header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'; sandbox");
+}
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');

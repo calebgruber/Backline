@@ -8,7 +8,11 @@
 
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-bs-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (e) {
+      // ignore storage write failures (private mode/policy)
+    }
     const btn = document.getElementById('theme-toggle');
     if (btn) {
       btn.textContent = theme === 'dark' ? '☀️' : '🌙';
@@ -162,6 +166,20 @@
           });
         });
         clone.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (el instanceof HTMLInputElement) {
+            if (el.type === 'checkbox' || el.type === 'radio') {
+              el.checked = false;
+            } else {
+              el.value = '';
+            }
+            return;
+          }
+          if (el instanceof HTMLSelectElement) {
+            if (el.options.length > 0) {
+              el.selectedIndex = 0;
+            }
+            return;
+          }
           el.value = '';
         });
         container.appendChild(clone);
