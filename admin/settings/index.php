@@ -53,11 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $schemaCheck = $validationPdo->prepare('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?');
             $schemaCheck->execute([(string) $candidateSettings['db']['name']]);
-            if ($schemaCheck->fetchColumn()) {
-                $dbNameSql = '`' . str_replace('`', '``', (string) $candidateSettings['db']['name']) . '`';
-                $validationPdo->exec('USE ' . $dbNameSql);
-                $validationPdo->query('SELECT 1');
+            if (!$schemaCheck->fetchColumn()) {
+                throw new RuntimeException('Target database does not exist.');
             }
+            $dbNameSql = '`' . str_replace('`', '``', (string) $candidateSettings['db']['name']) . '`';
+            $validationPdo->exec('USE ' . $dbNameSql);
+            $validationPdo->query('SELECT 1');
 
             if (save_settings($candidateSettings)) {
                 $settings = $candidateSettings;

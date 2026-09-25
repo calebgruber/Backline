@@ -30,7 +30,6 @@ if (empty($_SESSION['setup_csrf_token'])) {
 $csrfToken = (string) $_SESSION['setup_csrf_token'];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-    $settingsBackup = is_file(settings_file()) ? file_get_contents(settings_file()) : null;
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         $errors[] = 'Invalid request token.';
@@ -159,11 +158,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     throw new RuntimeException('Could not save setup settings file.');
                 }
                 if (!mark_setup_complete()) {
-                    if (is_string($settingsBackup)) {
-                        file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
-                    } else {
-                        @unlink(settings_file());
-                    }
                     $pdo->beginTransaction();
                     try {
                         $cleanupAdmin($pdo, $adminId);
@@ -187,11 +181,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $pdo->rollBack();
             }
             @unlink(setup_state_file());
-            if (is_string($settingsBackup)) {
-                file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
-            } else {
-                @unlink(settings_file());
-            }
             error_log('Setup failed: ' . $error->getMessage());
             $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
         } finally {
