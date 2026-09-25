@@ -63,7 +63,7 @@ function render_page(string $title, callable $content): void
     echo '<style>
     :root{--bg:#0b1020;--card:#121a32;--line:#2d3a66;--text:#eef2ff;--muted:#9fb0e8;--accent:#5aa8ff}
     *{box-sizing:border-box}body{margin:0;font:500 14px/1.45 "Montserrat","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#070b18,#0b1020);color:var(--text)}
-    h1,h2,h3,header,.brand{font-family:"JetBrains Mono",ui-monospace,monospace}
+    h1,h2,h3,.brand{font-family:"JetBrains Mono",ui-monospace,monospace}
     .preloader{position:fixed;inset:0;display:grid;place-items:center;background:#050914;z-index:9999;transition:.2s opacity}
     .spinner{width:52px;height:52px;border:4px solid #23305b;border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
