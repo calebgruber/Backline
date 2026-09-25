@@ -112,6 +112,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$lockAcquired) {
                 throw new RuntimeException('Could not acquire setup lock.');
             }
+            $cleanupAdmin = static function (PDO $pdoConnection, int $userId): void {
+                $cleanupConcentrations = $pdoConnection->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
+                $cleanupConcentrations->execute([$userId]);
+                $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE id = ?');
+                $cleanup->execute([$userId]);
+            };
 
             try {
                 foreach (apply_pending_migrations_with_pdo($pdo, '') as $result) {
@@ -141,10 +147,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $pdo->commit();
 
                 if (!save_settings($candidateSettings)) {
-                    $cleanupConcentrations = $pdo->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
-                    $cleanupConcentrations->execute([$adminId]);
-                    $cleanup = $pdo->prepare('DELETE FROM users WHERE id = ?');
-                    $cleanup->execute([$adminId]);
+                    $cleanupAdmin($pdo, $adminId);
                     throw new RuntimeException('Could not save setup settings file.');
                 }
                 if (!mark_setup_complete()) {
@@ -153,10 +156,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     } else {
                         @unlink(settings_file());
                     }
-                    $cleanupConcentrations = $pdo->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
-                    $cleanupConcentrations->execute([$adminId]);
-                    $cleanup = $pdo->prepare('DELETE FROM users WHERE id = ?');
-                    $cleanup->execute([$adminId]);
+                    $cleanupAdmin($pdo, $adminId);
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
             } finally {

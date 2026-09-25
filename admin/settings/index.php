@@ -49,10 +49,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
-            $dbNameSql = '`' . str_replace('`', '``', (string) $candidateSettings['db']['name']) . '`';
-            $validationPdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
-            $validationPdo->exec('USE ' . $dbNameSql);
-            $validationPdo->query('SELECT 1');
+            $schemaCheck = $validationPdo->prepare('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?');
+            $schemaCheck->execute([(string) $candidateSettings['db']['name']]);
+            if ($schemaCheck->fetchColumn()) {
+                $dbNameSql = '`' . str_replace('`', '``', (string) $candidateSettings['db']['name']) . '`';
+                $validationPdo->exec('USE ' . $dbNameSql);
+                $validationPdo->query('SELECT 1');
+            }
 
             if (save_settings($candidateSettings)) {
                 $settings = $candidateSettings;

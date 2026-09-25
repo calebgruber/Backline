@@ -93,7 +93,7 @@ function render_page(string $title, callable $content): void
     echo '<div id="preloader" class="preloader" aria-hidden="true"><div class="spinner" aria-hidden="true"></div></div>';
     echo '<header><div class="brand">';
     if ($logo !== '') {
-        echo '<img src="' . htmlspecialchars($logo) . '" alt="Branding logo">';
+        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars((string) ($settings['app_name'] ?? 'Backline')) . '">';
     } else {
         echo htmlspecialchars((string) ($settings['app_name'] ?? 'Backline'));
     }
