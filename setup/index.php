@@ -81,8 +81,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     }
                 }
 
-                $upsertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), password_hash = VALUES(password_hash)');
-                $upsertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
+                $existingUserCheck = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+                $existingUserCheck->execute([$adminEmail]);
+                if ($existingUserCheck->fetchColumn()) {
+                    throw new RuntimeException('Admin email already exists. Choose a new email.');
+                }
+
+                $insertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?)');
+                $insertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
 
                 $adminLookup = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
                 $adminLookup->execute([$adminEmail]);
@@ -95,11 +101,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
 
+                $existingSettingsContent = is_file(settings_file()) ? file_get_contents(settings_file()) : null;
                 if (!save_settings($candidateSettings)) {
                     throw new RuntimeException('Could not save setup settings file.');
                 }
 
                 if (!mark_setup_complete()) {
+                    if (is_string($existingSettingsContent)) {
+                        file_put_contents(settings_file(), $existingSettingsContent, LOCK_EX);
+                    } else {
+                        @unlink(settings_file());
+                    }
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
             } finally {
