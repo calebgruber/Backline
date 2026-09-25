@@ -72,8 +72,8 @@ function render_page(string $title, callable $content): void
     .brand{font-size:18px;font-weight:600}.brand img{height:34px;display:block}
     main{max-width:1100px;margin:22px auto;padding:0 18px 36px}
     .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-    input,select,textarea,button{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#0a1228;color:var(--text)}
-    button{cursor:pointer;background:#173063}
+    input:not([type="checkbox"]):not([type="radio"]),select,textarea{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#0a1228;color:var(--text)}
+    button{cursor:pointer;background:#173063;padding:9px 10px;border-radius:8px;border:1px solid var(--line);color:var(--text)}
     .btn{display:inline-block;width:auto;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:#173063;color:var(--text);text-decoration:none}
     .btn.secondary{background:#0f1f44}.btn.ghost{background:transparent}
     .grid{display:grid;gap:12px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}

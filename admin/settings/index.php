@@ -28,12 +28,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $candidateSettings['branding_logo_dark'] = trim((string) ($_POST['branding_logo_dark'] ?? ''));
         $candidateSettings['branding_footer_made_in'] = trim((string) ($_POST['branding_footer_made_in'] ?? ''));
         $dbPassInput = (string) ($_POST['db_pass'] ?? '');
+        $keepDbPassword = isset($_POST['keep_db_pass']) && $_POST['keep_db_pass'] === '1';
         $candidateSettings['db'] = [
             'host' => trim((string) ($_POST['db_host'] ?? '127.0.0.1')),
             'port' => trim((string) ($_POST['db_port'] ?? '3306')),
             'name' => trim((string) ($_POST['db_name'] ?? 'backline')),
             'user' => trim((string) ($_POST['db_user'] ?? 'root')),
-            'pass' => $dbPassInput !== '' ? $dbPassInput : (string) ($settings['db']['pass'] ?? ''),
+            'pass' => $keepDbPassword ? (string) ($settings['db']['pass'] ?? '') : $dbPassInput,
             'charset' => trim((string) ($_POST['db_charset'] ?? 'utf8mb4')),
         ];
 
@@ -102,6 +103,7 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
     echo '<label>Database<input name="db_name" value="' . htmlspecialchars((string) $settings['db']['name']) . '"></label>';
     echo '<label>User<input name="db_user" value="' . htmlspecialchars((string) $settings['db']['user']) . '"></label>';
     echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
+    echo '<label><input type="checkbox" name="keep_db_pass" value="1" checked> Keep existing password when password field is blank</label>';
     echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars((string) $settings['db']['charset']) . '"></label>';
     echo '</div><button type="submit" name="save_settings" value="1">Save settings</button></form>';
 

@@ -35,7 +35,7 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
 }
 
 $detectedMime = mime_content_type($file) ?: 'application/octet-stream';
-$safeInline = in_array(strtolower($detectedMime), ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'], true);
+$safeInline = in_array(strtolower($detectedMime), ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], true);
 $contentType = $safeInline ? $detectedMime : 'application/octet-stream';
 $disposition = $safeInline ? 'inline' : 'attachment';
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], basename($file));

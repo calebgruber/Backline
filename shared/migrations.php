@@ -48,9 +48,12 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
         applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-    $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 10)")->fetchColumn();
-    if (!$lockAcquired) {
-        return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
+    $needsLock = $lockName !== '';
+    if ($needsLock) {
+        $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 10)")->fetchColumn();
+        if (!$lockAcquired) {
+            return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
+        }
     }
 
     try {
@@ -80,7 +83,9 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
             }
         }
     } finally {
-        $pdo->query("SELECT RELEASE_LOCK(" . $pdo->quote($lockName) . ")");
+        if ($needsLock) {
+            $pdo->query("SELECT RELEASE_LOCK(" . $pdo->quote($lockName) . ")");
+        }
     }
 
     return $results;

@@ -119,7 +119,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             try {
-                foreach (apply_pending_migrations_with_pdo($pdo, 'backline_setup_migrations') as $result) {
+                foreach (apply_pending_migrations_with_pdo($pdo, '') as $result) {
                     if (($result['status'] ?? '') === 'failed') {
                         throw new RuntimeException((string) ($result['migration'] ?? 'migration') . ': ' . (string) ($result['message'] ?? 'Failed'));
                     }
