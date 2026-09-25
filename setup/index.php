@@ -93,11 +93,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 throw new RuntimeException('Setup has already been completed.');
             }
 
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $dbHost, $dbPort, $dbName, $dbCharset);
+            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $dbHost, $dbPort, $dbCharset);
             $pdo = new PDO($dsn, $dbUser, $dbPass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
+            $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
+            $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $dbCharset);
+            $pdo->exec('USE ' . $dbNameSql);
 
             $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
             if (!$lockAcquired) {

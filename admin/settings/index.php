@@ -39,11 +39,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         try {
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $candidateSettings['db']['host'], $candidateSettings['db']['port'], $candidateSettings['db']['name'], $candidateSettings['db']['charset']);
+            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $candidateSettings['db']['host'], $candidateSettings['db']['port'], $candidateSettings['db']['charset']);
             $validationPdo = new PDO($dsn, (string) $candidateSettings['db']['user'], (string) $candidateSettings['db']['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
+            $dbNameSql = '`' . str_replace('`', '``', (string) $candidateSettings['db']['name']) . '`';
+            $validationPdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $candidateSettings['db']['charset']);
+            $validationPdo->exec('USE ' . $dbNameSql);
             $validationPdo->query('SELECT 1');
 
             if (save_settings($candidateSettings)) {
