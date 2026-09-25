@@ -32,7 +32,7 @@ if ($root === false || $resolvedBase === false || (!str_starts_with($resolvedBas
 $items = [];
 if ($resolvedBase !== false && is_dir($resolvedBase)) {
     foreach (scandir($resolvedBase) ?: [] as $item) {
-        if ($item === '.' || $item === '..') {
+        if ($item === '.' || $item === '..' || str_starts_with($item, '.')) {
             continue;
         }
         $fullPath = $resolvedBase . '/' . $item;

@@ -40,7 +40,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $stmt->execute([$email]);
             $userRow = $stmt->fetch();
 
-            $valid = $userRow && !empty($userRow['password_hash']) && password_verify($password, (string) $userRow['password_hash']);
+            $dummyHash = '$2y$10$7f88sJHCa9BnB3V0mzx4YO9HByB3H0QdVfW0IpW8I8wlQwLO9vf7W';
+            $hashToVerify = $userRow && !empty($userRow['password_hash']) ? (string) $userRow['password_hash'] : $dummyHash;
+            $passwordOk = password_verify($password, $hashToVerify);
+            $valid = $userRow && $passwordOk;
             if (!$valid) {
                 $errors[] = 'Invalid email or password.';
             } else {

@@ -107,7 +107,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
             $pdo->exec('USE ' . $dbNameSql);
 
-            $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
+            $lockStmt = $pdo->query("SELECT GET_LOCK('backline_setup', 10)");
+            $lockAcquired = $lockStmt ? (bool) $lockStmt->fetchColumn() : false;
             if (!$lockAcquired) {
                 throw new RuntimeException('Could not acquire setup lock.');
             }
@@ -137,8 +138,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantStmt = $pdo->prepare('INSERT IGNORE INTO user_concentrations (user_id, concentration) VALUES (?, ?)');
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
+                $pdo->commit();
 
                 if (!save_settings($candidateSettings)) {
+                    $cleanupConcentrations = $pdo->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
+                    $cleanupConcentrations->execute([$adminId]);
+                    $cleanup = $pdo->prepare('DELETE FROM users WHERE id = ?');
+                    $cleanup->execute([$adminId]);
                     throw new RuntimeException('Could not save setup settings file.');
                 }
                 if (!mark_setup_complete()) {
@@ -147,10 +153,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     } else {
                         @unlink(settings_file());
                     }
+                    $cleanupConcentrations = $pdo->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
+                    $cleanupConcentrations->execute([$adminId]);
+                    $cleanup = $pdo->prepare('DELETE FROM users WHERE id = ?');
+                    $cleanup->execute([$adminId]);
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
-
-                $pdo->commit();
             } finally {
                 $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
             }

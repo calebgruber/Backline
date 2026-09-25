@@ -50,7 +50,11 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
 
     $needsLock = $lockName !== '';
     if ($needsLock) {
-        $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 10)")->fetchColumn();
+        $lockQuery = $pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 10)");
+        if ($lockQuery === false) {
+            return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not query migration lock']];
+        }
+        $lockAcquired = (bool) $lockQuery->fetchColumn();
         if (!$lockAcquired) {
             return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
         }
