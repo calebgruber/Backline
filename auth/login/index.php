@@ -48,6 +48,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantsStmt->execute([(int) $userRow['id']]);
                 $dbConcentrations = $grantsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
+                session_regenerate_id(true);
                 $_SESSION['user'] = [
                     'email' => (string) $userRow['email'],
                     'role' => (string) $userRow['role'],

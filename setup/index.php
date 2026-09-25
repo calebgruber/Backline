@@ -12,7 +12,6 @@ if (is_setup_complete()) {
 }
 
 $errors = [];
-$messages = [];
 $settings = app_settings();
 
 if (empty($_SESSION['setup_csrf_token'])) {
@@ -60,60 +59,89 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     ];
 
     if ($errors === []) {
-        if (!save_settings($candidateSettings)) {
-            $errors[] = 'Could not save setup settings file.';
-        } else {
-            $settings = $candidateSettings;
-            reset_db_connection();
+        try {
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $dbHost, $dbPort, $dbName, $dbCharset);
+            $pdo = new PDO($dsn, $dbUser, $dbPass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+
+            $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
+            if (!$lockAcquired) {
+                throw new RuntimeException('Could not acquire setup lock.');
+            }
 
             try {
-                db()->query('SELECT 1');
-                foreach (apply_pending_migrations() as $result) {
-                    if (($result['status'] ?? '') === 'failed') {
-                        throw new RuntimeException((string) ($result['migration'] ?? 'migration') . ': ' . (string) ($result['message'] ?? 'Failed'));
+                $pdo->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    migration VARCHAR(255) NOT NULL UNIQUE,
+                    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+                $applied = $pdo->query('SELECT migration FROM schema_migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                $appliedMap = array_flip($applied);
+
+                foreach (migration_files() as $file) {
+                    $migrationName = basename($file);
+                    if (isset($appliedMap[$migrationName])) {
+                        continue;
                     }
+
+                    $sql = trim((string) file_get_contents($file));
+                    if ($sql === '') {
+                        continue;
+                    }
+
+                    $pdo->exec($sql);
+                    $insertMigration = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
+                    $insertMigration->execute([$migrationName]);
                 }
 
-                $pdo = db();
-                $pdo->beginTransaction();
-                $stmt = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?)');
-                $stmt->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
-                $adminId = (int) $pdo->lastInsertId();
+                $upsertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), password_hash = VALUES(password_hash)');
+                $upsertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
 
-                $grantStmt = $pdo->prepare('INSERT INTO user_concentrations (user_id, concentration) VALUES (?, ?)');
+                $adminLookup = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+                $adminLookup->execute([$adminEmail]);
+                $adminId = (int) $adminLookup->fetchColumn();
+                if ($adminId <= 0) {
+                    throw new RuntimeException('Could not resolve admin user id.');
+                }
+
+                $grantStmt = $pdo->prepare('INSERT IGNORE INTO user_concentrations (user_id, concentration) VALUES (?, ?)');
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
-                $pdo->commit();
+
+                if (!save_settings($candidateSettings)) {
+                    throw new RuntimeException('Could not save setup settings file.');
+                }
 
                 if (!mark_setup_complete()) {
-                    throw new RuntimeException('Setup completed but could not write setup lock file.');
+                    throw new RuntimeException('Could not write setup completion marker.');
                 }
-
-                $_SESSION['user'] = [
-                    'email' => $adminEmail,
-                    'role' => 'admin',
-                    'concentrations' => ['lx', 'snd'],
-                ];
-
-                header('Location: ' . app_url('admin/dash'));
-                exit;
-            } catch (Throwable $error) {
-                if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                error_log('Setup failed: ' . $error->getMessage());
-                $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
+            } finally {
+                $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
             }
+
+            reset_db_connection();
+            session_regenerate_id(true);
+            $_SESSION['user'] = [
+                'email' => $adminEmail,
+                'role' => 'admin',
+                'concentrations' => ['lx', 'snd'],
+            ];
+
+            header('Location: ' . app_url('admin/dash'));
+            exit;
+        } catch (Throwable $error) {
+            error_log('Setup failed: ' . $error->getMessage());
+            $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
         }
     }
 }
 
-render_page('Setup', function () use ($csrfToken, $errors, $messages, $settings): void {
+render_page('Setup', function () use ($csrfToken, $errors, $settings): void {
     echo '<section class="panel"><h1>One-time Setup</h1><p class="muted">Configure DB + first admin account. This page is disabled after successful setup.</p>';
 
-    foreach ($messages as $message) {
-        echo '<p>' . htmlspecialchars($message) . '</p>';
-    }
     foreach ($errors as $error) {
         echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
     }
