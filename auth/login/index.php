@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!function_exists('app_is_installed')) {
+    require_once __DIR__ . '/../../shared/bootstrap.php';
+}
+
 if (!app_is_installed()) {
     redirect('/setup');
 }
