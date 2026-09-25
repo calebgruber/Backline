@@ -13,6 +13,8 @@ Starter pure-PHP/MySQL baseline for Backline with route folders:
 Includes:
 
 - modern shared UI shell with preloader
+- Tabler CDN installation in shared shell (`shared/ui.php`)
+- high-priority user override stylesheet at `shared/assets/custom.css` (loaded last)
 - local settings storage (`BACKLINE_STORAGE_PATH/system_settings.php`, defaults to `/storage` in this project; point `BACKLINE_STORAGE_PATH` to a directory outside your web root)
 - migration runner in Admin Settings
 - initial schema migration at `/migrations/202609250001_initial_schema.sql`

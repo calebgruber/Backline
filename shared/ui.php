@@ -176,8 +176,9 @@ function render_page(string $title, callable $content): void
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">';
-    echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">';
+    echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
+    echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/custom.css')) . '">';
     echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-bs-theme",t);})();</script>';
     echo '</head><body class="backline-body">';
 
@@ -222,7 +223,7 @@ function render_page(string $title, callable $content): void
     $content();
     echo '</div></main>';
 
-    echo '<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/js/tabler.min.js"></script>';
+    echo '<script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>';
     echo '<script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script>';
     echo '</body></html>';
 }
