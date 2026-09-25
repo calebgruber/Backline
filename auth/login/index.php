@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/shared/ui.php';
 require_once dirname(__DIR__, 2) . '/shared/db.php';
-
-const LOGIN_DUMMY_PASSWORD_HASH = '$2y$10$7f88sJHCa9BnB3V0mzx4YO9HByB3H0QdVfW0IpW8I8wlQwLO9vf7W';
+require_once dirname(__DIR__, 2) . '/shared/login_security.php';
 
 if (!is_setup_complete()) {
     header('Location: ' . app_url('setup'));
@@ -40,13 +39,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $errors[] = 'Database connection is unavailable.';
     } else {
         try {
-            $stmt = db()->prepare('SELECT id, email, role, password_hash FROM users WHERE email = ? LIMIT 1');
-            $stmt->execute([$email]);
+            $stmt = db()->prepare('SELECT id, email, role, password_hash FROM users WHERE email = ? AND password_hash IS NOT NULL AND password_hash <> ? LIMIT 1');
+            $stmt->execute([$email, '']);
             $userRow = $stmt->fetch();
 
-            $hashToVerify = $userRow && !empty($userRow['password_hash']) ? (string) $userRow['password_hash'] : LOGIN_DUMMY_PASSWORD_HASH;
-            $passwordOk = password_verify($password, $hashToVerify);
-            $valid = $userRow && $passwordOk;
+            $valid = verify_login_credentials($userRow ?: null, $password);
             if (!$valid) {
                 $errors[] = 'Invalid email or password.';
             } else {
@@ -59,7 +56,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     'id' => (int) $userRow['id'],
                     'email' => (string) $userRow['email'],
                     'role' => (string) $userRow['role'],
-                    'concentrations' => array_values(array_intersect(['lx', 'snd'], $dbConcentrations)),
+                    'concentrations' => normalized_session_concentrations($dbConcentrations),
                 ];
 
                 header('Location: ' . app_url(user_home_route($_SESSION['user'])));
@@ -73,19 +70,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 render_page('Login', function () use ($csrfToken, $errors, $submittedEmail): void {
-    echo '<section class="panel"><h1>Login</h1><p class="muted">Sign in with your account.</p>';
+    ui_card_open('lock', 'Login');
+    echo '<p class="text-muted">Sign in with your account.</p>';
     if ($errors !== []) {
-        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><strong>Sign-in error:</strong><ul>';
+        echo '<div role="alert" aria-live="assertive">';
         foreach ($errors as $error) {
-            echo '<li>' . htmlspecialchars($error) . '</li>';
+            ui_alert('danger', $error);
         }
-        echo '</ul></div></div>';
+        echo '</div>';
     }
 
-    echo '<form method="post" class="grid">';
+    echo '<form method="post">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
     echo '<label>Email<input type="email" name="email" value="' . htmlspecialchars($submittedEmail) . '" required></label>';
     echo '<label>Password<input type="password" name="password" required></label>';
-    echo '<button type="submit">Sign In</button>';
-    echo '</form></section>';
+    echo '<button class="btn btn-primary" type="submit">Sign In</button>';
+    echo '</form>';
+    ui_card_close();
 });

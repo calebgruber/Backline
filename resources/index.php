@@ -17,17 +17,33 @@ if (!in_array($selected, $roots, true)) {
     $selected = $roots[0];
 }
 
-$relativePath = trim((string) ($_GET['path'] ?? ''), '/');
+$rawRelativePath = trim((string) ($_GET['path'] ?? ''), '/');
+$relativePath = $rawRelativePath;
 $segments = $relativePath === '' ? [] : explode('/', $relativePath);
 $segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..' && !str_contains($segment, '\\') && !str_contains($segment, '/')));
 $relativePath = implode('/', $segments);
+$invalidInputPath = $rawRelativePath !== $relativePath;
 
 $root = realpath(dirname(__DIR__) . '/uploads/resources/' . $selected);
 $base = $root !== false ? ($root . ($relativePath !== '' ? '/' . $relativePath : '')) : '';
 $resolvedBase = $base !== '' ? realpath($base) : false;
-if ($root === false || $resolvedBase === false || (!str_starts_with($resolvedBase, $root . DIRECTORY_SEPARATOR) && $resolvedBase !== $root)) {
-    $resolvedBase = $root;
-    $relativePath = '';
+$invalidPath = $invalidInputPath;
+$missingPath = false;
+if ($root === false) {
+    $missingPath = true;
+    http_response_code(404);
+    $resolvedBase = false;
+} elseif ($relativePath !== '' && $resolvedBase === false) {
+    $missingPath = true;
+    http_response_code(404);
+    $resolvedBase = false;
+} elseif ($resolvedBase !== false && !str_starts_with($resolvedBase, $root . DIRECTORY_SEPARATOR) && $resolvedBase !== $root) {
+    $invalidPath = true;
+    http_response_code(400);
+    $resolvedBase = false;
+} elseif ($invalidPath) {
+    http_response_code(400);
+    $resolvedBase = false;
 }
 $items = [];
 if ($resolvedBase !== false && is_dir($resolvedBase)) {
@@ -46,10 +62,22 @@ if ($resolvedBase !== false && is_dir($resolvedBase)) {
                 : app_url('resources/file') . '?' . http_build_query(['folder' => $selected, 'path' => $relativePath, 'name' => $item]),
         ];
     }
+    usort($items, static function (array $a, array $b): int {
+        if (($a['is_dir'] ?? false) !== ($b['is_dir'] ?? false)) {
+            return ($a['is_dir'] ?? false) ? -1 : 1;
+        }
+        return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+    });
 }
 
-render_page('Resources', function () use ($roots, $selected, $items, $relativePath): void {
-    echo '<section class="panel"><h1>Resources</h1><div class="grid two">';
+render_page('Resources', function () use ($roots, $selected, $items, $relativePath, $invalidPath, $missingPath): void {
+    ui_card_open('folder_open', 'Resources');
+    if ($invalidPath) {
+        ui_alert('danger', 'Invalid resource path.');
+    } elseif ($missingPath) {
+        ui_alert('warning', 'Requested resource path was not found.');
+    }
+    echo '<div class="form-row">';
     echo '<div><h3>Folders</h3><ul>';
     foreach ($roots as $root) {
         $href = app_url('resources') . '?' . http_build_query(['folder' => $root]);
@@ -65,12 +93,13 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
     foreach ($items as $item) {
         echo '<li>';
         if ($item['is_dir']) {
-            echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . ' <span class="muted">(folder)</span></a>';
+            echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . ' <span class="text-muted">(folder)</span></a>';
         } else {
             $newTabLabel = $item['name'] . ' (opens in new tab)';
-            echo '<a target="_blank" rel="noopener" aria-label="' . htmlspecialchars($newTabLabel) . '" href="' . htmlspecialchars($item['url']) . '">' . htmlspecialchars($item['name']) . ' <span class="muted">(opens in new tab)</span></a>';
+            echo '<a target="_blank" rel="noopener" aria-label="' . htmlspecialchars($newTabLabel) . '" href="' . htmlspecialchars($item['url']) . '">' . htmlspecialchars($item['name']) . ' <span class="text-muted">(opens in new tab)</span></a>';
         }
         echo '</li>';
     }
-    echo '</ul></div></div></section>';
+    echo '</ul></div></div>';
+    ui_card_close();
 });

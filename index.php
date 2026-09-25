@@ -13,7 +13,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/in
 if (!defined('APP_BASE_PATH')) {
     define('APP_BASE_PATH', $basePath);
 }
-if ($basePath !== '' && $basePath !== '/' && str_starts_with($requestPath, $basePath)) {
+if ($basePath !== '' && $basePath !== '/' && ($requestPath === $basePath || str_starts_with($requestPath, rtrim($basePath, '/') . '/'))) {
     $requestPath = substr($requestPath, strlen($basePath)) ?: '/';
 }
 

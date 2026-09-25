@@ -15,7 +15,7 @@ $folder = (string) ($_GET['folder'] ?? '');
 $name = (string) ($_GET['name'] ?? '');
 $relativePath = trim((string) ($_GET['path'] ?? ''), '/');
 $segments = $relativePath === '' ? [] : explode('/', $relativePath);
-$segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..'));
+$segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..' && !str_contains($segment, '\\') && !str_contains($segment, '/')));
 $relativePath = implode('/', $segments);
 
 if (!in_array($folder, $roots, true) || $name === '' || str_contains($name, '/') || str_contains($name, '\\') || $name === '.' || $name === '..' || str_contains($name, '..')) {
@@ -44,7 +44,7 @@ $inlineMimeAllowlist = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 $safeInline = !$isRisky && in_array($mime, $inlineMimeAllowlist, true);
 $contentType = $safeInline ? $detectedMime : 'application/octet-stream';
 $disposition = $safeInline ? 'inline' : 'attachment';
-$downloadName = $isRisky ? 'resource-download.bin' : basename($file);
+$downloadName = $isRisky ? 'resource-download.bin' : $name;
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $downloadName);
 $encodedFilename = rawurlencode($downloadName);
 header('Content-Type: ' . $contentType);

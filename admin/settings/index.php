@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($safeCharset, $allowedCharsets, true)) {
                 throw new RuntimeException('Unsupported DB charset.');
             }
-            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $candidateSettings['db']['host'], $candidateSettings['db']['port'], $candidateSettings['db']['charset']);
+            $dsn = sprintf('mysql:host=%s;port=%s;charset=%s', $candidateSettings['db']['host'], $candidateSettings['db']['port'], $safeCharset);
             $validationPdo = new PDO($dsn, (string) $candidateSettings['db']['user'], (string) $candidateSettings['db']['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -101,41 +101,43 @@ try {
 }
 
 render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending, $csrfToken, $keepDbPasswordChecked): void {
-    echo '<section class="panel"><h1>System Settings</h1>';
+    ui_card_open('settings', 'System Settings');
     if ($messages !== []) {
-        echo '<div class="alert success" role="status" aria-live="polite"><div class="alert-text"><ul>';
+        echo '<div role="status" aria-live="polite">';
         foreach ($messages as $message) {
-            echo '<li>' . htmlspecialchars($message) . '</li>';
+            ui_alert('success', $message);
         }
-        echo '</ul></div></div>';
+        echo '</div>';
     }
     if ($errors !== []) {
-        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><ul>';
+        echo '<div role="alert" aria-live="assertive">';
         foreach ($errors as $error) {
-            echo '<li>' . htmlspecialchars($error) . '</li>';
+            ui_alert('danger', $error);
         }
-        echo '</ul></div></div>';
+        echo '</div>';
     }
 
-    echo '<form method="post" class="grid">';
+    echo '<form method="post">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
-    echo '<div class="grid two">';
+    echo '<div class="form-row">';
     echo '<label>System name<input name="app_name" value="' . htmlspecialchars((string) $settings['app_name']) . '"></label>';
     echo '<label>Logo URL<input name="branding_logo" value="' . htmlspecialchars((string) $settings['branding_logo']) . '"></label>';
     echo '<label>Dark Logo URL<input name="branding_logo_dark" value="' . htmlspecialchars((string) $settings['branding_logo_dark']) . '"></label>';
     echo '<label>Footer “Made in” text<input name="branding_footer_made_in" value="' . htmlspecialchars((string) $settings['branding_footer_made_in']) . '"></label>';
-    echo '</div><h3>MySQL</h3><div class="grid two">';
+    echo '</div><h3>MySQL</h3><div class="form-row">';
     echo '<label>Host<input name="db_host" value="' . htmlspecialchars((string) $settings['db']['host']) . '"></label>';
     echo '<label>Port<input name="db_port" value="' . htmlspecialchars((string) $settings['db']['port']) . '"></label>';
     echo '<label>Database<input name="db_name" value="' . htmlspecialchars((string) $settings['db']['name']) . '"></label>';
     echo '<label>User<input name="db_user" value="' . htmlspecialchars((string) $settings['db']['user']) . '"></label>';
+    echo '<fieldset><legend>Password update</legend>';
     echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
     echo '<label><input type="checkbox" name="keep_db_pass" value="1"' . ($keepDbPasswordChecked ? ' checked' : '') . '> Keep existing password when password field is blank</label>';
+    echo '</fieldset>';
     echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars((string) $settings['db']['charset']) . '"></label>';
-    echo '</div><button type="submit" name="save_settings" value="1">Save settings</button></form>';
+    echo '</div><button class="btn btn-primary" type="submit" name="save_settings" value="1">Save settings</button></form>';
 
     echo '<h3>Database migrations</h3>';
-    echo '<p class="muted">Applied: ' . count($applied) . ' · Pending: ' . count($pending) . '</p>';
+    echo '<p class="text-muted">Applied: ' . count($applied) . ' · Pending: ' . count($pending) . '</p>';
     echo '<ul>';
     foreach ($applied as $migration) {
         echo '<li>✅ ' . htmlspecialchars((string) $migration) . '</li>';
@@ -143,6 +145,6 @@ render_page('System Settings', function () use ($settings, $messages, $errors, $
     foreach ($pending as $migrationFile) {
         echo '<li>🕒 ' . htmlspecialchars(basename((string) $migrationFile)) . '</li>';
     }
-    echo '</ul><form method="post"><input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '"><button type="submit" name="run_migrations" value="1">Apply pending migrations</button></form>';
-    echo '</section>';
+    echo '</ul><form method="post"><input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '"><button class="btn btn-primary" type="submit" name="run_migrations" value="1">Apply pending migrations</button></form>';
+    ui_card_close();
 });

@@ -46,16 +46,26 @@
     const overlay = document.getElementById('sidebar-overlay');
 
     if (!btn || !sidebar) return;
+    function syncSidebarA11y() {
+      var isMobile = window.matchMedia('(max-width: 768px)').matches;
+      var isOpen = sidebar.classList.contains('open');
+      sidebar.setAttribute('aria-hidden', isMobile && !isOpen ? 'true' : 'false');
+      if (overlay) {
+        overlay.classList.toggle('hidden', !isOpen);
+      }
+    }
+    syncSidebarA11y();
+    window.addEventListener('resize', syncSidebarA11y);
 
     btn.addEventListener('click', function () {
       sidebar.classList.toggle('open');
-      if (overlay) overlay.classList.toggle('hidden');
+      syncSidebarA11y();
     });
 
     if (overlay) {
       overlay.addEventListener('click', function () {
         sidebar.classList.remove('open');
-        overlay.classList.add('hidden');
+        syncSidebarA11y();
       });
     }
   }
@@ -157,6 +167,7 @@
 
     // Intercept same-origin link clicks
     document.addEventListener('click', function (e) {
+      if (typeof e.button === 'number' && e.button !== 0) return;
       var link = e.target.closest('a[href]');
       if (!link) return;
       var href = link.getAttribute('href') || '';
@@ -168,8 +179,10 @@
         return;
       }
       if (!/^https?:$/.test(parsed.protocol) || parsed.origin !== window.location.origin) return;
-      if (link.target || e.ctrlKey || e.metaKey || e.shiftKey ||
-          link.hasAttribute('download')) return;
+      if ((link.target && link.target.toLowerCase() !== '_self') || e.ctrlKey || e.metaKey || e.shiftKey || link.hasAttribute('download')) return;
+      var currentNoHash = window.location.origin + window.location.pathname + window.location.search;
+      var targetNoHash = parsed.origin + parsed.pathname + parsed.search;
+      if (currentNoHash === targetNoHash) return;
       startLoader();
     });
 

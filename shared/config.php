@@ -89,6 +89,9 @@ function app_url(string $path = ''): string
     $base = defined('APP_BASE_PATH')
         ? (string) APP_BASE_PATH
         : rtrim(trim((string) getenv('BACKLINE_BASE_PATH')), '/');
+    if ($base !== '' && $base !== '/' && !str_starts_with($base, '/')) {
+        $base = '/' . $base;
+    }
     $base = ($base === '' || $base === '/') ? '' : $base;
     if ($base === '') {
         return '/' . ltrim($path, '/');

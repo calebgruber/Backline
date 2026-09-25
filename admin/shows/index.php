@@ -8,5 +8,7 @@ require_once dirname(__DIR__, 2) . '/shared/ui.php';
 require_role('admin');
 
 render_page('Admin Shows', function (): void {
-    echo '<section class="panel"><h1>Shows</h1><p class="muted">Next build step: admin global show visibility, show deletion, and required contact field validation.</p></section>';
+    ui_card_open('theater_comedy', 'Shows');
+    echo '<p class="text-muted">Next build step: admin global show visibility, show deletion, and required contact field validation.</p>';
+    ui_card_close();
 });

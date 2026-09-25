@@ -59,7 +59,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         'db_port' => $dbPort,
         'db_name' => $dbName,
         'db_user' => $dbUser,
-        'db_pass' => $dbPass,
+        'db_pass' => '',
         'db_charset' => $dbCharset,
         'admin_email' => $adminEmail,
     ];
@@ -70,7 +70,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (strlen($adminPassword) < 10) {
         $errors[] = 'Admin password must be at least 10 characters.';
     }
-    if (!hash_equals($adminPassword, $adminPasswordConfirm)) {
+    if ($adminPassword !== $adminPasswordConfirm) {
         $errors[] = 'Admin passwords do not match.';
     }
 
@@ -87,7 +87,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
     if ($errors === []) {
         $setupLockHandle = null;
-        $dbWasCreatedBySetup = false;
         try {
             if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
                 throw new RuntimeException('Could not prepare setup storage directory.');
@@ -106,11 +105,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
-            $dbExistsStmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?');
-            $dbExistsStmt->execute([$dbName]);
-            $dbAlreadyExisted = (int) $dbExistsStmt->fetchColumn() > 0;
             $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
-            $dbWasCreatedBySetup = !$dbAlreadyExisted;
             $pdo->exec('USE ' . $dbNameSql);
 
             $lockStmt = $pdo->query("SELECT GET_LOCK('backline_setup', 10)");
@@ -118,13 +113,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$lockAcquired) {
                 throw new RuntimeException('Could not acquire setup lock.');
             }
-            $cleanupAdmin = static function (PDO $pdoConnection, int $userId): void {
-                $cleanupConcentrations = $pdoConnection->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
-                $cleanupConcentrations->execute([$userId]);
-                $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE id = ?');
-                $cleanup->execute([$userId]);
-            };
-            $revertSetupChanges = static function (PDO $pdoConnection, int $userId, ?string $settingsBackupContent, callable $cleanupAdminFn): void {
+            $restoreSettings = static function (?string $settingsBackupContent): void {
                 if (is_string($settingsBackupContent)) {
                     if (file_put_contents(settings_file(), $settingsBackupContent, LOCK_EX) === false) {
                         error_log('Setup rollback warning: failed restoring settings backup file.');
@@ -135,7 +124,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     }
                 }
                 @unlink(setup_state_file());
-
+            };
+            $cleanupAdmin = static function (PDO $pdoConnection, int $userId): void {
+                $cleanupConcentrations = $pdoConnection->prepare('DELETE FROM user_concentrations WHERE user_id = ?');
+                $cleanupConcentrations->execute([$userId]);
+                $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE id = ?');
+                $cleanup->execute([$userId]);
+            };
+            $revertSetupChanges = static function (PDO $pdoConnection, int $userId, ?string $settingsBackupContent, callable $cleanupAdminFn, callable $restoreSettingsFn): void {
+                $restoreSettingsFn($settingsBackupContent);
                 try {
                     $pdoConnection->beginTransaction();
                     $cleanupAdminFn($pdoConnection, $userId);
@@ -156,14 +153,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 }
 
                 $pdo->beginTransaction();
-                $existingUserCheck = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-                $existingUserCheck->execute([$adminEmail]);
-                if ($existingUserCheck->fetchColumn()) {
-                    throw new RuntimeException('Admin email already exists. Choose a new email.');
-                }
-
                 $insertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?)');
-                $insertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
+                try {
+                    $insertAdmin->execute([$adminEmail, 'admin', password_hash($adminPassword, PASSWORD_DEFAULT)]);
+                } catch (PDOException $pdoError) {
+                    if (($pdoError->errorInfo[0] ?? '') === '23000') {
+                        throw new RuntimeException('Admin email already exists. Choose a new email.');
+                    }
+                    throw $pdoError;
+                }
 
                 $adminId = (int) $pdo->lastInsertId();
                 if ($adminId <= 0) {
@@ -174,16 +172,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
                 $pdo->commit();
+                $rollbackSetupWithAdmin = static function (string $message) use ($pdo, $adminId, $settingsBackup, $cleanupAdmin, $restoreSettings, $revertSetupChanges): void {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    $revertSetupChanges($pdo, $adminId, $settingsBackup, $cleanupAdmin, $restoreSettings);
+                    throw new RuntimeException($message);
+                };
 
                 if (!save_settings($candidateSettings)) {
-                    $revertSetupChanges($pdo, $adminId, $settingsBackup, $cleanupAdmin);
-                    throw new RuntimeException('Could not save setup settings file.');
+                    $rollbackSetupWithAdmin('Could not save setup settings file.');
                 }
                 $settingsSaved = true;
                 if (!mark_setup_complete()) {
-                    $revertSetupChanges($pdo, $adminId, $settingsBackup, $cleanupAdmin);
                     $settingsSaved = false;
-                    throw new RuntimeException('Could not write setup completion marker.');
+                    $rollbackSetupWithAdmin('Could not write setup completion marker.');
                 }
             } finally {
                 $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
@@ -196,21 +199,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            if (($dbWasCreatedBySetup ?? false) && isset($pdo) && $pdo instanceof PDO) {
-                try {
-                    $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
-                    $pdo->exec('DROP DATABASE IF EXISTS ' . $dbNameSql);
-                } catch (Throwable $dropError) {
-                    error_log('Setup rollback warning: failed dropping created database. ' . $dropError->getMessage());
-                }
-            }
-            @unlink(setup_state_file());
             if ($settingsSaved) {
-                if (is_string($settingsBackup)) {
-                    file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
-                } else {
-                    @unlink(settings_file());
-                }
+                $restoreSettings($settingsBackup);
+            } else {
+                @unlink(setup_state_file());
             }
             error_log('Setup failed: ' . $error->getMessage());
             $errors[] = 'Setup failed. Verify DB settings and check server logs for details.';
@@ -224,37 +216,39 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 render_page('Setup', function () use ($csrfToken, $errors, $form): void {
-    echo '<section class="panel"><h1>One-time Setup</h1><p class="muted">Configure DB + first admin account. This page is disabled after successful setup.</p>';
+    ui_card_open('settings', 'One-time Setup');
+    echo '<p class="text-muted">Configure DB + first admin account. This page is disabled after successful setup.</p>';
 
     if ($errors !== []) {
-        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><strong>Setup error:</strong><ul>';
+        echo '<div role="alert" aria-live="assertive">';
         foreach ($errors as $error) {
-            echo '<li>' . htmlspecialchars($error) . '</li>';
+            ui_alert('danger', $error);
         }
-        echo '</ul></div></div>';
+        echo '</div>';
     }
 
-    echo '<form method="post" class="grid">';
+    echo '<form method="post">';
     echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken) . '">';
 
     echo '<h3>Application</h3>';
     echo '<label>Application Name<input name="app_name" value="' . htmlspecialchars($form['app_name']) . '" required></label>';
 
-    echo '<h3>Database</h3><div class="grid two">';
+    echo '<h3>Database</h3><div class="form-row">';
     echo '<label>Host<input name="db_host" value="' . htmlspecialchars($form['db_host']) . '" required></label>';
     echo '<label>Port<input name="db_port" value="' . htmlspecialchars($form['db_port']) . '" required></label>';
     echo '<label>Database<input name="db_name" value="' . htmlspecialchars($form['db_name']) . '" required></label>';
     echo '<label>User<input name="db_user" value="' . htmlspecialchars($form['db_user']) . '" required></label>';
-    echo '<label>Password<input type="password" name="db_pass" value="' . htmlspecialchars($form['db_pass']) . '" autocomplete="new-password"></label>';
+    echo '<label>Password<input type="password" name="db_pass" value="" autocomplete="new-password"></label>';
     echo '<label>Charset<input name="db_charset" value="' . htmlspecialchars($form['db_charset']) . '" required></label>';
     echo '</div>';
 
-    echo '<h3>Initial Admin Account</h3><div class="grid two">';
+    echo '<h3>Initial Admin Account</h3><div class="form-row">';
     echo '<label>Admin Email<input type="email" name="admin_email" value="' . htmlspecialchars($form['admin_email']) . '" required></label>';
     echo '<label>Admin Password<input type="password" name="admin_password" required></label>';
     echo '<label>Confirm Password<input type="password" name="admin_password_confirm" required></label>';
     echo '</div>';
 
-    echo '<button type="submit">Complete Setup</button>';
-    echo '</form></section>';
+    echo '<button class="btn btn-primary" type="submit">Complete Setup</button>';
+    echo '</form>';
+    ui_card_close();
 });

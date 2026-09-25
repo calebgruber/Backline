@@ -61,7 +61,11 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
     }
 
     try {
-        $applied = $pdo->query('SELECT migration FROM schema_migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $appliedQuery = $pdo->query('SELECT migration FROM schema_migrations ORDER BY migration');
+        if ($appliedQuery === false) {
+            return [['migration' => 'schema_migrations', 'status' => 'failed', 'message' => 'Could not read applied migrations']];
+        }
+        $applied = $appliedQuery->fetchAll(PDO::FETCH_COLUMN) ?: [];
         $appliedMap = array_flip($applied);
         $pendingFiles = array_values(array_filter(
             migration_files(),
@@ -70,23 +74,31 @@ function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backlin
 
         foreach ($pendingFiles as $file) {
             $name = basename($file);
-            $sql = trim((string) file_get_contents($file));
+            $sqlRaw = file_get_contents($file);
+            if ($sqlRaw === false) {
+                $results[] = ['migration' => $name, 'status' => 'failed', 'message' => 'Could not read migration file'];
+                break;
+            }
+            $sql = trim($sqlRaw);
             if ($sql === '') {
                 $results[] = ['migration' => $name, 'status' => 'skipped', 'message' => 'Empty file'];
                 continue;
             }
 
             try {
-                $pdo->beginTransaction();
+                $isLikelyDdl = preg_match('/\\b(CREATE|ALTER|DROP|RENAME|TRUNCATE|LOCK|UNLOCK|ANALYZE|OPTIMIZE|REPAIR|GRANT|REVOKE)\\b/i', $sql) === 1;
+                if (!$isLikelyDdl) {
+                    $pdo->beginTransaction();
+                }
                 $pdo->exec($sql);
                 $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
                 $stmt->execute([$name]);
-                if ($pdo->inTransaction()) {
+                if (!$isLikelyDdl && $pdo->inTransaction()) {
                     $pdo->commit();
                 }
                 $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
             } catch (Throwable $error) {
-                if ($pdo->inTransaction()) {
+                if (isset($isLikelyDdl) && !$isLikelyDdl && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
                 $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];

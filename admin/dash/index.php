@@ -8,7 +8,7 @@ require_once dirname(__DIR__, 2) . '/shared/ui.php';
 require_role('admin');
 
 render_page('Admin Dashboard', function (): void {
-    echo '<section class="panel"><h1>Admin Dashboard</h1>';
+    ui_card_open('dashboard', 'Admin Dashboard');
     echo '<p>Inventory, users, categories, shows, and system settings are admin-managed.</p>';
     echo '<ul>';
     echo '<li><a href="' . htmlspecialchars(app_url('admin/components')) . '">UI components showcase</a></li>';
@@ -19,5 +19,6 @@ render_page('Admin Dashboard', function (): void {
     echo '<li><a href="' . htmlspecialchars(app_url('admin/resources')) . '">Resources manager</a></li>';
     echo '<li><a href="' . htmlspecialchars(app_url('lx')) . '">Lighting app</a></li>';
     echo '<li><a href="' . htmlspecialchars(app_url('snd')) . '">Sound app</a></li>';
-    echo '</ul></section>';
+    echo '</ul>';
+    ui_card_close();
 });

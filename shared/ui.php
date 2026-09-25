@@ -56,7 +56,8 @@ function current_path(): string
 {
     $pathRaw = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
     $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
-    if ($basePath !== '' && $basePath !== '/' && str_starts_with($pathRaw, $basePath)) {
+    $basePrefix = $basePath === '' || $basePath === '/' ? '' : rtrim($basePath, '/') . '/';
+    if ($basePath !== '' && $basePath !== '/' && ($pathRaw === $basePath || str_starts_with($pathRaw, $basePrefix))) {
         $pathRaw = substr($pathRaw, strlen($basePath)) ?: '/';
     }
 
@@ -64,7 +65,7 @@ function current_path(): string
     return $path === '' ? 'auth/login' : $path;
 }
 
-function user_initials(string $value): string
+function user_avatar_text(string $value): string
 {
     $trimmed = trim($value);
     if ($trimmed === '') {
@@ -85,14 +86,92 @@ function is_active_nav(string $target): bool
     }
     $targetPath = parse_url($target, PHP_URL_PATH) ?: $target;
     $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
-    if ($basePath !== '' && $basePath !== '/' && str_starts_with($targetPath, $basePath)) {
+    $basePrefix = $basePath === '' || $basePath === '/' ? '' : rtrim($basePath, '/') . '/';
+    if ($basePath !== '' && $basePath !== '/' && ($targetPath === $basePath || str_starts_with($targetPath, $basePrefix))) {
         $targetPath = substr($targetPath, strlen($basePath)) ?: '/';
     }
     $target = trim($targetPath, '/');
     if ($target === '') {
         return false;
     }
+
     return $path === $target || str_starts_with($path, $target . '/');
+}
+
+function card_accent_color(string $icon): string
+{
+    static $map = [
+        'dashboard' => '#6366f1',
+        'settings' => '#6366f1',
+        'group' => '#10b981',
+        'theater_comedy' => '#8b5cf6',
+        'inventory_2' => '#3b82f6',
+        'folder' => '#f59e0b',
+        'folder_open' => '#f59e0b',
+        'lightbulb' => '#f59e0b',
+        'graphic_eq' => '#ef4444',
+        'lock' => '#3b82f6',
+        'widgets' => '#3b82f6',
+    ];
+    return $map[$icon] ?? '#3b82f6';
+}
+
+function hex_to_rgb_and_text(string $hex): array
+{
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) === 3) {
+        $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+    }
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    $lum = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
+    return [$r . ',' . $g . ',' . $b, $lum > 0.55 ? '#000000' : '#ffffff'];
+}
+
+function ui_alert(string $type, string $message): void
+{
+    $type = in_array($type, ['info', 'success', 'warning', 'danger'], true) ? $type : 'info';
+    $icons = [
+        'info' => 'info',
+        'success' => 'check_circle',
+        'warning' => 'warning',
+        'danger' => 'error',
+    ];
+    $accents = [
+        'info' => ['#3b82f6', '59,130,246', '#ffffff'],
+        'success' => ['#10b981', '16,185,129', '#ffffff'],
+        'warning' => ['#f59e0b', '245,158,11', '#000000'],
+        'danger' => ['#ef4444', '239,68,68', '#ffffff'],
+    ];
+    [$color, $rgb, $textOn] = $accents[$type] ?? $accents['info'];
+
+    echo '<div class="alert alert-' . htmlspecialchars($type) . '" style="--alert-accent:' . htmlspecialchars($color) . ';--alert-accent-rgb:' . htmlspecialchars($rgb) . ';--alert-text-on-solid:' . htmlspecialchars($textOn) . '">';
+    echo '<span class="material-symbols-outlined">' . htmlspecialchars($icons[$type]) . '</span>';
+    echo '<span class="alert-text">' . htmlspecialchars($message) . '</span>';
+    echo '</div>';
+}
+
+function ui_card_open(string $icon, string $title): void
+{
+    $accent = card_accent_color($icon);
+    [$rgb, $textOn] = hex_to_rgb_and_text($accent);
+    $style = 'border-left:3px solid ' . $accent
+        . ';--card-accent:' . $accent
+        . ';--card-accent-rgb:' . $rgb
+        . ';--card-text-on-solid:' . $textOn;
+
+    echo '<section class="card" style="' . htmlspecialchars($style) . '">';
+    echo '<div class="card-top"><div class="card-tab">';
+    echo '<span class="material-symbols-outlined">' . htmlspecialchars($icon) . '</span>';
+    echo '<h3>' . htmlspecialchars($title) . '</h3>';
+    echo '</div></div>';
+    echo '<div class="card-body">';
+}
+
+function ui_card_close(): void
+{
+    echo '</div></section>';
 }
 
 function render_page(string $title, callable $content): void
@@ -107,8 +186,9 @@ function render_page(string $title, callable $content): void
     echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<meta name="robots" content="noindex,nofollow">';
     echo '<title>' . htmlspecialchars($title) . ' | ' . htmlspecialchars($appName) . '</title>';
-    echo '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
+    echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
+    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">';
     echo '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
     echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("page-loader");if(l)l.classList.add("pg-done");});</script>';
@@ -120,17 +200,15 @@ function render_page(string $title, callable $content): void
     echo '<span class="topbar-sep">›</span>';
     echo '<span class="topbar-app"><span class="material-symbols-outlined">dashboard</span>' . htmlspecialchars($title) . '</span>';
     echo '<div class="topbar-right">';
-    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme" aria-label="Toggle light and dark theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
+    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme" aria-label="Toggle theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
     if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        $initials = user_initials($displayName);
-        echo '<span class="topbar-user"><div class="topbar-avatar">' . htmlspecialchars($initials) . '</div></span>';
+        echo '<span class="topbar-user"><div class="topbar-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div></span>';
     }
     echo '</div></div>';
 
-    echo '<div id="sidebar-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49;top:2.625rem;"></div>';
-    echo '<aside class="sidebar">';
-    echo '<div class="sidebar-header"><h2>';
+    echo '<div id="sidebar-overlay" class="hidden sidebar-overlay"></div>';
+    echo '<aside class="sidebar"><div class="sidebar-header"><h2>';
     if ($logo !== '') {
         echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light">';
         if ($logoDark !== '') {
@@ -154,13 +232,10 @@ function render_page(string $title, callable $content): void
 
     if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        $initials = user_initials($displayName);
-        echo '<div class="sidebar-footer"><div class="user-info"><div class="user-avatar">' . htmlspecialchars($initials) . '</div><div class="user-details"><div class="user-name truncate">' . htmlspecialchars($displayName) . '</div><div class="user-role">' . htmlspecialchars(ucfirst((string) ($user['role'] ?? 'user'))) . '</div></div></div></div>';
+        echo '<div class="sidebar-footer"><div class="user-info"><div class="user-avatar">' . htmlspecialchars(user_avatar_text($displayName)) . '</div><div class="user-details"><div class="user-name truncate">' . htmlspecialchars($displayName) . '</div><div class="user-role">' . htmlspecialchars(ucfirst((string) ($user['role'] ?? 'user'))) . '</div></div></div></div>';
     }
 
-    echo '</aside><main class="content">';
-    echo '<div class="page-header"><div><h2>' . htmlspecialchars($title) . '</h2></div></div>';
-    echo '<div class="page-body">';
+    echo '</aside><main class="content"><div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div><div class="page-body">';
     $content();
     echo '</div></main></div><script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script></body></html>';
 }
