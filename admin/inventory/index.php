@@ -37,8 +37,7 @@ function parse_import_rows(string $shop, string $text): array
                 'sku' => (string) ($cols[3] ?? ''),
                 'shop_quantity' => (int) ($cols[4] ?? 0),
                 'unit' => (string) ($cols[5] ?? 'ea'),
-                'default_note' => (string) ($cols[6] ?? ''),
-                'description' => (string) ($cols[7] ?? ''),
+                'description' => trim((string) ($cols[7] ?? '')) !== '' ? (string) ($cols[7] ?? '') : (string) ($cols[6] ?? ''),
             ];
         } else {
             $rows[] = [
@@ -47,8 +46,7 @@ function parse_import_rows(string $shop, string $text): array
                 'sku' => null,
                 'shop_quantity' => (int) ($cols[2] ?? 0),
                 'unit' => (string) ($cols[3] ?? 'ea'),
-                'default_note' => (string) ($cols[4] ?? ''),
-                'description' => (string) ($cols[5] ?? ''),
+                'description' => trim((string) ($cols[5] ?? '')) !== '' ? (string) ($cols[5] ?? '') : (string) ($cols[4] ?? ''),
             ];
         }
     }
@@ -71,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $shop === 'snd' ? (post('sku') ?: null) : null,
             (int) post('shop_quantity', '0'),
             post('unit', 'ea'),
-            post('default_note'),
+            '',
             post('description'),
             isset($_POST['is_spacer']) ? 1 : 0,
             (int) post('sort_order', '0'),
@@ -82,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_item') {
         if ($shop === 'snd') {
             $stmt = db()->prepare('UPDATE inventory_items
-                SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, default_note = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
                 WHERE id = ? AND shop_type = ?');
             $stmt->execute([
                 (int) post('category_id', '0') ?: null,
@@ -90,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 post('sku') ?: null,
                 (int) post('shop_quantity', '0'),
                 post('unit', 'ea'),
-                post('default_note'),
                 post('description'),
                 isset($_POST['is_spacer']) ? 1 : 0,
                 (int) post('sort_order', '0'),
@@ -99,14 +96,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         } else {
             $stmt = db()->prepare('UPDATE inventory_items
-                SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, default_note = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
                 WHERE id = ? AND shop_type = ?');
             $stmt->execute([
                 (int) post('category_id', '0') ?: null,
                 post('name'),
                 (int) post('shop_quantity', '0'),
                 post('unit', 'ea'),
-                post('default_note'),
                 post('description'),
                 isset($_POST['is_spacer']) ? 1 : 0,
                 (int) post('sort_order', '0'),
@@ -143,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ins = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NOW(), NOW())');
-            $ins->execute([$shop, $catId ?: null, $row['name'], $row['sku'], $row['shop_quantity'], $row['unit'], $row['default_note'], $row['description']]);
+            $ins->execute([$shop, $catId ?: null, $row['name'], $row['sku'], $row['shop_quantity'], $row['unit'], '', $row['description']]);
         }
         db()->commit();
         flash_set('success', strtoupper($shop) . ' import complete: ' . count($rows) . ' rows.');
@@ -226,8 +222,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                         <div class="mb-2"><input class="form-control" name="name" placeholder="Name" required></div>
                                         <?php if ($shopKey === 'snd'): ?><div class="mb-2"><input class="form-control" name="sku" placeholder="SKU"></div><?php endif; ?>
                                         <div class="row g-2"><div class="col"><input class="form-control" type="number" name="shop_quantity" placeholder="Qty"></div><div class="col"><input class="form-control" name="unit" placeholder="Unit" value="ea"></div></div>
-                                        <div class="mb-2 mt-2"><textarea class="form-control" name="default_note" placeholder="Default note"></textarea></div>
-                                        <div class="mb-2"><textarea class="form-control" name="description" placeholder="Description"></textarea></div>
+                                        <div class="mb-2 mt-2"><textarea class="form-control" name="description" placeholder="Description"></textarea></div>
                                         <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="is_spacer"><span class="form-check-label">Spacer item</span></label>
                                         <button class="btn btn-primary">Create <?= e(strtoupper($shopKey)) ?> Item</button>
                                     </form>
@@ -265,11 +260,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
-                                <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Default Note</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
+                                <thead><tr><th>Category</th><th>Name</th><?php if ($shopKey === 'snd'): ?><th>SKU</th><?php endif; ?><th>Qty</th><th>Unit</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                                 <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tbody>
                                     <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-category-name="<?= e($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
-                                        <td colspan="10">
+                                        <td colspan="<?= $shopKey === 'snd' ? '9' : '8' ?>">
                                             <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-right me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
                                         </td>
                                     </tr>
@@ -286,10 +281,9 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                                 </select>
                                             </td>
                                             <td><input class="form-control" name="name" value="<?= e($item['name']) ?>" form="item-update-<?= (int) $item['id'] ?>" required></td>
-                                            <td>                                            <input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>" <?= $shopKey === 'lx' ? 'readonly' : '' ?>></td>
+                                            <?php if ($shopKey === 'snd'): ?><td><input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td><?php endif; ?>
                                             <td><input class="form-control" type="number" name="shop_quantity" value="<?= (int) $item['shop_quantity'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td><input class="form-control" name="unit" value="<?= e($item['unit']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
-                                            <td><input class="form-control" name="default_note" value="<?= e((string) $item['default_note']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td><input class="form-control" name="description" value="<?= e((string) $item['description']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
                                             <td class="text-center"><input class="form-check-input" type="checkbox" name="is_spacer" value="1" form="item-update-<?= (int) $item['id'] ?>" <?= (int) $item['is_spacer'] ? 'checked' : '' ?>></td>
                                             <td><input class="form-control" type="number" name="sort_order" value="<?= (int) $item['sort_order'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
