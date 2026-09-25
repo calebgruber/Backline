@@ -46,7 +46,10 @@ return " . $export . ";
 
 function app_setting(string $key, mixed $default = null): mixed
 {
-    static $cache = null;
+    if (!array_key_exists('__app_settings_cache', $GLOBALS)) {
+        $GLOBALS['__app_settings_cache'] = null;
+    }
+    $cache = $GLOBALS['__app_settings_cache'];
 
     if (!app_is_installed()) {
         return $default;
@@ -59,10 +62,16 @@ function app_setting(string $key, mixed $default = null): mixed
             foreach ($rows as $row) {
                 $cache[(string) $row['key_name']] = json_decode((string) $row['value_json'], true);
             }
+            $GLOBALS['__app_settings_cache'] = $cache;
         } catch (Throwable) {
             return $default;
         }
     }
 
     return array_key_exists($key, $cache) ? $cache[$key] : $default;
+}
+
+function app_setting_clear_cache(): void
+{
+    $GLOBALS['__app_settings_cache'] = null;
 }

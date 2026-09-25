@@ -12,6 +12,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $logoLightFile = first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']);
     $logoDarkFile = first_existing_brand_asset($brandingDir, ['logo-dark.*']);
     $faviconFile = first_existing_brand_asset($brandingDir, ['favicon.*']);
+    $loginBackgroundFile = first_existing_brand_asset($brandingDir, ['login-bg.*']);
     $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : '';
     $logoDarkPath = $logoDarkFile ? '/uploads/branding/' . basename($logoDarkFile) : '';
     $faviconPath = $faviconFile ? '/uploads/branding/' . basename($faviconFile) : '';
@@ -19,6 +20,11 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $hasDarkLogo = $logoDarkFile !== null;
     $hasFavicon = $faviconFile !== null;
     $theme = ($_COOKIE['theme_preference'] ?? 'light') === 'dark' ? 'dark' : 'light';
+    $bodyRouteClass = 'route-' . trim(str_replace('/', '-', $path), '-');
+    if ($bodyRouteClass === 'route-') {
+        $bodyRouteClass = 'route-root';
+    }
+    $loginBackgroundPath = $path === '/auth/login' && $loginBackgroundFile ? '/uploads/branding/' . basename($loginBackgroundFile) : '';
     $isLxContext = path_starts_with($path, '/lx');
     $isSndContext = path_starts_with($path, '/snd');
     $appContextLabel = $isLxContext ? 'Backline LX App' : ($isSndContext ? 'Backline SND App' : '');
@@ -32,13 +38,14 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
     <?php if ($hasFavicon): ?><link rel="icon" href="<?= e($faviconPath) ?>"><?php endif; ?>
     <link href="/shared/assets/style.css" rel="stylesheet">
     <link href="/shared/assets/custom.css" rel="stylesheet">
 </head>
-<body>
+<body class="<?= e($bodyRouteClass) ?>">
 <div id="global-preloader" class="preloader-backdrop">
     <div class="spinner-border text-primary" role="status"></div>
 </div>
@@ -136,6 +143,57 @@ function render_page(string $title, callable $body, ?array $user = null): void
     update();
   });
   update();
+})();
+
+(() => {
+  const loginBgPath = <?= json_encode($loginBackgroundPath, JSON_UNESCAPED_SLASHES) ?>;
+  if (document.body.classList.contains('route-auth-login') && typeof loginBgPath === 'string' && loginBgPath.trim() !== '') {
+    document.body.style.backgroundImage = 'url("' + loginBgPath + '")';
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundAttachment = 'fixed';
+  }
+})();
+
+(() => {
+  const palette = ['#206bc4', '#2fb344', '#f76707', '#e03131', '#7950f2', '#0ca678', '#d63384', '#5f3dc4', '#15aabf', '#be4bdb'];
+  const iconMap = [
+    { match: /(inventory|item|stock|shop)/i, icon: 'inventory_2' },
+    { match: /(category|categories|folder|resource)/i, icon: 'folder' },
+    { match: /(user|users|profile|account)/i, icon: 'person' },
+    { match: /(setting|config|branding)/i, icon: 'settings' },
+    { match: /(show|dash|home|launch)/i, icon: 'dashboard' },
+    { match: /(sound|snd)/i, icon: 'graphic_eq' },
+    { match: /(light|lx)/i, icon: 'light_mode' },
+    { match: /(migration|database)/i, icon: 'database' }
+  ];
+  const pickIcon = (title) => {
+    const found = iconMap.find((row) => row.match.test(title));
+    return found ? found.icon : 'widgets';
+  };
+  const hash = (text) => {
+    let value = 0;
+    for (let i = 0; i < text.length; i += 1) value = ((value << 5) - value) + text.charCodeAt(i);
+    return Math.abs(value);
+  };
+
+  document.querySelectorAll('.card').forEach((card) => {
+    const title = card.querySelector('.card-title');
+    if (!title) return;
+    const titleText = (title.textContent || '').trim();
+    if (!titleText) return;
+    const color = palette[hash(titleText) % palette.length];
+    card.style.setProperty('--card-accent-color', color);
+    card.classList.add('card-title-enhanced');
+    if (!title.querySelector('.card-title-icon')) {
+      title.classList.add('d-flex', 'align-items-center', 'gap-2');
+      const icon = document.createElement('span');
+      icon.className = 'card-title-icon material-symbols-outlined';
+      icon.textContent = pickIcon(titleText);
+      title.prepend(icon);
+    }
+  });
 })();
 </script>
 </body>
