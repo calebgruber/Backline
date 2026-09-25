@@ -40,8 +40,8 @@ if ($resolvedBase !== false && is_dir($resolvedBase)) {
             'name' => $item,
             'is_dir' => is_dir($fullPath),
             'url' => is_dir($fullPath)
-                ? app_url('resources?folder=' . rawurlencode($selected) . '&path=' . rawurlencode($nextPath))
-                : app_url('resources/file?folder=' . rawurlencode($selected) . '&path=' . rawurlencode($relativePath) . '&name=' . rawurlencode($item)),
+                ? app_url('resources') . '?' . http_build_query(['folder' => $selected, 'path' => $nextPath])
+                : app_url('resources/file') . '?' . http_build_query(['folder' => $selected, 'path' => $relativePath, 'name' => $item]),
         ];
     }
 }
@@ -50,7 +50,7 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
     echo '<section class="panel"><h1>Resources</h1><div class="grid two">';
     echo '<div><h3>Folders</h3><ul>';
     foreach ($roots as $root) {
-        $href = app_url('resources?folder=' . rawurlencode($root));
+        $href = app_url('resources') . '?' . http_build_query(['folder' => $root]);
         echo '<li><a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($root) . '</a></li>';
     }
     echo '</ul></div><div><h3>' . htmlspecialchars($selected . ($relativePath !== '' ? ' / ' . $relativePath : '')) . '</h3><ul>';
@@ -58,7 +58,7 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
         $parts = explode('/', $relativePath);
         array_pop($parts);
         $upPath = implode('/', $parts);
-        echo '<li><a href="' . htmlspecialchars(app_url('resources?folder=' . rawurlencode($selected) . '&path=' . rawurlencode($upPath))) . '">.. (Up)</a></li>';
+        echo '<li><a href="' . htmlspecialchars(app_url('resources') . '?' . http_build_query(['folder' => $selected, 'path' => $upPath])) . '">.. (Up)</a></li>';
     }
     foreach ($items as $item) {
         echo '<li>';
