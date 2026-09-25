@@ -16,10 +16,10 @@ if (!function_exists('app_config')) {
 
 $user = require_permission('admin.access');
 
-function save_branding_asset(string $inputName, string $baseName, array $allowedMimeToExt): void
+function save_branding_asset(string $inputName, string $baseName, array $allowedMimeToExt): bool
 {
     if (empty($_FILES[$inputName]['tmp_name'] ?? null)) {
-        return;
+        return true;
     }
 
     $dir = __DIR__ . '/../../uploads/branding';
@@ -35,7 +35,7 @@ function save_branding_asset(string $inputName, string $baseName, array $allowed
     }
     if (!isset($allowedMimeToExt[$mime])) {
         flash_set('danger', 'Unsupported file type uploaded for branding asset.');
-        return;
+        return false;
     }
     $ext = $allowedMimeToExt[$mime];
 
@@ -45,7 +45,9 @@ function save_branding_asset(string $inputName, string $baseName, array $allowed
 
     if (!move_uploaded_file($tmpPath, $dir . '/' . $baseName . '.' . $ext)) {
         flash_set('danger', 'Failed to save uploaded branding asset.');
+        return false;
     }
+    return true;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -61,19 +63,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('action') === 'save_branding') {
         $appName = post('app_name', 'Backline');
         $madeIn = post('made_in', 'USA');
+        $loginCardColor = trim(post('login_card_color', ''));
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $loginCardColor)) {
+            $loginCardColor = '';
+        }
+        $loginCardIcon = trim(post('login_card_icon', ''));
+        if (!preg_match('/^[a-z0-9_]{1,48}$/i', $loginCardIcon)) {
+            $loginCardIcon = '';
+        }
         $stmt = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES
             ("branding.app_name", ?, NOW(), NOW()),
-            ("branding.made_in", ?, NOW(), NOW())
+            ("branding.made_in", ?, NOW(), NOW()),
+            ("branding.login_card_color", ?, NOW(), NOW()),
+            ("branding.login_card_icon", ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
-        $stmt->execute([json_encode($appName), json_encode($madeIn)]);
+        $stmt->execute([json_encode($appName), json_encode($madeIn), json_encode($loginCardColor), json_encode($loginCardIcon)]);
 
         $logoMimes = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
         $faviconMimes = $logoMimes + ['image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico'];
-        save_branding_asset('logo_light', 'logo-light', $logoMimes);
-        save_branding_asset('logo_dark', 'logo-dark', $logoMimes);
-        save_branding_asset('logo', 'logo-light', $logoMimes); // backwards compatibility
-        save_branding_asset('favicon', 'favicon', $faviconMimes);
-        save_branding_asset('login_background', 'login-bg', $logoMimes);
+        $uploadsOk = true;
+        $uploadsOk = save_branding_asset('logo_light', 'logo-light', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_dark', 'logo-dark', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_lx', 'logo-lx', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_snd', 'logo-snd', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo', 'logo-light', $logoMimes) && $uploadsOk; // backwards compatibility
+        $uploadsOk = save_branding_asset('favicon', 'favicon', $faviconMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('login_background', 'login-bg', $logoMimes) && $uploadsOk;
 
         if (post('clear_login_background') === '1') {
             foreach (glob(__DIR__ . '/../../uploads/branding/login-bg.*') ?: [] as $existing) {
@@ -82,7 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         app_setting_clear_cache();
 
-        flash_set('success', 'Branding saved.');
+        if ($uploadsOk) {
+            flash_set('success', 'Branding saved.');
+        }
     }
 
     redirect('/admin/settings');
@@ -91,13 +108,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $rows = migration_status_rows();
 $appName = 'Backline';
 $madeIn = 'USA';
-$settings = db()->query('SELECT key_name, value_json FROM app_settings WHERE key_name IN ("branding.app_name", "branding.made_in")')->fetchAll();
+$loginCardColor = '';
+$loginCardIcon = '';
+$settings = db()->query('SELECT key_name, value_json FROM app_settings WHERE key_name IN ("branding.app_name", "branding.made_in", "branding.login_card_color", "branding.login_card_icon")')->fetchAll();
 foreach ($settings as $row) {
     if ($row['key_name'] === 'branding.app_name') $appName = (string) json_decode((string) $row['value_json'], true);
     if ($row['key_name'] === 'branding.made_in') $madeIn = (string) json_decode((string) $row['value_json'], true);
+    if ($row['key_name'] === 'branding.login_card_color') $loginCardColor = (string) json_decode((string) $row['value_json'], true);
+    if ($row['key_name'] === 'branding.login_card_icon') $loginCardIcon = (string) json_decode((string) $row['value_json'], true);
 }
 
-render_page('System Settings', function () use ($rows, $appName, $madeIn): void {
+render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon): void {
     ?>
     <div class="row row-cards">
         <div class="col-lg-6">
@@ -111,10 +132,14 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn): void 
                         <div class="mb-3"><label class="form-label">Made In</label><input class="form-control" name="made_in" value="<?= e($madeIn) ?>"></div>
                         <div class="mb-3"><label class="form-label">Light Logo</label><input class="form-control" type="file" name="logo_light" accept="image/*"></div>
                         <div class="mb-3"><label class="form-label">Dark Logo</label><input class="form-control" type="file" name="logo_dark" accept="image/*"></div>
+                        <div class="mb-3"><label class="form-label">LX App Logo</label><input class="form-control" type="file" name="logo_lx" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">SND App Logo</label><input class="form-control" type="file" name="logo_snd" accept="image/png,image/jpeg,image/webp"></div>
                         <div class="mb-3"><label class="form-label">Login Background Image</label><input class="form-control" type="file" name="login_background" accept="image/png,image/jpeg,image/webp"></div>
                         <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="clear_login_background" value="1"><span class="form-check-label">Remove login background</span></label>
+                        <div class="mb-3"><label class="form-label">Login Card Color</label><input class="form-control" type="text" name="login_card_color" value="<?= e($loginCardColor) ?>" placeholder="#206bc4"></div>
+                        <div class="mb-3"><label class="form-label">Login Card Material Icon</label><input class="form-control" type="text" name="login_card_icon" value="<?= e($loginCardIcon) ?>" placeholder="lock"></div>
                         <div class="mb-3"><label class="form-label">Favicon (.ico or .png)</label><input class="form-control" type="file" name="favicon" accept=".ico,image/png,image/x-icon"></div>
-                        <div class="form-hint mb-3">Login background is applied only on /auth/login.</div>
+                        <div class="form-hint mb-3">Login card style settings apply only on /auth/login.</div>
                         <button class="btn btn-primary">Save branding</button>
                     </form>
                 </div>

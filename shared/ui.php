@@ -11,6 +11,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $brandingDir = __DIR__ . '/../uploads/branding';
     $logoLightFile = first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']);
     $logoDarkFile = first_existing_brand_asset($brandingDir, ['logo-dark.*']);
+    $logoLxFile = first_existing_brand_asset($brandingDir, ['logo-lx.*']);
+    $logoSndFile = first_existing_brand_asset($brandingDir, ['logo-snd.*']);
     $faviconFile = first_existing_brand_asset($brandingDir, ['favicon.*']);
     $loginBackgroundFile = first_existing_brand_asset($brandingDir, ['login-bg.*']);
     $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : '';
@@ -27,6 +29,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $loginBackgroundPath = $path === '/auth/login' && $loginBackgroundFile ? '/uploads/branding/' . basename($loginBackgroundFile) : '';
     $isLxContext = path_starts_with($path, '/lx');
     $isSndContext = path_starts_with($path, '/snd');
+    $contextLogoFile = $isLxContext ? $logoLxFile : ($isSndContext ? $logoSndFile : null);
+    $contextLogoPath = $contextLogoFile ? '/uploads/branding/' . basename($contextLogoFile) : '';
     $appContextLabel = $isLxContext ? 'Backline LX App' : ($isSndContext ? 'Backline SND App' : '');
     ?>
 <!doctype html>
@@ -54,11 +58,13 @@ function render_page(string $title, callable $body, ?array $user = null): void
         <div class="container-xl">
             <h1 class="navbar-brand navbar-brand-autodark pe-0 pe-md-3">
                 <a href="<?= $user ? '/dash/home' : '/' ?>" class="d-flex align-items-center">
-                    <?php if ($hasLightLogo || $hasDarkLogo): ?>
+                    <?php if ($contextLogoPath !== ''): ?>
+                        <img src="<?= e($contextLogoPath) ?>" alt="logo" class="app-logo">
+                    <?php elseif ($hasLightLogo || $hasDarkLogo): ?>
                         <?php if ($hasLightLogo): ?><img src="<?= e($logoLightPath) ?>" alt="logo" class="app-logo logo-light"><?php endif; ?>
                         <?php if ($hasDarkLogo): ?><img src="<?= e($logoDarkPath) ?>" alt="logo" class="app-logo logo-dark"><?php endif; ?>
                     <?php else: ?>
-                        <span class="app-wordmark"><?= e($appName) ?></span>
+                        <span class="app-wordmark"><?= e($isLxContext ? 'Backline LX' : ($isSndContext ? 'Backline SND' : $appName)) ?></span>
                     <?php endif; ?>
                 </a>
             </h1>
@@ -183,14 +189,19 @@ function render_page(string $title, callable $body, ?array $user = null): void
     if (!title) return;
     const titleText = (title.textContent || '').trim();
     if (!titleText) return;
-    const color = palette[hash(titleText) % palette.length];
+    const customColor = card.getAttribute('data-card-color') || '';
+    const customIcon = card.getAttribute('data-card-icon') || '';
+    const isColorValid = /^#[0-9a-fA-F]{6}$/.test(customColor);
+    const isIconValid = /^[a-z0-9_]{1,48}$/i.test(customIcon);
+    const color = isColorValid ? customColor : palette[hash(titleText) % palette.length];
+    const iconName = isIconValid ? customIcon : pickIcon(titleText);
     card.style.setProperty('--card-accent-color', color);
     card.classList.add('card-title-enhanced');
     if (!title.querySelector('.card-title-icon')) {
       title.classList.add('d-flex', 'align-items-center', 'gap-2');
       const icon = document.createElement('span');
       icon.className = 'card-title-icon material-symbols-outlined';
-      icon.textContent = pickIcon(titleText);
+      icon.textContent = iconName;
       title.prepend(icon);
     }
   });

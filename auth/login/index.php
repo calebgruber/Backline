@@ -39,10 +39,12 @@ render_page('Login', function (): void {
     $logoDarkFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-dark.*']) : null;
     $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : null;
     $logoDarkPath = $logoDarkFile ? '/uploads/branding/' . basename($logoDarkFile) : null;
+    $loginCardColor = (string) app_setting('branding.login_card_color', '');
+    $loginCardIcon = (string) app_setting('branding.login_card_icon', '');
     ?>
     <div class="row justify-content-center mt-6">
         <div class="col-md-5">
-            <div class="card">
+            <div class="card" data-card-color="<?= e($loginCardColor) ?>" data-card-icon="<?= e($loginCardIcon) ?>">
                 <div class="card-header"><h3 class="card-title">Login</h3></div>
                 <div class="card-body">
                     <?php if ($logoLightPath || $logoDarkPath): ?>
