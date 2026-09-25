@@ -75,30 +75,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if (is_setup_complete()) {
                     throw new RuntimeException('Setup has already been completed.');
                 }
-
-                $pdo->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    migration VARCHAR(255) NOT NULL UNIQUE,
-                    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-                $applied = $pdo->query('SELECT migration FROM schema_migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN) ?: [];
-                $appliedMap = array_flip($applied);
-
-                foreach (migration_files() as $file) {
-                    $migrationName = basename($file);
-                    if (isset($appliedMap[$migrationName])) {
-                        continue;
+                foreach (apply_pending_migrations_with_pdo($pdo, 'backline_setup_migrations') as $result) {
+                    if (($result['status'] ?? '') === 'failed') {
+                        throw new RuntimeException((string) ($result['migration'] ?? 'migration') . ': ' . (string) ($result['message'] ?? 'Failed'));
                     }
-
-                    $sql = trim((string) file_get_contents($file));
-                    if ($sql === '') {
-                        continue;
-                    }
-
-                    $pdo->exec($sql);
-                    $insertMigration = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
-                    $insertMigration->execute([$migrationName]);
                 }
 
                 $upsertAdmin = $pdo->prepare('INSERT INTO users (email, role, password_hash) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), password_hash = VALUES(password_hash)');
@@ -127,14 +107,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             reset_db_connection();
-            session_regenerate_id(true);
-            $_SESSION['user'] = [
-                'email' => $adminEmail,
-                'role' => 'admin',
-                'concentrations' => ['lx', 'snd'],
-            ];
-
-            header('Location: ' . app_url('admin/dash'));
+            header('Location: ' . app_url('auth/login'));
             exit;
         } catch (Throwable $error) {
             error_log('Setup failed: ' . $error->getMessage());

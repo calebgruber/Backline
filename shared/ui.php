@@ -69,7 +69,7 @@ function render_page(string $title, callable $content): void
     .muted{color:var(--muted);font-size:12px}
     @media(max-width:860px){.grid.two{grid-template-columns:1fr}}
     </style></head><body>';
-    echo '<div id="preloader" class="preloader" role="status" aria-live="polite" aria-label="Loading page"><div class="spinner" aria-hidden="true"></div><span class="muted">Loading…</span></div>';
+    echo '<div id="preloader" class="preloader" aria-hidden="true"><div class="spinner" aria-hidden="true"></div></div>';
     echo '<header><div class="brand">';
     if ($logo !== '') {
         echo '<img src="' . htmlspecialchars($logo) . '" alt="Branding logo">';

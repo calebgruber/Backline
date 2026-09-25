@@ -34,13 +34,17 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
     exit;
 }
 
+$detectedMime = mime_content_type($file) ?: 'application/octet-stream';
+$safeInline = !in_array(strtolower($detectedMime), ['text/html', 'image/svg+xml', 'application/xhtml+xml'], true);
+$contentType = $safeInline ? $detectedMime : 'application/octet-stream';
+$disposition = $safeInline ? 'inline' : 'attachment';
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], basename($file));
 $encodedFilename = rawurlencode(basename($file));
-header('Content-Type: application/octet-stream');
+header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
-header('Content-Disposition: attachment; filename="' . $safeFilename . '"; filename*=UTF-8\'\'' . $encodedFilename);
+header('Content-Disposition: ' . $disposition . '; filename="' . $safeFilename . '"; filename*=UTF-8\'\'' . $encodedFilename);
 header('Content-Length: ' . (string) filesize($file));
 readfile($file);

@@ -35,9 +35,20 @@ function pending_migrations(): array
 function apply_pending_migrations(): array
 {
     ensure_migrations_table();
-    $results = [];
     $pdo = db();
-    $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_migrations', 10)")->fetchColumn();
+    return apply_pending_migrations_with_pdo($pdo, 'backline_migrations');
+}
+
+function apply_pending_migrations_with_pdo(PDO $pdo, string $lockName = 'backline_migrations'): array
+{
+    $results = [];
+    $pdo->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        migration VARCHAR(255) NOT NULL UNIQUE,
+        applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+    $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 10)")->fetchColumn();
     if (!$lockAcquired) {
         return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
     }
@@ -69,7 +80,7 @@ function apply_pending_migrations(): array
             }
         }
     } finally {
-        $pdo->query("SELECT RELEASE_LOCK('backline_migrations')");
+        $pdo->query("SELECT RELEASE_LOCK(" . $pdo->quote($lockName) . ")");
     }
 
     return $results;
