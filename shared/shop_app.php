@@ -21,9 +21,9 @@ if (!function_exists('render_shop_app_page')) {
     {
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
-            ? db()->query('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
+            ? db()->query('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
             : (function () use ($user) {
-                $stmt = db()->prepare('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY show_name');
+                $stmt = db()->prepare('SELECT id, show_name, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY show_name');
                 $stmt->execute([(int) $user['id']]);
                 return $stmt;
             })();
@@ -303,9 +303,18 @@ if (!function_exists('render_shop_app_page')) {
                                     trim((string) ($selectedShow['lead_designer_email'] ?? '')),
                                     trim((string) ($selectedShow['lead_designer_phone'] ?? '')),
                                 ], static fn ($v) => $v !== '')));
+                                $assistantName = $shopType === 'lx'
+                                    ? trim((string) (($selectedShow['ald_name'] ?? '') ?: ($selectedShow['assistant_snd_designer_name'] ?? '')))
+                                    : trim((string) (($selectedShow['assistant_snd_designer_name'] ?? '') ?: ($selectedShow['ald_name'] ?? '')));
+                                $assistantEmail = $shopType === 'lx'
+                                    ? trim((string) (($selectedShow['ald_email'] ?? '') ?: ($selectedShow['assistant_snd_designer_email'] ?? '')))
+                                    : trim((string) (($selectedShow['assistant_snd_designer_email'] ?? '') ?: ($selectedShow['ald_email'] ?? '')));
+                                $assistantPhone = $shopType === 'lx'
+                                    ? trim((string) (($selectedShow['ald_phone'] ?? '') ?: ($selectedShow['assistant_snd_designer_phone'] ?? '')))
+                                    : trim((string) (($selectedShow['assistant_snd_designer_phone'] ?? '') ?: ($selectedShow['ald_phone'] ?? '')));
                                 $assistantContact = implode(' · ', array_values(array_filter([
-                                    trim((string) ($selectedShow['assistant_snd_designer_email'] ?? '')),
-                                    trim((string) ($selectedShow['assistant_snd_designer_phone'] ?? '')),
+                                    $assistantEmail,
+                                    $assistantPhone,
                                 ], static fn ($v) => $v !== '')));
                                 $shopManagerContact = implode(' · ', array_values(array_filter([
                                     trim((string) ($selectedShow['shop_manager_email'] ?? '')),
@@ -327,7 +336,7 @@ if (!function_exists('render_shop_app_page')) {
                                 };
                                 ?>
                                 <div class="col-md-6"><div class="small text-secondary">Lead Contact</div><div><?= e($leadContact !== '' ? $leadContact : '—') ?></div></div>
-                                <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e($displayOrDash($selectedShow['assistant_snd_designer_name'] ?? null)) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e($displayOrDash($assistantName)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Contact</div><div><?= e($assistantContact !== '' ? $assistantContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager</div><div><?= e($displayOrDash($selectedShow['shop_manager_name'] ?? null)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager Contact</div><div><?= e($shopManagerContact !== '' ? $shopManagerContact : '—') ?></div></div>
