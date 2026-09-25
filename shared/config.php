@@ -47,8 +47,8 @@ function app_settings(): array
 
 function save_settings(array $settings): bool
 {
-    if (!is_dir(storage_path())) {
-        mkdir(storage_path(), 0775, true);
+    if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
+        return false;
     }
 
     $export = '<?php' . PHP_EOL . 'return ' . var_export($settings, true) . ';' . PHP_EOL;

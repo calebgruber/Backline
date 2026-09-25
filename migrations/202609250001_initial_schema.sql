@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS revision_items (
     specific_return_date DATE NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_revision_inventory_item (revision_id, inventory_item_id),
+    KEY idx_revision_inventory_item (revision_id, inventory_item_id),
     CONSTRAINT fk_revision_items_revision FOREIGN KEY (revision_id) REFERENCES order_revisions(id) ON DELETE CASCADE,
     CONSTRAINT fk_revision_items_inventory FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -123,11 +123,12 @@ CREATE TABLE IF NOT EXISTS revision_items (
 CREATE TABLE IF NOT EXISTS paperwork_settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     show_id BIGINT UNSIGNED NULL,
+    show_scope_id BIGINT UNSIGNED AS (IFNULL(show_id, 0)) STORED,
     setting_key VARCHAR(190) NOT NULL,
     setting_value TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_show_setting (show_id, setting_key),
+    UNIQUE KEY uniq_show_setting (show_scope_id, setting_key),
     CONSTRAINT fk_paperwork_show FOREIGN KEY (show_id) REFERENCES shows(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

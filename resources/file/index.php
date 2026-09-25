@@ -18,7 +18,7 @@ $segments = $relativePath === '' ? [] : explode('/', $relativePath);
 $segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..'));
 $relativePath = implode('/', $segments);
 
-if (!in_array($folder, $roots, true) || $name === '' || str_contains($name, '/')) {
+if (!in_array($folder, $roots, true) || $name === '' || str_contains($name, '/') || str_contains($name, '\\')) {
     http_response_code(404);
     echo 'Not found';
     exit;

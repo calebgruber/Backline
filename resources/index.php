@@ -18,17 +18,23 @@ if (!in_array($selected, $roots, true)) {
 
 $relativePath = trim((string) ($_GET['path'] ?? ''), '/');
 $segments = $relativePath === '' ? [] : explode('/', $relativePath);
-$segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..'));
+$segments = array_values(array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.' && $segment !== '..' && !str_contains($segment, '\\') && !str_contains($segment, '/')));
 $relativePath = implode('/', $segments);
 
-$base = dirname(__DIR__) . '/uploads/resources/' . $selected . ($relativePath !== '' ? '/' . $relativePath : '');
+$root = realpath(dirname(__DIR__) . '/uploads/resources/' . $selected);
+$base = $root !== false ? ($root . ($relativePath !== '' ? '/' . $relativePath : '')) : '';
+$resolvedBase = $base !== '' ? realpath($base) : false;
+if ($root === false || $resolvedBase === false || (!str_starts_with($resolvedBase, $root . DIRECTORY_SEPARATOR) && $resolvedBase !== $root)) {
+    $resolvedBase = $root;
+    $relativePath = '';
+}
 $items = [];
-if (is_dir($base)) {
-    foreach (scandir($base) ?: [] as $item) {
+if ($resolvedBase !== false && is_dir($resolvedBase)) {
+    foreach (scandir($resolvedBase) ?: [] as $item) {
         if ($item === '.' || $item === '..') {
             continue;
         }
-        $fullPath = $base . '/' . $item;
+        $fullPath = $resolvedBase . '/' . $item;
         $nextPath = ltrim($relativePath . '/' . $item, '/');
         $items[] = [
             'name' => $item,
