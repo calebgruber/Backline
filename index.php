@@ -18,7 +18,11 @@ if ($basePath !== '' && $basePath !== '/' && str_starts_with($requestPath, $base
 $routeSegments = array_values(array_filter(explode('/', trim($requestPath, '/')), static fn (string $segment): bool => $segment !== ''));
 $safeSegments = [];
 foreach ($routeSegments as $segment) {
+    $segment = rawurldecode($segment);
     if ($segment === '.' || $segment === '..') {
+        continue;
+    }
+    if (str_contains($segment, '/') || str_contains($segment, '\\') || str_contains($segment, "\0")) {
         continue;
     }
     $safeSegments[] = $segment;

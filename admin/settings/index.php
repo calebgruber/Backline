@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if (save_settings($settings)) {
+            reset_db_connection();
             $messages[] = 'Settings saved locally.';
         } else {
             $errors[] = 'Failed to write settings file.';

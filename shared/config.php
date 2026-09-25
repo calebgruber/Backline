@@ -48,12 +48,36 @@ function app_settings(): array
 
 function save_settings(array $settings): bool
 {
+    if (!storage_path_is_safe()) {
+        return false;
+    }
     if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
         return false;
     }
 
     $export = '<?php' . PHP_EOL . 'return ' . var_export($settings, true) . ';' . PHP_EOL;
     return file_put_contents(settings_file(), $export, LOCK_EX) !== false;
+}
+
+function storage_path_is_safe(): bool
+{
+    $documentRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+    if ($documentRoot === '') {
+        return true;
+    }
+
+    $docRootReal = realpath($documentRoot);
+    $storageParent = dirname(storage_path());
+    if (!is_dir($storageParent)) {
+        @mkdir($storageParent, 0775, true);
+    }
+    $storageParentReal = realpath($storageParent);
+    if ($docRootReal === false || $storageParentReal === false) {
+        return true;
+    }
+
+    $docRoot = rtrim($docRootReal, DIRECTORY_SEPARATOR);
+    return !($storageParentReal === $docRoot || str_starts_with($storageParentReal, $docRoot . DIRECTORY_SEPARATOR));
 }
 
 function app_url(string $path = ''): string
