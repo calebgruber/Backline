@@ -11,10 +11,13 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $brandingDir = __DIR__ . '/../uploads/branding';
     $logoLightFile = first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']);
     $logoDarkFile = first_existing_brand_asset($brandingDir, ['logo-dark.*']);
-    $logoLxFile = first_existing_brand_asset($brandingDir, ['logo-lx.*']);
-    $logoSndFile = first_existing_brand_asset($brandingDir, ['logo-snd.*']);
+    $logoLxLightFile = first_existing_brand_asset($brandingDir, ['logo-lx-light.*', 'logo-lx.*']);
+    $logoLxDarkFile = first_existing_brand_asset($brandingDir, ['logo-lx-dark.*']);
+    $logoSndLightFile = first_existing_brand_asset($brandingDir, ['logo-snd-light.*', 'logo-snd.*']);
+    $logoSndDarkFile = first_existing_brand_asset($brandingDir, ['logo-snd-dark.*']);
     $faviconFile = first_existing_brand_asset($brandingDir, ['favicon.*']);
-    $loginBackgroundFile = first_existing_brand_asset($brandingDir, ['login-bg.*']);
+    $loginBackgroundLightFile = first_existing_brand_asset($brandingDir, ['login-bg-light.*', 'login-bg.*']);
+    $loginBackgroundDarkFile = first_existing_brand_asset($brandingDir, ['login-bg-dark.*']);
     $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : '';
     $logoDarkPath = $logoDarkFile ? '/uploads/branding/' . basename($logoDarkFile) : '';
     $faviconPath = $faviconFile ? '/uploads/branding/' . basename($faviconFile) : '';
@@ -26,15 +29,26 @@ function render_page(string $title, callable $body, ?array $user = null): void
     if ($bodyRouteClass === 'route-') {
         $bodyRouteClass = 'route-root';
     }
-    $loginBackgroundPath = $path === '/auth/login' && $loginBackgroundFile ? '/uploads/branding/' . basename($loginBackgroundFile) : '';
+    $loginBackgroundLightPath = $path === '/auth/login' && $loginBackgroundLightFile ? '/uploads/branding/' . basename($loginBackgroundLightFile) : '';
+    $loginBackgroundDarkPath = $path === '/auth/login' && $loginBackgroundDarkFile ? '/uploads/branding/' . basename($loginBackgroundDarkFile) : '';
     $isLxContext = path_starts_with($path, '/lx');
     $isSndContext = path_starts_with($path, '/snd');
-    $contextLogoFile = $isLxContext ? $logoLxFile : ($isSndContext ? $logoSndFile : null);
-    $contextLogoPath = $contextLogoFile ? '/uploads/branding/' . basename($contextLogoFile) : '';
+    $activeLogoLightPath = $logoLightPath;
+    $activeLogoDarkPath = $logoDarkPath;
+    if ($isLxContext) {
+        $activeLogoLightPath = $logoLxLightFile ? '/uploads/branding/' . basename($logoLxLightFile) : $logoLightPath;
+        $activeLogoDarkPath = $logoLxDarkFile ? '/uploads/branding/' . basename($logoLxDarkFile) : $logoDarkPath;
+    } elseif ($isSndContext) {
+        $activeLogoLightPath = $logoSndLightFile ? '/uploads/branding/' . basename($logoSndLightFile) : $logoLightPath;
+        $activeLogoDarkPath = $logoSndDarkFile ? '/uploads/branding/' . basename($logoSndDarkFile) : $logoDarkPath;
+    }
+    $activeHasLightLogo = $activeLogoLightPath !== '';
+    $activeHasDarkLogo = $activeLogoDarkPath !== '';
     $appContextLabel = $isLxContext ? 'Backline LX App' : ($isSndContext ? 'Backline SND App' : '');
+    $brandAltText = $isLxContext ? 'Backline LX logo' : ($isSndContext ? 'Backline SND logo' : $appName . ' logo');
     ?>
 <!doctype html>
-<html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $hasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $hasLightLogo ? '1' : '0' ?>">
+<html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $activeHasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $activeHasLightLogo ? '1' : '0' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -58,11 +72,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
         <div class="container-xl">
             <h1 class="navbar-brand navbar-brand-autodark pe-0 pe-md-3">
                 <a href="<?= $user ? '/dash/home' : '/' ?>" class="d-flex align-items-center">
-                    <?php if ($contextLogoPath !== ''): ?>
-                        <img src="<?= e($contextLogoPath) ?>" alt="logo" class="app-logo">
-                    <?php elseif ($hasLightLogo || $hasDarkLogo): ?>
-                        <?php if ($hasLightLogo): ?><img src="<?= e($logoLightPath) ?>" alt="logo" class="app-logo logo-light"><?php endif; ?>
-                        <?php if ($hasDarkLogo): ?><img src="<?= e($logoDarkPath) ?>" alt="logo" class="app-logo logo-dark"><?php endif; ?>
+                    <?php if ($activeHasLightLogo || $activeHasDarkLogo): ?>
+                        <?php if ($activeHasLightLogo): ?><img src="<?= e($activeLogoLightPath) ?>" alt="<?= e($brandAltText) ?>" class="app-logo logo-light"><?php endif; ?>
+                        <?php if ($activeHasDarkLogo): ?><img src="<?= e($activeLogoDarkPath) ?>" alt="<?= e($brandAltText) ?>" class="app-logo logo-dark"><?php endif; ?>
                     <?php else: ?>
                         <span class="app-wordmark"><?= e($isLxContext ? 'Backline LX' : ($isSndContext ? 'Backline SND' : $appName)) ?></span>
                     <?php endif; ?>
@@ -152,17 +164,44 @@ function render_page(string $title, callable $body, ?array $user = null): void
 })();
 
 (() => {
-  const loginBgPath = <?= json_encode($loginBackgroundPath, JSON_UNESCAPED_SLASHES) ?>;
-  if (document.body.classList.contains('route-auth-login') && typeof loginBgPath === 'string' && loginBgPath.trim() !== '') {
-    document.body.style.backgroundImage = 'url("' + loginBgPath + '")';
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundPosition = 'center';
-    document.body.style.backgroundRepeat = 'no-repeat';
-    document.body.style.backgroundAttachment = 'fixed';
-  }
+  const html = document.documentElement;
+  const loginBgLightPath = <?= json_encode($loginBackgroundLightPath, JSON_UNESCAPED_SLASHES) ?>;
+  const loginBgDarkPath = <?= json_encode($loginBackgroundDarkPath, JSON_UNESCAPED_SLASHES) ?>;
+  if (!document.body.classList.contains('route-auth-login')) return;
+  const applyBackground = () => {
+    const isDark = html.getAttribute('data-bs-theme') === 'dark';
+    const backgroundPath = isDark && loginBgDarkPath ? loginBgDarkPath : loginBgLightPath;
+    if (backgroundPath) {
+      document.body.style.backgroundImage = 'url("' + backgroundPath + '")';
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundRepeat = 'no-repeat';
+      document.body.style.backgroundAttachment = 'fixed';
+    } else {
+      document.body.style.backgroundImage = '';
+      document.body.style.backgroundSize = '';
+      document.body.style.backgroundPosition = '';
+      document.body.style.backgroundRepeat = '';
+      document.body.style.backgroundAttachment = '';
+    }
+  };
+  applyBackground();
+  const themeToggle = document.getElementById('theme-toggle');
+  themeToggle?.addEventListener('click', () => {
+    window.setTimeout(applyBackground, 0);
+  });
 })();
 
 (() => {
+  const hexToRgb = (hex) => {
+    const normalized = hex.replace('#', '');
+    if (normalized.length !== 6) return null;
+    const num = Number.parseInt(normalized, 16);
+    if (Number.isNaN(num)) return null;
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255].join(', ');
+  }
+;
+
   const palette = ['#206bc4', '#2fb344', '#f76707', '#e03131', '#7950f2', '#0ca678', '#d63384', '#5f3dc4', '#15aabf', '#be4bdb'];
   const iconMap = [
     { match: /(inventory|item|stock|shop)/i, icon: 'inventory_2' },
@@ -194,9 +233,12 @@ function render_page(string $title, callable $body, ?array $user = null): void
     const isColorValid = /^#[0-9a-fA-F]{6}$/.test(customColor);
     const isIconValid = /^[a-z0-9_]{1,48}$/i.test(customIcon);
     const color = isColorValid ? customColor : palette[hash(titleText) % palette.length];
+    const rgb = hexToRgb(color);
     const iconName = isIconValid ? customIcon : pickIcon(titleText);
     card.style.setProperty('--card-accent-color', color);
+    if (rgb) card.style.setProperty('--card-accent-rgb', rgb);
     card.classList.add('card-title-enhanced');
+    title.classList.add('card-title-pill');
     if (!title.querySelector('.card-title-icon')) {
       title.classList.add('d-flex', 'align-items-center', 'gap-2');
       const icon = document.createElement('span');

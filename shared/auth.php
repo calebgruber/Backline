@@ -57,7 +57,7 @@ function require_permission(string $permission): array
     $user = require_auth();
     if (!user_has_permission($user, $permission)) {
         http_response_code(403);
-        render_page('Forbidden', function () {
+        render_page('Forbidden', function () use ($user) {
             echo '<div class="alert alert-danger">You do not have permission for this action.</div>';
         }, $user);
         exit;

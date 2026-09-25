@@ -56,6 +56,24 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
     border-left: 5px solid var(--card-accent-color);
 }
 
+.card-title-enhanced .card-header {
+    overflow: visible;
+}
+
+.card-title-enhanced .card-title-pill {
+    padding: .35rem 1rem;
+    border-radius: 0 999px 999px 0;
+    background: rgba(var(--card-accent-rgb), .25);
+    color: var(--card-accent-color);
+    display: inline-flex;
+    align-items: center;
+}
+
+.card-title-enhanced .card-header .card-title-pill {
+    margin-left: -1rem;
+    padding-left: calc(1rem + 5px);
+}
+
 .card-title-icon {
     font-size: 1.05em;
     line-height: 1;

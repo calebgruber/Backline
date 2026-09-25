@@ -80,18 +80,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([json_encode($appName), json_encode($madeIn), json_encode($loginCardColor), json_encode($loginCardIcon)]);
 
         $logoMimes = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
-        $faviconMimes = $logoMimes + ['image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico'];
+        $faviconMimes = ['image/png' => 'png', 'image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico'];
         $uploadsOk = true;
         $uploadsOk = save_branding_asset('logo_light', 'logo-light', $logoMimes) && $uploadsOk;
         $uploadsOk = save_branding_asset('logo_dark', 'logo-dark', $logoMimes) && $uploadsOk;
         $uploadsOk = save_branding_asset('logo_lx', 'logo-lx', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_lx_light', 'logo-lx-light', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_lx_dark', 'logo-lx-dark', $logoMimes) && $uploadsOk;
         $uploadsOk = save_branding_asset('logo_snd', 'logo-snd', $logoMimes) && $uploadsOk;
-        $uploadsOk = save_branding_asset('logo', 'logo-light', $logoMimes) && $uploadsOk; // backwards compatibility
+        $uploadsOk = save_branding_asset('logo_snd_light', 'logo-snd-light', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo_snd_dark', 'logo-snd-dark', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('logo', 'logo', $logoMimes) && $uploadsOk; // backwards compatibility
         $uploadsOk = save_branding_asset('favicon', 'favicon', $faviconMimes) && $uploadsOk;
         $uploadsOk = save_branding_asset('login_background', 'login-bg', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('login_background_light', 'login-bg-light', $logoMimes) && $uploadsOk;
+        $uploadsOk = save_branding_asset('login_background_dark', 'login-bg-dark', $logoMimes) && $uploadsOk;
 
-        if (post('clear_login_background') === '1') {
+        $hasLoginBackgroundUpload = !empty($_FILES['login_background']['tmp_name'] ?? null)
+            || !empty($_FILES['login_background_light']['tmp_name'] ?? null)
+            || !empty($_FILES['login_background_dark']['tmp_name'] ?? null);
+        if (post('clear_login_background') === '1' && !$hasLoginBackgroundUpload) {
             foreach (glob(__DIR__ . '/../../uploads/branding/login-bg.*') ?: [] as $existing) {
+                @unlink($existing);
+            }
+            foreach (glob(__DIR__ . '/../../uploads/branding/login-bg-light.*') ?: [] as $existing) {
+                @unlink($existing);
+            }
+            foreach (glob(__DIR__ . '/../../uploads/branding/login-bg-dark.*') ?: [] as $existing) {
                 @unlink($existing);
             }
         }
@@ -133,13 +148,19 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                         <div class="mb-3"><label class="form-label">Light Logo</label><input class="form-control" type="file" name="logo_light" accept="image/*"></div>
                         <div class="mb-3"><label class="form-label">Dark Logo</label><input class="form-control" type="file" name="logo_dark" accept="image/*"></div>
                         <div class="mb-3"><label class="form-label">LX App Logo</label><input class="form-control" type="file" name="logo_lx" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">LX App Light Logo</label><input class="form-control" type="file" name="logo_lx_light" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">LX App Dark Logo</label><input class="form-control" type="file" name="logo_lx_dark" accept="image/png,image/jpeg,image/webp"></div>
                         <div class="mb-3"><label class="form-label">SND App Logo</label><input class="form-control" type="file" name="logo_snd" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">SND App Light Logo</label><input class="form-control" type="file" name="logo_snd_light" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">SND App Dark Logo</label><input class="form-control" type="file" name="logo_snd_dark" accept="image/png,image/jpeg,image/webp"></div>
                         <div class="mb-3"><label class="form-label">Login Background Image</label><input class="form-control" type="file" name="login_background" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">Login Background Light</label><input class="form-control" type="file" name="login_background_light" accept="image/png,image/jpeg,image/webp"></div>
+                        <div class="mb-3"><label class="form-label">Login Background Dark</label><input class="form-control" type="file" name="login_background_dark" accept="image/png,image/jpeg,image/webp"></div>
                         <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="clear_login_background" value="1"><span class="form-check-label">Remove login background</span></label>
                         <div class="mb-3"><label class="form-label">Login Card Color</label><input class="form-control" type="text" name="login_card_color" value="<?= e($loginCardColor) ?>" placeholder="#206bc4"></div>
                         <div class="mb-3"><label class="form-label">Login Card Material Icon</label><input class="form-control" type="text" name="login_card_icon" value="<?= e($loginCardIcon) ?>" placeholder="lock"></div>
                         <div class="mb-3"><label class="form-label">Favicon (.ico or .png)</label><input class="form-control" type="file" name="favicon" accept=".ico,image/png,image/x-icon"></div>
-                        <div class="form-hint mb-3">Login card style settings apply only on /auth/login.</div>
+                        <div class="form-hint mb-3">Theme-specific LX/SND logos and login backgrounds will follow light/dark mode automatically.</div>
                         <button class="btn btn-primary">Save branding</button>
                     </form>
                 </div>

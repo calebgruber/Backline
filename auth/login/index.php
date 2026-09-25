@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 render_page('Login', function (): void {
+    $appName = (string) app_setting('branding.app_name', config('app_name', 'Backline'));
     $brandingDir = __DIR__ . '/../../uploads/branding';
     $logoLightFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']) : null;
     $logoDarkFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-dark.*']) : null;
@@ -49,8 +50,8 @@ render_page('Login', function (): void {
                 <div class="card-body">
                     <?php if ($logoLightPath || $logoDarkPath): ?>
                         <div class="text-center mb-4">
-                            <?php if ($logoLightPath): ?><img src="<?= e($logoLightPath) ?>" alt="logo" class="auth-page-logo logo-light"><?php endif; ?>
-                            <?php if ($logoDarkPath): ?><img src="<?= e($logoDarkPath) ?>" alt="logo" class="auth-page-logo logo-dark"><?php endif; ?>
+                            <?php if ($logoLightPath): ?><img src="<?= e($logoLightPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-light"><?php endif; ?>
+                            <?php if ($logoDarkPath): ?><img src="<?= e($logoDarkPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-dark"><?php endif; ?>
                         </div>
                     <?php endif; ?>
                     <form method="post" autocomplete="on">
