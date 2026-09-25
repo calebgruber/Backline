@@ -29,7 +29,10 @@ if (!function_exists('render_shop_app_page')) {
             })();
         $shows = $showListStmt->fetchAll();
 
-        $selectedShowId = (int) ($_GET['show'] ?? ($_POST['show_id'] ?? ($shows[0]['id'] ?? 0)));
+        $selectedShowId = (int) ($_GET['show'] ?? ($_POST['show_id'] ?? 0));
+        if ($selectedShowId <= 0 && !$showFirstNav) {
+            $selectedShowId = (int) ($shows[0]['id'] ?? 0);
+        }
         $selectedShow = null;
         foreach ($shows as $s) {
             if ((int) $s['id'] === $selectedShowId) {
