@@ -98,20 +98,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
-            $cleanupAdmin = static function (PDO $pdoConnection, string $email): void {
-                $pdoConnection->beginTransaction();
-                try {
-                    $cleanupConcentrations = $pdoConnection->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
-                    $cleanupConcentrations->execute([$email]);
-                    $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE email = ?');
-                    $cleanup->execute([$email]);
-                    $pdoConnection->commit();
-                } catch (Throwable) {
-                    if ($pdoConnection->inTransaction()) {
-                        $pdoConnection->rollBack();
-                    }
-                }
-            };
 
             $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
             if (!$lockAcquired) {
@@ -143,23 +129,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $grantStmt = $pdo->prepare('INSERT IGNORE INTO user_concentrations (user_id, concentration) VALUES (?, ?)');
                 $grantStmt->execute([$adminId, 'lx']);
                 $grantStmt->execute([$adminId, 'snd']);
+
+                if (!save_settings($candidateSettings)) {
+                    throw new RuntimeException('Could not save setup settings file.');
+                }
+                if (!mark_setup_complete()) {
+                    if (is_string($settingsBackup)) {
+                        file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
+                    } else {
+                        @unlink(settings_file());
+                    }
+                    throw new RuntimeException('Could not write setup completion marker.');
+                }
+
                 $pdo->commit();
             } finally {
                 $pdo->query("SELECT RELEASE_LOCK('backline_setup')");
-            }
-
-            if (!save_settings($candidateSettings)) {
-                $cleanupAdmin($pdo, $adminEmail);
-                throw new RuntimeException('Could not save setup settings file.');
-            }
-            if (!mark_setup_complete()) {
-                if (is_string($settingsBackup)) {
-                    file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
-                } else {
-                    @unlink(settings_file());
-                }
-                $cleanupAdmin($pdo, $adminEmail);
-                throw new RuntimeException('Could not write setup completion marker.');
             }
 
             reset_db_connection();

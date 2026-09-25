@@ -15,8 +15,8 @@ render_page('Admin Components', function (): void {
 
     echo '<section class="panel"><h2>Buttons + Badges</h2><div class="stack">';
     echo '<button type="button">Primary Button</button>';
-    echo '<a class="btn secondary" href="#">Secondary Link Button</a>';
-    echo '<a class="btn ghost" href="#">Ghost Button</a>';
+    echo '<span class="btn secondary">Secondary Button Style</span>';
+    echo '<span class="btn ghost">Ghost Button Style</span>';
     echo '<span class="badge">Default</span><span class="badge success">Success</span><span class="badge warning">Warning</span><span class="badge danger">Danger</span>';
     echo '</div></section>';
 

@@ -97,7 +97,7 @@ function render_page(string $title, callable $content): void
         echo htmlspecialchars((string) ($settings['app_name'] ?? 'Backline'));
     }
 
-    echo '</div><nav>';
+    echo '</div><nav aria-label="Primary">';
     foreach (nav_items() as $label => $href) {
         $isActive = ($path === $href || str_starts_with($path, $href . '/'));
         $active = $isActive ? 'active' : '';
