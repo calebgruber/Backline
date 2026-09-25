@@ -22,6 +22,7 @@ $routes = [
     '/auth/reset' => __DIR__ . '/auth/reset/index.php',
     '/auth/invite' => __DIR__ . '/auth/invite/index.php',
     '/setup' => __DIR__ . '/setup/index.php',
+    '/dash/home' => __DIR__ . '/dash/home/index.php',
     '/admin/dash' => __DIR__ . '/admin/dash/index.php',
     '/admin/settings' => __DIR__ . '/admin/settings/index.php',
     '/admin/users' => __DIR__ . '/admin/users/index.php',
@@ -31,7 +32,9 @@ $routes = [
     '/admin/shows' => __DIR__ . '/admin/shows/index.php',
     '/profile' => __DIR__ . '/profile/index.php',
     '/lx' => __DIR__ . '/lx/index.php',
+    '/lx/app' => __DIR__ . '/lx/app/index.php',
     '/snd' => __DIR__ . '/snd/index.php',
+    '/snd/app' => __DIR__ . '/snd/app/index.php',
     '/resources' => __DIR__ . '/resources/index.php',
 ];
 

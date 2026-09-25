@@ -19,7 +19,7 @@ if (!app_is_installed()) {
 }
 
 if (auth_user()) {
-    redirect('/admin/dash');
+    redirect('/dash/home');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = post('password');
     if (auth_login($email, $password)) {
         flash_set('success', 'Welcome back.');
-        redirect('/admin/dash');
+        redirect('/dash/home');
     }
     flash_set('danger', 'Invalid credentials.');
 }
@@ -36,16 +36,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 render_page('Login', function (): void {
     $brandingDir = __DIR__ . '/../../uploads/branding';
     $logoLightFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']) : null;
-    $logoPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : null;
+    $logoDarkFile = function_exists('first_existing_brand_asset') ? first_existing_brand_asset($brandingDir, ['logo-dark.*']) : null;
+    $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : null;
+    $logoDarkPath = $logoDarkFile ? '/uploads/branding/' . basename($logoDarkFile) : null;
     ?>
     <div class="row justify-content-center mt-6">
         <div class="col-md-5">
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Login</h3></div>
                 <div class="card-body">
-                    <?php if ($logoPath): ?>
+                    <?php if ($logoLightPath || $logoDarkPath): ?>
                         <div class="text-center mb-4">
-                            <img src="<?= e($logoPath) ?>" alt="logo" class="auth-page-logo">
+                            <?php if ($logoLightPath): ?><img src="<?= e($logoLightPath) ?>" alt="logo" class="auth-page-logo logo-light"><?php endif; ?>
+                            <?php if ($logoDarkPath): ?><img src="<?= e($logoDarkPath) ?>" alt="logo" class="auth-page-logo logo-dark"><?php endif; ?>
                         </div>
                     <?php endif; ?>
                     <form method="post" autocomplete="on">

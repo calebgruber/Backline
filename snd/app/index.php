@@ -16,6 +16,6 @@ if (!function_exists('app_config')) {
 
 $user = require_permission('snd.access');
 
-render_page('Launch SND', function (): void {
-    echo '<div class="card show-context"><div class="card-body text-center py-5"><h2 class="mb-2">Launching Backline SND</h2><p class="text-secondary mb-4">Prepare your sound workflow and open the application.</p><a href="/snd/app" class="btn btn-primary btn-lg">Open Backline SND</a></div></div>';
+render_page('Sound', function (): void {
+    echo '<div class="card show-context"><div class="card-body"><h3 class="card-title">Sound App</h3><p class="text-secondary">Shop orders, revisions, labels, cable mapping, and bundles are scaffolded for SND.</p></div></div>';
 }, $user);

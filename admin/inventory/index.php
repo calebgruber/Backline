@@ -228,18 +228,33 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
 
                     <div class="card mt-3">
                         <div class="card-header"><h3 class="card-title"><?= e($shopLabel) ?> Items</h3></div>
+                        <div class="card-body border-bottom">
+                            <div class="row g-2">
+                                <div class="col-md-7">
+                                    <input type="text" class="form-control inventory-search" data-shop="<?= e($shopKey) ?>" placeholder="Search items in <?= e($shopLabel) ?>">
+                                </div>
+                                <div class="col-md-5">
+                                    <select class="form-select inventory-category-filter" data-shop="<?= e($shopKey) ?>">
+                                        <option value="">All Categories</option>
+                                        <?php foreach (array_keys($itemsGroupedByShopCategory[$shopKey]) as $catName): ?>
+                                            <option value="<?= e($catName) ?>"><?= e($catName) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
                                 <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                                 <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tbody>
-                                    <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>">
+                                    <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-category-name="<?= e($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
                                         <td colspan="8">
-                                            <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-down me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
+                                            <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-right me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
                                         </td>
                                     </tr>
                                 </tbody>
-                                <tbody class="category-item-group" id="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
+                                <tbody class="category-item-group" id="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-shop="<?= e($shopKey) ?>" style="display:none;">
                                     <?php foreach ($groupItems as $item): ?>
                                         <tr data-item-id="<?= (int) $item['id'] ?>">
                                             <td>
@@ -299,6 +314,38 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
             icon.classList.toggle('ti-chevron-right', !hidden);
           }
         });
+      });
+
+      const applyInventoryFilter = (shop) => {
+        const search = (document.querySelector('.inventory-search[data-shop=\"' + shop + '\"]')?.value || '').toLowerCase();
+        const selectedCategory = (document.querySelector('.inventory-category-filter[data-shop=\"' + shop + '\"]')?.value || '').toLowerCase();
+        document.querySelectorAll('.category-header-row[data-shop=\"' + shop + '\"]').forEach((header) => {
+          const categoryName = (header.getAttribute('data-category-name') || '').toLowerCase();
+          const group = document.getElementById(header.getAttribute('data-target') || '');
+          if (!group) return;
+          let visibleRows = 0;
+          group.querySelectorAll('tr[data-item-id]').forEach((row) => {
+            const text = row.innerText.toLowerCase();
+            const matchSearch = search === '' || text.includes(search);
+            const matchCategory = selectedCategory === '' || categoryName === selectedCategory;
+            const show = matchSearch && matchCategory;
+            row.style.display = show ? '' : 'none';
+            if (show) visibleRows++;
+          });
+          const showGroup = visibleRows > 0;
+          header.style.display = showGroup ? '' : 'none';
+          group.style.display = showGroup ? '' : 'none';
+          const icon = header.querySelector('.ti');
+          if (icon) {
+            icon.classList.add('ti-chevron-down');
+            icon.classList.remove('ti-chevron-right');
+          }
+        });
+      };
+
+      document.querySelectorAll('.inventory-search, .inventory-category-filter').forEach((el) => {
+        el.addEventListener('input', () => applyInventoryFilter(el.getAttribute('data-shop') || ''));
+        el.addEventListener('change', () => applyInventoryFilter(el.getAttribute('data-shop') || ''));
       });
 
       document.querySelectorAll('.category-item-group').forEach((group) => {

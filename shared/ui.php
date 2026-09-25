@@ -43,7 +43,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <header class="navbar navbar-expand-md d-print-none">
         <div class="container-xl">
             <h1 class="navbar-brand navbar-brand-autodark pe-0 pe-md-3">
-                <a href="<?= $user ? '/admin/dash' : '/' ?>" class="d-flex align-items-center">
+                <a href="<?= $user ? '/dash/home' : '/' ?>" class="d-flex align-items-center">
                     <?php if ($hasLightLogo || $hasDarkLogo): ?>
                         <?php if ($hasLightLogo): ?><img src="<?= e($logoLightPath) ?>" alt="logo" class="app-logo logo-light"><?php endif; ?>
                         <?php if ($hasDarkLogo): ?><img src="<?= e($logoDarkPath) ?>" alt="logo" class="app-logo logo-dark"><?php endif; ?>
@@ -85,7 +85,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
             <div class="navbar">
                 <div class="container-xl">
                     <ul class="navbar-nav">
-                        <?php nav_item('/admin/dash', 'Dashboard', $path); ?>
+                        <?php nav_item('/dash/home', 'Dashboard', $path); ?>
                         <?php if (user_has_permission($user, 'admin.access')) nav_item('/admin/settings', 'Settings', $path); ?>
                         <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
                         <?php if (user_has_permission($user, 'categories.manage')) nav_item('/admin/categories', 'Categories', $path); ?>

@@ -15,7 +15,7 @@ if (!function_exists('app_config')) {
 }
 
 if (auth_user()) {
-    redirect('/admin/dash');
+    redirect('/dash/home');
 }
 
 render_page('Backline', function (): void {

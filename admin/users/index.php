@@ -58,13 +58,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         audit_log((int) $user['id'], 'user', 'delete', $target);
     }
 
+    if ($action === 'update_permissions') {
+        $target = (int) post('user_id');
+        $selectedPerms = [];
+        foreach (array_keys($_POST) as $key) {
+            if (str_starts_with((string) $key, 'perm_')) {
+                $selectedPerms[] = substr((string) $key, 5);
+            }
+        }
+
+        db()->beginTransaction();
+        $stmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ?');
+        $stmt->execute([$target]);
+
+        if (!empty($selectedPerms)) {
+            $placeholders = implode(',', array_fill(0, count($selectedPerms), '?'));
+            $permStmt = db()->prepare('SELECT id, key_name FROM permissions WHERE key_name IN (' . $placeholders . ')');
+            $permStmt->execute($selectedPerms);
+            $permRows = $permStmt->fetchAll();
+
+            $ins = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) VALUES (?, ?, NOW())');
+            foreach ($permRows as $permRow) {
+                $ins->execute([$target, (int) $permRow['id']]);
+            }
+        }
+
+        db()->commit();
+        flash_set('success', 'User permissions updated.');
+        audit_log((int) $user['id'], 'user', 'permissions_update', $target, ['permissions' => $selectedPerms]);
+    }
+
     redirect('/admin/users');
 }
 
 $users = db()->query('SELECT id, name, email, created_at FROM users WHERE deleted_at IS NULL ORDER BY id DESC')->fetchAll();
+$permissionRows = db()->query('SELECT id, key_name FROM permissions ORDER BY key_name')->fetchAll();
+$userPermissionRows = db()->query('SELECT up.user_id, p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id')->fetchAll();
+$userPermMap = [];
+foreach ($userPermissionRows as $row) {
+    $userPermMap[(int) $row['user_id']][] = (string) $row['key_name'];
+}
 
-render_page('Users', function () use ($users): void {
-    $perms = ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'];
+render_page('Users', function () use ($users, $permissionRows, $userPermMap): void {
+    $perms = array_map(static fn ($r) => (string) $r['key_name'], $permissionRows);
     ?>
     <div class="row row-cards">
         <div class="col-lg-5">
@@ -87,9 +123,34 @@ render_page('Users', function () use ($users): void {
         <div class="col-lg-7">
             <div class="card"><div class="table-responsive"><table class="table table-vcenter"><thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead><tbody>
             <?php foreach ($users as $u): ?>
-                <tr><td><?= e($u['name']) ?></td><td><?= e($u['email']) ?></td><td>
-                    <form method="post" onsubmit="return confirm('Delete user?')" class="d-inline"><?= csrf_input() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
-                </td></tr>
+                <tr>
+                    <td><?= e($u['name']) ?></td>
+                    <td><?= e($u['email']) ?></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#perms-<?= (int) $u['id'] ?>">Permissions</button>
+                        <form method="post" onsubmit="return confirm('Delete user?')" class="d-inline"><?= csrf_input() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
+                    </td>
+                </tr>
+                <tr class="collapse" id="perms-<?= (int) $u['id'] ?>">
+                    <td colspan="3">
+                        <form method="post" class="row g-2 align-items-start">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="action" value="update_permissions">
+                            <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
+                            <?php foreach ($perms as $perm): ?>
+                                <div class="col-md-4">
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="perm_<?= e($perm) ?>" <?= in_array($perm, $userPermMap[(int) $u['id']] ?? [], true) ? 'checked' : '' ?>>
+                                        <span class="form-check-label"><?= e($perm) ?></span>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                            <div class="col-12">
+                                <button class="btn btn-primary btn-sm">Save Permissions</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
             <?php endforeach; ?>
             </tbody></table></div></div>
         </div>
