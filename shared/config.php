@@ -67,17 +67,17 @@ function storage_path_is_safe(): bool
     }
 
     $docRootReal = realpath($documentRoot);
-    $storageParent = dirname(storage_path());
-    if (!is_dir($storageParent)) {
-        @mkdir($storageParent, 0775, true);
+    $storageDir = storage_path();
+    if (!is_dir($storageDir)) {
+        @mkdir($storageDir, 0775, true);
     }
-    $storageParentReal = realpath($storageParent);
-    if ($docRootReal === false || $storageParentReal === false) {
+    $storageDirReal = realpath($storageDir);
+    if ($docRootReal === false || $storageDirReal === false) {
         return true;
     }
 
     $docRoot = rtrim($docRootReal, DIRECTORY_SEPARATOR);
-    return !($storageParentReal === $docRoot || str_starts_with($storageParentReal, $docRoot . DIRECTORY_SEPARATOR));
+    return !($storageDirReal === $docRoot || str_starts_with($storageDirReal, $docRoot . DIRECTORY_SEPARATOR));
 }
 
 function app_url(string $path = ''): string

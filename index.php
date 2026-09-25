@@ -22,7 +22,7 @@ foreach ($routeSegments as $segment) {
     if ($segment === '.' || $segment === '..') {
         continue;
     }
-    if (str_contains($segment, '/') || str_contains($segment, '\\') || str_contains($segment, "\0")) {
+    if (str_contains($segment, '/') || str_contains($segment, '\\') || str_contains($segment, chr(0))) {
         continue;
     }
     $safeSegments[] = $segment;

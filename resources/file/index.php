@@ -35,11 +35,12 @@ if ($base === false || $file === false || !str_starts_with($file, $base . DIRECT
 
 $mime = mime_content_type($file) ?: 'application/octet-stream';
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], basename($file));
+$encodedFilename = rawurlencode(basename($file));
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
-header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
+header('Content-Disposition: attachment; filename="' . $safeFilename . '"; filename*=UTF-8\'\'' . $encodedFilename);
 header('Content-Length: ' . (string) filesize($file));
 readfile($file);

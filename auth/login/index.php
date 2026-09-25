@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/shared/ui.php';
+require_once dirname(__DIR__, 2) . '/shared/db.php';
 
 $errors = [];
 if (empty($_SESSION['login_csrf_token'])) {
@@ -40,21 +41,45 @@ if ($requestMethod === 'POST') {
         exit;
     }
 
-    $bootstrapAdminEmail = trim((string) getenv('BACKLINE_BOOTSTRAP_ADMIN_EMAIL'));
-    $role = ($bootstrapAdminEmail !== '' && strcasecmp($bootstrapAdminEmail, $email) === 0) ? 'admin' : 'user';
-    $defaultConcentrations = array_values(array_intersect(
-        ['lx', 'snd'],
-        array_map('trim', explode(',', (string) getenv('BACKLINE_DEFAULT_CONCENTRATIONS')))
-    ));
-    if ($defaultConcentrations === []) {
-        $defaultConcentrations = ['lx'];
+    $sessionUser = null;
+    if (db_ready()) {
+        try {
+            $stmt = db()->prepare('SELECT id, email, role FROM users WHERE email = ? LIMIT 1');
+            $stmt->execute([$email]);
+            $userRow = $stmt->fetch();
+            if ($userRow) {
+                $grantsStmt = db()->prepare('SELECT concentration FROM user_concentrations WHERE user_id = ?');
+                $grantsStmt->execute([(int) $userRow['id']]);
+                $dbConcentrations = $grantsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                $sessionUser = [
+                    'email' => (string) $userRow['email'],
+                    'role' => (string) $userRow['role'],
+                    'concentrations' => array_values(array_intersect(['lx', 'snd'], $dbConcentrations)),
+                ];
+            }
+        } catch (Throwable) {
+            $sessionUser = null;
+        }
     }
-    $concentrations = $role === 'admin' ? ['lx', 'snd'] : $defaultConcentrations;
-    $_SESSION['user'] = [
-        'email' => $email,
-        'role' => $role,
-        'concentrations' => $concentrations,
-    ];
+
+    if ($sessionUser === null) {
+        $bootstrapAdminEmail = trim((string) getenv('BACKLINE_BOOTSTRAP_ADMIN_EMAIL'));
+        $role = ($bootstrapAdminEmail !== '' && strcasecmp($bootstrapAdminEmail, $email) === 0) ? 'admin' : 'user';
+        $defaultConcentrations = array_values(array_intersect(
+            ['lx', 'snd'],
+            array_map('trim', explode(',', (string) getenv('BACKLINE_DEFAULT_CONCENTRATIONS')))
+        ));
+        if ($defaultConcentrations === []) {
+            $defaultConcentrations = ['lx'];
+        }
+        $sessionUser = [
+            'email' => $email,
+            'role' => $role,
+            'concentrations' => $role === 'admin' ? ['lx', 'snd'] : $defaultConcentrations,
+        ];
+    }
+
+    $_SESSION['user'] = $sessionUser;
     header('Location: ' . app_url(user_home_route($_SESSION['user'])));
     exit;
 }

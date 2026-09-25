@@ -46,16 +46,11 @@ function apply_pending_migrations(): array
 
         try {
             $pdo = db();
-            $pdo->beginTransaction();
             $pdo->exec($sql);
-            $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
+            $stmt = $pdo->prepare('INSERT IGNORE INTO schema_migrations (migration) VALUES (?)');
             $stmt->execute([$name]);
-            $pdo->commit();
             $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
         } catch (Throwable $error) {
-            if (isset($pdo) && $pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
             $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];
             break;
         }
