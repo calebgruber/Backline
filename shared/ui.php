@@ -67,7 +67,7 @@ function render_page(string $title, callable $content): void
     .preloader{position:fixed;inset:0;display:grid;place-items:center;background:#050914;z-index:9999;transition:.2s opacity}
     .spinner{width:52px;height:52px;border:4px solid #23305b;border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line);background:#0a1228;position:sticky;top:0}
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line);background:#0a1228;position:sticky;top:0;z-index:1000}
     nav a{color:var(--muted);text-decoration:none;margin-right:14px}nav a.active,nav a:hover{color:var(--text)}
     .brand{font-size:18px;font-weight:600}.brand img{height:34px;display:block}
     main{max-width:1100px;margin:22px auto;padding:0 18px 36px}

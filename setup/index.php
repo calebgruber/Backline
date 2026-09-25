@@ -86,6 +86,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
+            $cleanupAdmin = static function (PDO $pdoConnection, string $email): void {
+                $pdoConnection->beginTransaction();
+                try {
+                    $cleanupConcentrations = $pdoConnection->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
+                    $cleanupConcentrations->execute([$email]);
+                    $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE email = ?');
+                    $cleanup->execute([$email]);
+                    $pdoConnection->commit();
+                } catch (Throwable) {
+                    if ($pdoConnection->inTransaction()) {
+                        $pdoConnection->rollBack();
+                    }
+                }
+            };
 
             $lockAcquired = (bool) $pdo->query("SELECT GET_LOCK('backline_setup', 10)")->fetchColumn();
             if (!$lockAcquired) {
@@ -128,18 +142,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
 
             if (!save_settings($candidateSettings)) {
-                $pdo->beginTransaction();
-                try {
-                    $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
-                    $cleanupConcentrations->execute([$adminEmail]);
-                    $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
-                    $cleanup->execute([$adminEmail]);
-                    $pdo->commit();
-                } catch (Throwable) {
-                    if ($pdo->inTransaction()) {
-                        $pdo->rollBack();
-                    }
-                }
+                $cleanupAdmin($pdo, $adminEmail);
                 throw new RuntimeException('Could not save setup settings file.');
             }
             if (!mark_setup_complete()) {
@@ -148,18 +151,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 } else {
                     @unlink(settings_file());
                 }
-                $pdo->beginTransaction();
-                try {
-                    $cleanupConcentrations = $pdo->prepare('DELETE uc FROM user_concentrations uc INNER JOIN users u ON u.id = uc.user_id WHERE u.email = ?');
-                    $cleanupConcentrations->execute([$adminEmail]);
-                    $cleanup = $pdo->prepare('DELETE FROM users WHERE email = ?');
-                    $cleanup->execute([$adminEmail]);
-                    $pdo->commit();
-                } catch (Throwable) {
-                    if ($pdo->inTransaction()) {
-                        $pdo->rollBack();
-                    }
-                }
+                $cleanupAdmin($pdo, $adminEmail);
                 throw new RuntimeException('Could not write setup completion marker.');
             }
 
