@@ -8,19 +8,20 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $path = route_path();
     $flash = flash_take();
     $appName = (string) app_setting('branding.app_name', config('app_name', 'Backline'));
-    $logoLightPath = '/uploads/branding/logo-light.png';
-    $logoDarkPath = '/uploads/branding/logo-dark.png';
-    $faviconPath = file_exists(__DIR__ . '/../uploads/branding/favicon.png') ? '/uploads/branding/favicon.png' : '/uploads/branding/favicon.ico';
-    $logoLightFile = __DIR__ . '/../uploads/branding/logo-light.png';
-    $logoDarkFile = __DIR__ . '/../uploads/branding/logo-dark.png';
-    $faviconFile = __DIR__ . '/../uploads/branding/' . basename($faviconPath);
-    $hasLightLogo = file_exists($logoLightFile);
-    $hasDarkLogo = file_exists($logoDarkFile);
-    $hasFavicon = file_exists($faviconFile);
+    $brandingDir = __DIR__ . '/../uploads/branding';
+    $logoLightFile = first_existing_brand_asset($brandingDir, ['logo-light.*', 'logo.*']);
+    $logoDarkFile = first_existing_brand_asset($brandingDir, ['logo-dark.*']);
+    $faviconFile = first_existing_brand_asset($brandingDir, ['favicon.*']);
+    $logoLightPath = $logoLightFile ? '/uploads/branding/' . basename($logoLightFile) : '';
+    $logoDarkPath = $logoDarkFile ? '/uploads/branding/' . basename($logoDarkFile) : '';
+    $faviconPath = $faviconFile ? '/uploads/branding/' . basename($faviconFile) : '';
+    $hasLightLogo = $logoLightFile !== null;
+    $hasDarkLogo = $logoDarkFile !== null;
+    $hasFavicon = $faviconFile !== null;
     $theme = ($_COOKIE['theme_preference'] ?? 'light') === 'dark' ? 'dark' : 'light';
     ?>
 <!doctype html>
-<html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $hasDarkLogo ? '1' : '0' ?>">
+<html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $hasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $hasLightLogo ? '1' : '0' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -133,6 +134,18 @@ function render_page(string $title, callable $body, ?array $user = null): void
 </body>
 </html>
 <?php
+}
+
+function first_existing_brand_asset(string $dir, array $patterns): ?string
+{
+    foreach ($patterns as $pattern) {
+        $matches = glob($dir . '/' . $pattern) ?: [];
+        if (!empty($matches)) {
+            sort($matches);
+            return $matches[0];
+        }
+    }
+    return null;
 }
 
 function nav_item(string $href, string $label, string $current): void

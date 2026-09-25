@@ -16,6 +16,30 @@ if (!function_exists('app_config')) {
 
 $user = require_permission('admin.access');
 
+function save_branding_asset(string $inputName, string $baseName): void
+{
+    if (empty($_FILES[$inputName]['tmp_name'] ?? null)) {
+        return;
+    }
+
+    $dir = __DIR__ . '/../../uploads/branding';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+
+    $name = (string) ($_FILES[$inputName]['name'] ?? '');
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if ($ext === '') {
+        $ext = 'png';
+    }
+
+    foreach (glob($dir . '/' . $baseName . '.*') ?: [] as $existing) {
+        @unlink($existing);
+    }
+
+    move_uploaded_file($_FILES[$inputName]['tmp_name'], $dir . '/' . $baseName . '.' . $ext);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
 
@@ -35,32 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
         $stmt->execute([json_encode($appName), json_encode($madeIn)]);
 
-        if (!empty($_FILES['logo_light']['tmp_name'] ?? null)) {
-            $dir = __DIR__ . '/../../uploads/branding';
-            if (!is_dir($dir)) {
-                mkdir($dir, 0775, true);
-            }
-            move_uploaded_file($_FILES['logo_light']['tmp_name'], $dir . '/logo-light.png');
-        }
-
-        if (!empty($_FILES['logo_dark']['tmp_name'] ?? null)) {
-            $dir = __DIR__ . '/../../uploads/branding';
-            if (!is_dir($dir)) {
-                mkdir($dir, 0775, true);
-            }
-            move_uploaded_file($_FILES['logo_dark']['tmp_name'], $dir . '/logo-dark.png');
-        }
-
-        if (!empty($_FILES['favicon']['tmp_name'] ?? null)) {
-            $dir = __DIR__ . '/../../uploads/branding';
-            if (!is_dir($dir)) {
-                mkdir($dir, 0775, true);
-            }
-            $name = (string) ($_FILES['favicon']['name'] ?? '');
-            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            $target = $ext === 'png' ? 'favicon.png' : 'favicon.ico';
-            move_uploaded_file($_FILES['favicon']['tmp_name'], $dir . '/' . $target);
-        }
+        save_branding_asset('logo_light', 'logo-light');
+        save_branding_asset('logo_dark', 'logo-dark');
+        save_branding_asset('logo', 'logo-light'); // backwards compatibility
+        save_branding_asset('favicon', 'favicon');
 
         flash_set('success', 'Branding saved.');
     }
