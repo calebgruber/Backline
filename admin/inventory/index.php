@@ -85,6 +85,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('warning', 'Item deleted.');
     }
 
+    if ($action === 'update_item') {
+        $stmt = db()->prepare('UPDATE inventory_items
+            SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+            WHERE id = ? AND shop_type = ?');
+        $stmt->execute([
+            (int) post('category_id', '0') ?: null,
+            post('name'),
+            post('sku') ?: null,
+            (int) post('shop_quantity', '0'),
+            post('unit', 'ea'),
+            isset($_POST['is_spacer']) ? 1 : 0,
+            (int) post('sort_order', '0'),
+            (int) post('id'),
+            $shop,
+        ]);
+        flash_set('success', 'Item updated.');
+    }
+
     if ($action === 'clear_shop') {
         db()->beginTransaction();
         $stmt = db()->prepare('DELETE FROM inventory_items WHERE shop_type = ?');
@@ -195,24 +213,42 @@ render_page('Inventory', function () use ($itemsByShop, $catsByShop, $itemsGroup
                     <div class="card-header"><h3 class="card-title"><?= e($shopLabel) ?> Items</h3></div>
                     <div class="table-responsive">
                         <table class="table table-vcenter">
-                            <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Spacer</th><th></th></tr></thead>
+                            <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                             <tbody>
                             <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tr class="table-secondary">
-                                    <td colspan="7"><strong><?= e($categoryName) ?></strong></td>
+                                    <td colspan="8"><strong><?= e($categoryName) ?></strong></td>
                                 </tr>
                                 <?php foreach ($groupItems as $item): ?>
                                     <tr>
-                                        <td><?= e((string) $item['category_name']) ?></td>
-                                        <td><?= e($item['name']) ?></td>
-                                        <td><?= e((string) $item['sku']) ?></td>
-                                        <td><?= (int) $item['shop_quantity'] ?></td>
-                                        <td><?= e($item['unit']) ?></td>
-                                        <td><?= (int) $item['is_spacer'] ? 'Yes' : 'No' ?></td>
                                         <td>
-                                            <form method="post">
+                                            <select class="form-select form-select-sm" name="category_id" form="item-update-<?= (int) $item['id'] ?>">
+                                                <option value="">No category</option>
+                                                <?php foreach ($catsByShop[$shopKey] as $cat): ?>
+                                                    <option value="<?= (int) $cat['id'] ?>" <?= ((int) ($item['category_id'] ?? 0) === (int) $cat['id']) ? 'selected' : '' ?>><?= e($cat['name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                        <td><input class="form-control form-control-sm" name="name" value="<?= e($item['name']) ?>" form="item-update-<?= (int) $item['id'] ?>" required></td>
+                                        <td><input class="form-control form-control-sm" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>" <?= $shopKey === 'lx' ? 'disabled' : '' ?>></td>
+                                        <td><input class="form-control form-control-sm" type="number" name="shop_quantity" value="<?= (int) $item['shop_quantity'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
+                                        <td><input class="form-control form-control-sm" name="unit" value="<?= e($item['unit']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
+                                        <td class="text-center">
+                                            <input class="form-check-input" type="checkbox" name="is_spacer" value="1" form="item-update-<?= (int) $item['id'] ?>" <?= (int) $item['is_spacer'] ? 'checked' : '' ?>>
+                                        </td>
+                                        <td><input class="form-control form-control-sm" type="number" name="sort_order" value="<?= (int) $item['sort_order'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
+                                        <td class="text-end">
+                                            <form id="item-update-<?= (int) $item['id'] ?>" method="post" class="d-inline-block">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="action" value="update_item">
+                                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                                <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                                <button class="btn btn-sm btn-primary">Update</button>
+                                            </form>
+                                            <form method="post" class="d-inline-block ms-2">
                                                 <?= csrf_input() ?>
                                                 <input type="hidden" name="action" value="delete_item">
+                                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
                                                 <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
                                                 <button class="btn btn-sm btn-outline-danger">Delete</button>
                                             </form>

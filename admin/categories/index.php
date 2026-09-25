@@ -33,6 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('warning', 'Category deleted.');
     }
 
+    if ($action === 'update') {
+        $stmt = db()->prepare('UPDATE inventory_categories SET name = ?, sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
+        $stmt->execute([post('name'), (int) post('sort_order', '0'), (int) post('id'), $shop]);
+        flash_set('success', 'Category updated.');
+    }
+
     if ($action === 'clear_shop_categories') {
         $stmt = db()->prepare('DELETE FROM inventory_categories WHERE shop_type = ?');
         $stmt->execute([$shop]);
@@ -86,15 +92,27 @@ render_page('Categories', function () use ($categoriesByShop): void {
                     <div class="card-header"><h3 class="card-title"><?= e($shopLabel) ?> List</h3></div>
                     <div class="table-responsive">
                         <table class="table table-vcenter">
-                            <thead><tr><th>Name</th><th>Sort</th><th></th></tr></thead>
+                            <thead><tr><th>Name</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                             <tbody>
                             <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
                                 <tr>
-                                    <td><?= e($cat['name']) ?></td>
-                                    <td><?= (int) $cat['sort_order'] ?></td>
                                     <td>
-                                        <form method="post">
+                                        <input class="form-control form-control-sm" name="name" value="<?= e($cat['name']) ?>" required form="cat-update-<?= (int) $cat['id'] ?>">
+                                    </td>
+                                    <td>
+                                        <input class="form-control form-control-sm" type="number" name="sort_order" value="<?= (int) $cat['sort_order'] ?>" form="cat-update-<?= (int) $cat['id'] ?>">
+                                    </td>
+                                    <td class="text-end">
+                                        <form id="cat-update-<?= (int) $cat['id'] ?>" method="post" class="d-inline-block">
                                             <?= csrf_input() ?>
+                                            <input type="hidden" name="action" value="update">
+                                            <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                            <input type="hidden" name="id" value="<?= (int) $cat['id'] ?>">
+                                            <button class="btn btn-sm btn-primary">Update</button>
+                                        </form>
+                                        <form method="post" class="d-inline-block ms-2">
+                                            <?= csrf_input() ?>
+                                            <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="id" value="<?= (int) $cat['id'] ?>">
                                             <button class="btn btn-sm btn-outline-danger">Delete</button>
