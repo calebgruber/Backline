@@ -24,7 +24,12 @@ function require_any_access(array $concentrations): void
 {
     $user = current_user();
     if (!$user) {
-        header('Location: ' . app_url('auth/login'));
+        $loginUrl = app_url('auth/login');
+        if (!headers_sent()) {
+            header('Location: ' . $loginUrl);
+        } else {
+            echo '<script>window.location.href=' . json_encode($loginUrl) . ';</script>';
+        }
         exit;
     }
 

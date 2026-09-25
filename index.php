@@ -2,9 +2,17 @@
 
 declare(strict_types=1);
 
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 
-$route = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+$basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
+if ($basePath !== '' && $basePath !== '/' && str_starts_with($requestPath, $basePath)) {
+    $requestPath = substr($requestPath, strlen($basePath)) ?: '/';
+}
+
+$route = trim($requestPath, '/');
 $route = $route === '' ? 'auth/login' : $route;
 $routeFile = __DIR__ . '/' . $route . '/index.php';
 

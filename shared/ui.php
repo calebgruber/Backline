@@ -17,6 +17,7 @@ function nav_items(): array
 function render_page(string $title, callable $content): void
 {
     $settings = app_settings();
+    $user = $_SESSION['user'] ?? null;
     $path = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
     $path = $path === '' ? 'auth/login' : $path;
     $logo = trim((string) ($settings['branding_logo'] ?? ''));
@@ -52,7 +53,12 @@ function render_page(string $title, callable $content): void
         $active = str_starts_with($path, $href) ? 'active' : '';
         echo '<a class="' . $active . '" href="' . htmlspecialchars(app_url($href)) . '">' . htmlspecialchars($label) . '</a>';
     }
-    echo '<a href="' . htmlspecialchars(app_url('auth/login')) . '">Login</a>';
+    if ($user) {
+        $destination = ($user['role'] ?? '') === 'admin' ? 'admin/dash' : ((in_array('snd', $user['concentrations'] ?? [], true) ? 'snd' : 'lx'));
+        echo '<a href="' . htmlspecialchars(app_url($destination)) . '">' . htmlspecialchars((string) ($user['email'] ?? 'Account')) . '</a>';
+    } else {
+        echo '<a href="' . htmlspecialchars(app_url('auth/login')) . '">Login</a>';
+    }
     echo '</nav></header><main>';
     $content();
     echo '</main><script>window.addEventListener("load",()=>{const p=document.getElementById("preloader");if(p){p.style.opacity="0";setTimeout(()=>p.remove(),220);}});</script></body></html>';

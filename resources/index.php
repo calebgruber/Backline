@@ -27,7 +27,7 @@ if (is_dir($base)) {
         $items[] = [
             'name' => $item,
             'is_dir' => is_dir($fullPath),
-            'url' => app_url('uploads/resources/' . rawurlencode($selected) . '/' . rawurlencode($item)),
+            'url' => app_url('resources/file?folder=' . rawurlencode($selected) . '&name=' . rawurlencode($item)),
         ];
     }
 }

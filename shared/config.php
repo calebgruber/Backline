@@ -52,7 +52,7 @@ function save_settings(array $settings): bool
     }
 
     $export = '<?php' . PHP_EOL . 'return ' . var_export($settings, true) . ';' . PHP_EOL;
-    return file_put_contents(settings_file(), $export) !== false;
+    return file_put_contents(settings_file(), $export, LOCK_EX) !== false;
 }
 
 function app_url(string $path = ''): string
