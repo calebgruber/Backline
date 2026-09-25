@@ -2,3 +2,12 @@
 .alert {
   border-left: 5px solid var(--tblr-alert-color)!important;
 }
+.page-wrapper {
+  background-image: url('https://images.pexels.com/photos/31256342/pexels-photo-31256342.jpeg?cs=srgb&dl=pexels-optical-chemist-340351297-31256342.jpg&fm=jpg');
+  background-size: cover;
+}
+.page-wrapper-login {
+  background-image: url('https://images.pexels.com/photos/31256342/pexels-photo-31256342.jpeg?cs=srgb&dl=pexels-optical-chemist-340351297-31256342.jpg&fm=jpg');
+  background-size: cover;
+}
+  
