@@ -67,7 +67,8 @@ render_page('Resources', function () use ($roots, $selected, $items, $relativePa
         if ($item['is_dir']) {
             echo '<a href="' . htmlspecialchars($item['url']) . '"><span aria-hidden="true">📁 </span>' . htmlspecialchars($item['name']) . ' <span class="muted">(folder)</span></a>';
         } else {
-            echo '<a target="_blank" rel="noopener" href="' . htmlspecialchars($item['url']) . '">' . htmlspecialchars($item['name']) . '</a>';
+            $newTabLabel = $item['name'] . ' (opens in new tab)';
+            echo '<a target="_blank" rel="noopener" aria-label="' . htmlspecialchars($newTabLabel) . '" href="' . htmlspecialchars($item['url']) . '">' . htmlspecialchars($item['name']) . ' <span class="muted">(opens in new tab)</span></a>';
         }
         echo '</li>';
     }

@@ -102,11 +102,19 @@ try {
 
 render_page('System Settings', function () use ($settings, $messages, $errors, $applied, $pending, $csrfToken, $keepDbPasswordChecked): void {
     echo '<section class="panel"><h1>System Settings</h1>';
-    foreach ($messages as $message) {
-        echo '<p>' . htmlspecialchars($message) . '</p>';
+    if ($messages !== []) {
+        echo '<div class="alert success" role="status" aria-live="polite"><div class="alert-text"><ul>';
+        foreach ($messages as $message) {
+            echo '<li>' . htmlspecialchars($message) . '</li>';
+        }
+        echo '</ul></div></div>';
     }
-    foreach ($errors as $error) {
-        echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
+    if ($errors !== []) {
+        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><ul>';
+        foreach ($errors as $error) {
+            echo '<li>' . htmlspecialchars($error) . '</li>';
+        }
+        echo '</ul></div></div>';
     }
 
     echo '<form method="post" class="grid">';

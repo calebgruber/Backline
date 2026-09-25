@@ -35,16 +35,21 @@ if ($root === false || $base === false || $file === false || !is_file($file) || 
 }
 
 $detectedMime = mime_content_type($file) ?: 'application/octet-stream';
-$safeInline = in_array(strtolower($detectedMime), ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], true);
-$contentType = strtolower($detectedMime) === 'image/svg+xml' ? 'application/octet-stream' : $detectedMime;
-$disposition = $safeInline ? 'inline' : 'attachment';
+$mime = strtolower($detectedMime);
 $extension = strtolower((string) pathinfo($file, PATHINFO_EXTENSION));
-$isSvgLike = strtolower($detectedMime) === 'image/svg+xml' || $extension === 'svg';
-$downloadName = $isSvgLike ? 'resource-download.bin' : basename($file);
+$riskyMimeTypes = ['image/svg+xml', 'text/html', 'application/xhtml+xml'];
+$riskyExtensions = ['svg', 'html', 'htm', 'xhtml'];
+$isRisky = in_array($mime, $riskyMimeTypes, true) || in_array($extension, $riskyExtensions, true);
+$inlineMimeAllowlist = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+$safeInline = !$isRisky && in_array($mime, $inlineMimeAllowlist, true);
+$contentType = $safeInline ? $detectedMime : 'application/octet-stream';
+$disposition = $safeInline ? 'inline' : 'attachment';
+$downloadName = $isRisky ? 'resource-download.bin' : basename($file);
 $safeFilename = str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ''], $downloadName);
 $encodedFilename = rawurlencode($downloadName);
 header('Content-Type: ' . $contentType);
 header('X-Content-Type-Options: nosniff');
+header("Content-Security-Policy: default-src 'none'; style-src 'none'; script-src 'none'");
 header('Cache-Control: private, no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');

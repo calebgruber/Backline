@@ -74,8 +74,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 render_page('Login', function () use ($csrfToken, $errors, $submittedEmail): void {
     echo '<section class="panel"><h1>Login</h1><p class="muted">Sign in with your account.</p>';
-    foreach ($errors as $error) {
-        echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
+    if ($errors !== []) {
+        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><strong>Sign-in error:</strong><ul>';
+        foreach ($errors as $error) {
+            echo '<li>' . htmlspecialchars($error) . '</li>';
+        }
+        echo '</ul></div></div>';
     }
 
     echo '<form method="post" class="grid">';

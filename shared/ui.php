@@ -64,15 +64,34 @@ function current_path(): string
     return $path === '' ? 'auth/login' : $path;
 }
 
+function user_initials(string $value): string
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return 'AC';
+    }
+    if (function_exists('mb_substr')) {
+        return strtoupper((string) mb_substr($trimmed, 0, 2, 'UTF-8'));
+    }
+
+    return strtoupper(substr($trimmed, 0, 2));
+}
+
 function is_active_nav(string $target): bool
 {
     $path = current_path();
+    if ($target === '' || $target === '#' || str_starts_with($target, '#')) {
+        return false;
+    }
     $targetPath = parse_url($target, PHP_URL_PATH) ?: $target;
     $basePath = defined('APP_BASE_PATH') ? (string) APP_BASE_PATH : '';
     if ($basePath !== '' && $basePath !== '/' && str_starts_with($targetPath, $basePath)) {
         $targetPath = substr($targetPath, strlen($basePath)) ?: '/';
     }
     $target = trim($targetPath, '/');
+    if ($target === '') {
+        return false;
+    }
     return $path === $target || str_starts_with($path, $target . '/');
 }
 
@@ -81,6 +100,7 @@ function render_page(string $title, callable $content): void
     $settings = app_settings();
     $user = $_SESSION['user'] ?? null;
     $logo = safe_logo_src(trim((string) ($settings['branding_logo'] ?? '')));
+    $logoDark = safe_logo_src(trim((string) ($settings['branding_logo_dark'] ?? '')));
     $appName = (string) ($settings['app_name'] ?? 'Backline');
     $homeRoute = $user ? user_home_route($user) : 'auth/login';
 
@@ -88,21 +108,22 @@ function render_page(string $title, callable $content): void
     echo '<meta name="robots" content="noindex,nofollow">';
     echo '<title>' . htmlspecialchars($title) . ' | ' . htmlspecialchars($appName) . '</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">';
+    echo '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . htmlspecialchars(app_url('shared/assets/style.css')) . '">';
     echo '<script>(function(){var t=localStorage.getItem("cg-theme")||(window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("page-loader");if(l)l.classList.add("pg-done");});</script>';
     echo '</head><body><div id="page-loader"></div><div class="app">';
 
     echo '<div class="topbar">';
-    echo '<button id="mobile-menu-btn" class="topbar-btn mobile-menu-btn" title="Menu"><span class="material-symbols-outlined">menu</span></button>';
+    echo '<button id="mobile-menu-btn" class="topbar-btn mobile-menu-btn" title="Menu" aria-label="Open navigation menu"><span class="material-symbols-outlined">menu</span></button>';
     echo '<a href="' . htmlspecialchars(app_url($homeRoute)) . '" class="topbar-launcher"><span class="material-symbols-outlined">home</span>Launcher</a>';
     echo '<span class="topbar-sep">›</span>';
     echo '<span class="topbar-app"><span class="material-symbols-outlined">dashboard</span>' . htmlspecialchars($title) . '</span>';
     echo '<div class="topbar-right">';
-    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
+    echo '<button id="theme-toggle" class="topbar-btn" title="Toggle theme" aria-label="Toggle light and dark theme"><span class="material-symbols-outlined" id="theme-icon">dark_mode</span></button>';
     if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        $initials = strtoupper(substr($displayName, 0, 2));
+        $initials = user_initials($displayName);
         echo '<span class="topbar-user"><div class="topbar-avatar">' . htmlspecialchars($initials) . '</div></span>';
     }
     echo '</div></div>';
@@ -111,7 +132,10 @@ function render_page(string $title, callable $content): void
     echo '<aside class="sidebar">';
     echo '<div class="sidebar-header"><h2>';
     if ($logo !== '') {
-        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" style="height:26px;max-width:100%;object-fit:contain;">';
+        echo '<img src="' . htmlspecialchars($logo) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-light">';
+        if ($logoDark !== '') {
+            echo '<img src="' . htmlspecialchars($logoDark) . '" alt="' . htmlspecialchars($appName) . '" class="brand-logo brand-logo-dark">';
+        }
     } else {
         echo '<span class="material-symbols-outlined app-logo">dashboard</span>' . htmlspecialchars($appName);
     }
@@ -130,12 +154,12 @@ function render_page(string $title, callable $content): void
 
     if ($user) {
         $displayName = (string) ($user['email'] ?? 'Account');
-        $initials = strtoupper(substr($displayName, 0, 2));
+        $initials = user_initials($displayName);
         echo '<div class="sidebar-footer"><div class="user-info"><div class="user-avatar">' . htmlspecialchars($initials) . '</div><div class="user-details"><div class="user-name truncate">' . htmlspecialchars($displayName) . '</div><div class="user-role">' . htmlspecialchars(ucfirst((string) ($user['role'] ?? 'user'))) . '</div></div></div></div>';
     }
 
     echo '</aside><main class="content">';
-    echo '<div class="page-header"><div><h1>' . htmlspecialchars($title) . '</h1></div></div>';
+    echo '<div class="page-header"><div><h2>' . htmlspecialchars($title) . '</h2></div></div>';
     echo '<div class="page-body">';
     $content();
     echo '</div></main></div><script src="' . htmlspecialchars(app_url('shared/assets/app.js')) . '"></script></body></html>';

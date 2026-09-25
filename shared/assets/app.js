@@ -88,6 +88,8 @@
     const pw = document.getElementById('password');
     const bar = document.getElementById('pw-strength-bar');
     if (!pw || !bar) return;
+    const fill = bar.querySelector('.progress-fill');
+    if (!fill) return;
 
     pw.addEventListener('input', function () {
       const val = pw.value;
@@ -99,8 +101,8 @@
 
       const pct = (score / 4) * 100;
       const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
-      bar.querySelector('.progress-fill').style.width = pct + '%';
-      bar.querySelector('.progress-fill').style.background = colors[score - 1] || '#e2e8f0';
+      fill.style.width = pct + '%';
+      fill.style.background = colors[score - 1] || '#e2e8f0';
     });
   }
 
@@ -120,6 +122,7 @@
     document.querySelectorAll('[data-add-row]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const container = document.getElementById(btn.getAttribute('data-add-row'));
+        if (!container) return;
         const template  = container.querySelector('[data-row-template]');
         if (!template) return;
         const clone = template.cloneNode(true);
@@ -133,7 +136,8 @@
 
     document.addEventListener('click', function (e) {
       if (e.target.closest('[data-remove-row]')) {
-        e.target.closest('[data-remove-row]').closest('[data-row]').remove();
+        const row = e.target.closest('[data-remove-row]').closest('[data-row]');
+        if (row) row.remove();
       }
     });
   }
@@ -156,8 +160,16 @@
       var link = e.target.closest('a[href]');
       if (!link) return;
       var href = link.getAttribute('href') || '';
+      if (href === '' || href.charAt(0) === '#') return;
+      var parsed;
+      try {
+        parsed = new URL(href, window.location.href);
+      } catch (err) {
+        return;
+      }
+      if (!/^https?:$/.test(parsed.protocol) || parsed.origin !== window.location.origin) return;
       if (link.target || e.ctrlKey || e.metaKey || e.shiftKey ||
-          href.charAt(0) === '#' || href.indexOf('javascript:') === 0 || href === '') return;
+          link.hasAttribute('download')) return;
       startLoader();
     });
 

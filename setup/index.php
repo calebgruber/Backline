@@ -87,6 +87,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
     if ($errors === []) {
         $setupLockHandle = null;
+        $dbWasCreatedBySetup = false;
         try {
             if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
                 throw new RuntimeException('Could not prepare setup storage directory.');
@@ -105,7 +106,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
+            $dbExistsStmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?');
+            $dbExistsStmt->execute([$dbName]);
+            $dbAlreadyExisted = (int) $dbExistsStmt->fetchColumn() > 0;
             $pdo->exec('CREATE DATABASE IF NOT EXISTS ' . $dbNameSql . ' CHARACTER SET ' . $safeCharset);
+            $dbWasCreatedBySetup = !$dbAlreadyExisted;
             $pdo->exec('USE ' . $dbNameSql);
 
             $lockStmt = $pdo->query("SELECT GET_LOCK('backline_setup', 10)");
@@ -118,6 +123,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $cleanupConcentrations->execute([$userId]);
                 $cleanup = $pdoConnection->prepare('DELETE FROM users WHERE id = ?');
                 $cleanup->execute([$userId]);
+            };
+            $revertSetupChanges = static function (PDO $pdoConnection, int $userId, ?string $settingsBackupContent, callable $cleanupAdminFn): void {
+                if (is_string($settingsBackupContent)) {
+                    if (file_put_contents(settings_file(), $settingsBackupContent, LOCK_EX) === false) {
+                        error_log('Setup rollback warning: failed restoring settings backup file.');
+                    }
+                } else {
+                    if (is_file(settings_file()) && !@unlink(settings_file())) {
+                        error_log('Setup rollback warning: failed removing settings file.');
+                    }
+                }
+                @unlink(setup_state_file());
+
+                try {
+                    $pdoConnection->beginTransaction();
+                    $cleanupAdminFn($pdoConnection, $userId);
+                    $pdoConnection->commit();
+                } catch (Throwable $cleanupError) {
+                    error_log('Setup rollback warning: failed cleaning up admin user. ' . $cleanupError->getMessage());
+                    if ($pdoConnection->inTransaction()) {
+                        $pdoConnection->rollBack();
+                    }
+                }
             };
 
             try {
@@ -148,33 +176,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $pdo->commit();
 
                 if (!save_settings($candidateSettings)) {
-                    $pdo->beginTransaction();
-                    try {
-                        $cleanupAdmin($pdo, $adminId);
-                        $pdo->commit();
-                    } catch (Throwable) {
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollBack();
-                        }
-                    }
+                    $revertSetupChanges($pdo, $adminId, $settingsBackup, $cleanupAdmin);
                     throw new RuntimeException('Could not save setup settings file.');
                 }
                 $settingsSaved = true;
                 if (!mark_setup_complete()) {
-                    if (is_string($settingsBackup)) {
-                        file_put_contents(settings_file(), $settingsBackup, LOCK_EX);
-                    } else {
-                        @unlink(settings_file());
-                    }
-                    $pdo->beginTransaction();
-                    try {
-                        $cleanupAdmin($pdo, $adminId);
-                        $pdo->commit();
-                    } catch (Throwable) {
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollBack();
-                        }
-                    }
+                    $revertSetupChanges($pdo, $adminId, $settingsBackup, $cleanupAdmin);
+                    $settingsSaved = false;
                     throw new RuntimeException('Could not write setup completion marker.');
                 }
             } finally {
@@ -187,6 +195,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } catch (Throwable $error) {
             if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+            if (($dbWasCreatedBySetup ?? false) && isset($pdo) && $pdo instanceof PDO) {
+                try {
+                    $dbNameSql = '`' . str_replace('`', '``', $dbName) . '`';
+                    $pdo->exec('DROP DATABASE IF EXISTS ' . $dbNameSql);
+                } catch (Throwable $dropError) {
+                    error_log('Setup rollback warning: failed dropping created database. ' . $dropError->getMessage());
+                }
             }
             @unlink(setup_state_file());
             if ($settingsSaved) {
@@ -210,8 +226,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 render_page('Setup', function () use ($csrfToken, $errors, $form): void {
     echo '<section class="panel"><h1>One-time Setup</h1><p class="muted">Configure DB + first admin account. This page is disabled after successful setup.</p>';
 
-    foreach ($errors as $error) {
-        echo '<p style="color:#ffb8b8;">' . htmlspecialchars($error) . '</p>';
+    if ($errors !== []) {
+        echo '<div class="alert error" role="alert" aria-live="assertive"><div class="alert-text"><strong>Setup error:</strong><ul>';
+        foreach ($errors as $error) {
+            echo '<li>' . htmlspecialchars($error) . '</li>';
+        }
+        echo '</ul></div></div>';
     }
 
     echo '<form method="post" class="grid">';
