@@ -42,30 +42,33 @@ function apply_pending_migrations(): array
         return [['migration' => 'migration_lock', 'status' => 'failed', 'message' => 'Could not acquire migration lock']];
     }
 
-    foreach (pending_migrations() as $file) {
-        $name = basename($file);
-        $sql = trim((string) file_get_contents($file));
-        if ($sql === '') {
-            $results[] = ['migration' => $name, 'status' => 'skipped', 'message' => 'Empty file'];
-            continue;
-        }
-
-        try {
-            $pdo->beginTransaction();
-            $pdo->exec($sql);
-            $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
-            $stmt->execute([$name]);
-            $pdo->commit();
-            $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
-        } catch (Throwable $error) {
-            if (isset($pdo) && $pdo->inTransaction()) {
-                $pdo->rollBack();
+    try {
+        foreach (pending_migrations() as $file) {
+            $name = basename($file);
+            $sql = trim((string) file_get_contents($file));
+            if ($sql === '') {
+                $results[] = ['migration' => $name, 'status' => 'skipped', 'message' => 'Empty file'];
+                continue;
             }
-            $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];
-            break;
+
+            try {
+                $pdo->beginTransaction();
+                $pdo->exec($sql);
+                $stmt = $pdo->prepare('INSERT INTO schema_migrations (migration) VALUES (?)');
+                $stmt->execute([$name]);
+                $pdo->commit();
+                $results[] = ['migration' => $name, 'status' => 'applied', 'message' => 'Applied successfully'];
+            } catch (Throwable $error) {
+                if (isset($pdo) && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $results[] = ['migration' => $name, 'status' => 'failed', 'message' => $error->getMessage()];
+                break;
+            }
         }
+    } finally {
+        $pdo->query("SELECT RELEASE_LOCK('backline_migrations')");
     }
-    $pdo->query("SELECT RELEASE_LOCK('backline_migrations')");
 
     return $results;
 }

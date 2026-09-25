@@ -72,10 +72,12 @@ function storage_path_is_safe(): bool
         @mkdir($storageDir, 0775, true);
     }
     $storageDirReal = realpath($storageDir);
-    if ($docRootReal === false || $storageDirReal === false) {
+    if ($docRootReal === false) {
         return true;
     }
-
+    if ($storageDirReal === false) {
+        return false;
+    }
     $docRoot = rtrim($docRootReal, DIRECTORY_SEPARATOR);
     return !($storageDirReal === $docRoot || str_starts_with($storageDirReal, $docRoot . DIRECTORY_SEPARATOR));
 }
