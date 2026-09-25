@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/shared/config.php';
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
@@ -29,6 +31,17 @@ foreach ($routeSegments as $segment) {
 }
 $route = implode('/', $safeSegments);
 $route = $route === '' ? 'auth/login' : $route;
+
+$isSetupRoute = $route === 'setup' || str_starts_with($route, 'setup/');
+if (!is_setup_complete() && !$isSetupRoute) {
+    header('Location: ' . app_url('setup'));
+    exit;
+}
+if (is_setup_complete() && $isSetupRoute) {
+    header('Location: ' . app_url('auth/login'));
+    exit;
+}
+
 $routeFile = __DIR__ . '/' . $route . '/index.php';
 
 if (is_file($routeFile)) {

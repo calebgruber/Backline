@@ -14,6 +14,11 @@ function settings_file(): string
     return storage_path('system_settings.php');
 }
 
+function setup_state_file(): string
+{
+    return storage_path('setup_complete.php');
+}
+
 function default_settings(): array
 {
     return [
@@ -89,4 +94,32 @@ function app_url(string $path = ''): string
         : rtrim(trim((string) getenv('BACKLINE_BASE_PATH')), '/');
     $base = ($base === '' || $base === '/') ? '' : $base;
     return $base . '/' . ltrim($path, '/');
+}
+
+function is_setup_complete(): bool
+{
+    $file = setup_state_file();
+    if (!is_file($file)) {
+        return false;
+    }
+
+    $state = require $file;
+    return is_array($state) && !empty($state['completed']);
+}
+
+function mark_setup_complete(): bool
+{
+    if (!storage_path_is_safe()) {
+        return false;
+    }
+    if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
+        return false;
+    }
+
+    $export = '<?php' . PHP_EOL . 'return ' . var_export([
+        'completed' => true,
+        'completed_at' => date(DATE_ATOM),
+    ], true) . ';' . PHP_EOL;
+
+    return file_put_contents(setup_state_file(), $export, LOCK_EX) !== false;
 }
