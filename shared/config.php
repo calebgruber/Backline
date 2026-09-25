@@ -53,9 +53,6 @@ function app_settings(): array
 
 function save_settings(array $settings): bool
 {
-    if (!storage_path_is_safe()) {
-        return false;
-    }
     if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
         return false;
     }
@@ -113,9 +110,6 @@ function is_setup_complete(): bool
 
 function mark_setup_complete(): bool
 {
-    if (!storage_path_is_safe()) {
-        return false;
-    }
     if (!is_dir(storage_path()) && !mkdir(storage_path(), 0775, true) && !is_dir(storage_path())) {
         return false;
     }
