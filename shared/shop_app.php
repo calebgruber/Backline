@@ -236,14 +236,13 @@ if (!function_exists('render_shop_app_page')) {
 
         render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav): void {
             ?>
-            <div class="card show-context mb-3">
-                <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                    <h3 class="card-title mb-0"><?= e($heading) ?></h3>
-                    <a href="/dash/home" class="btn btn-outline-secondary btn-sm"><i class="ti ti-arrow-left me-1"></i>Back to Dashboard</a>
-                </div>
-            </div>
-
             <?php if ($showFirstNav && !$selectedShow): ?>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h3 class="card-title mb-2"><?= e($heading) ?></h3>
+                        <p class="text-secondary mb-0">Welcome. Select a show card to open its workspace.</p>
+                    </div>
+                </div>
                 <div class="row row-cards">
                     <?php foreach ($shows as $show): ?>
                         <div class="col-md-6 col-xl-4">
@@ -265,9 +264,6 @@ if (!function_exists('render_shop_app_page')) {
                 <div class="card mb-3">
                     <div class="card-header d-flex align-items-center justify-content-between gap-2">
                         <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
-                        <?php if ($showFirstNav): ?>
-                            <a class="btn btn-outline-secondary btn-sm" href="/<?= e($shopType) ?>/app">All Shows</a>
-                        <?php endif; ?>
                     </div>
                     <div class="card-body">
                         <?php if (!$showFirstNav): ?>
@@ -283,31 +279,23 @@ if (!function_exists('render_shop_app_page')) {
                                 </div>
                             </form>
                         <?php endif; ?>
-                        <?php if ($selectedShow): ?>
-                            <ul class="nav nav-pills mt-2">
-                                <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
-                                    <li class="nav-item">
-                                        <a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                            <div class="mt-3">
-                                <form method="post" class="d-inline-block">
-                                    <?= csrf_input() ?>
-                                    <input type="hidden" name="action" value="export_latest">
-                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                    <input type="hidden" name="current_tab" value="paperwork">
-                                    <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
-                                </form>
-                            </div>
-                        <?php endif; ?>
+                        <?php if ($selectedShow): ?><p class="text-secondary mb-0">Use the top navigation for this show’s sections.</p><?php endif; ?>
                     </div>
                 </div>
 
                 <?php if ($selectedShow && $currentTab === 'info'): ?>
                     <div class="card"><div class="card-body text-secondary">Show information is managed in <a href="/dash/shows">Shows</a>.</div></div>
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
-                    <div class="card"><div class="card-body text-secondary">Paperwork views are coming next. Use “Export Latest Paperwork” to start export flow when enabled.</div></div>
+                    <div class="card"><div class="card-body text-secondary">
+                        <p class="mb-3">Paperwork views are coming next. Use export to generate the latest paperwork when enabled.</p>
+                        <form method="post" class="d-inline-block">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="action" value="export_latest">
+                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                            <input type="hidden" name="current_tab" value="paperwork">
+                            <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
+                        </form>
+                    </div></div>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title">Revisions</h3></div>

@@ -17,6 +17,16 @@ if (!function_exists('app_config')) {
 $user = require_permission('lx.access');
 
 render_page('Launch LX', function (): void {
-    echo '<div class="launch-overlay launch-overlay-lx"><div class="launch-overlay-card"><div class="preloader-spinner mb-3" role="status" aria-hidden="true"></div><h2 class="mb-2">Launching Backline LX</h2><p class="text-secondary mb-3">Loading lighting orders, revisions, and tools…</p><a class="btn btn-sm btn-outline-primary" href="/lx/app">Open now</a></div></div>';
-    echo '<script>window.setTimeout(function(){window.location.href="/lx/app";}, 1100);</script>';
+    ?>
+    <section class="launch-screen launch-screen-lx">
+        <div class="launch-screen-panel">
+            <span class="badge bg-blue-lt mb-3">Lighting</span>
+            <div class="preloader-spinner mb-3" role="status" aria-hidden="true"></div>
+            <h2 class="mb-2">Opening Backline LX</h2>
+            <p class="text-secondary mb-3">Preparing your show workspace, orders, and revisions…</p>
+            <a class="btn btn-primary btn-sm" href="/lx/app">Open LX now</a>
+        </div>
+    </section>
+    <script>window.setTimeout(function(){window.location.href="/lx/app";}, 1100);</script>
+    <?php
 }, $user);

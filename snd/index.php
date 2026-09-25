@@ -17,6 +17,16 @@ if (!function_exists('app_config')) {
 $user = require_permission('snd.access');
 
 render_page('Launch SND', function (): void {
-    echo '<div class="launch-overlay launch-overlay-snd"><div class="launch-overlay-card"><div class="preloader-spinner mb-3" role="status" aria-hidden="true"></div><h2 class="mb-2">Launching Backline SND</h2><p class="text-secondary mb-3">Loading sound orders, revisions, and tools…</p><a class="btn btn-sm btn-outline-primary" href="/snd/app">Open now</a></div></div>';
-    echo '<script>window.setTimeout(function(){window.location.href="/snd/app";}, 1100);</script>';
+    ?>
+    <section class="launch-screen launch-screen-snd">
+        <div class="launch-screen-panel">
+            <span class="badge bg-purple-lt mb-3">Sound</span>
+            <div class="preloader-spinner mb-3" role="status" aria-hidden="true"></div>
+            <h2 class="mb-2">Opening Backline SND</h2>
+            <p class="text-secondary mb-3">Preparing your show workspace, orders, and revisions…</p>
+            <a class="btn btn-primary btn-sm" href="/snd/app">Open SND now</a>
+        </div>
+    </section>
+    <script>window.setTimeout(function(){window.location.href="/snd/app";}, 1100);</script>
+    <?php
 }, $user);

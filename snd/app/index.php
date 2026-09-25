@@ -17,4 +17,4 @@ if (!function_exists('app_config')) {
 $user = require_permission('snd.access');
 require_once __DIR__ . '/../../shared/shop_app.php';
 
-render_shop_app_page($user, 'snd', 'Sound', 'Backline SND', 'Create an initial order to start SND revision tracking.');
+render_shop_app_page($user, 'snd', 'Sound', 'Backline SND', 'Create an initial order to start SND revision tracking.', true);

@@ -41,27 +41,41 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
     border: 1px solid rgba(32, 107, 196, 0.32);
 }
 
-.launch-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
-    background: rgba(8, 19, 51, 0.86);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.25rem;
+.launch-screen {
+    min-height: calc(100vh - 150px);
+    border-radius: 1rem;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #e9f3ff 0%, #f3f8ff 45%, #f8fbff 100%);
 }
-.launch-overlay-lx { background: rgba(4, 41, 84, 0.9); }
-.launch-overlay-snd { background: rgba(44, 24, 70, 0.9); }
-
-.launch-overlay-card {
-    max-width: 460px;
+html[data-bs-theme="dark"] .launch-screen {
+    background: linear-gradient(135deg, #111a2e 0%, #0f1729 45%, #111b32 100%);
+}
+.launch-screen-lx {
+    background-image: linear-gradient(135deg, #e7f2ff 0%, #edf6ff 48%, #f7fbff 100%);
+}
+html[data-bs-theme="dark"] .launch-screen-lx {
+    background-image: linear-gradient(135deg, #0f223e 0%, #142845 45%, #13233d 100%);
+}
+.launch-screen-snd {
+    background-image: linear-gradient(135deg, #f1e9ff 0%, #f6f0ff 48%, #fbf8ff 100%);
+}
+html[data-bs-theme="dark"] .launch-screen-snd {
+    background-image: linear-gradient(135deg, #26163b 0%, #2f1c47 45%, #291b40 100%);
+}
+.launch-screen-panel {
+    max-width: 500px;
     width: 100%;
     text-align: center;
     padding: 2rem 1.5rem;
     border-radius: 1rem;
     background: var(--tblr-bg-surface);
-    box-shadow: 0 20px 48px rgba(9, 20, 46, .32);
+    border: 1px solid var(--tblr-border-color);
+    box-shadow: 0 20px 48px rgba(9, 20, 46, .18);
+}
+html[data-bs-theme="dark"] .launch-screen-panel {
+    box-shadow: 0 20px 48px rgba(0, 0, 0, .45);
 }
 
 .card-title-enhanced {
@@ -72,6 +86,9 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
     overflow: visible;
     padding-top: 0;
     padding-left: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 .card-title-enhanced .card-title-pill {
@@ -81,6 +98,8 @@ html[data-bs-theme="dark"] .category-toggle-btn { color: #8fc1ff; }
     color: var(--card-accent-color);
     display: inline-flex;
     align-items: center;
+    margin-right: auto;
+    max-width: 100%;
 }
 
 .card-title-enhanced .card-header .card-title-pill {

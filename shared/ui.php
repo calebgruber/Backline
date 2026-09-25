@@ -36,6 +36,11 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $isLxAppContext = path_starts_with($path, '/lx/app');
     $isSndAppContext = path_starts_with($path, '/snd/app');
     $isShopAppContext = $isLxAppContext || $isSndAppContext;
+    $selectedShopShowId = $isShopAppContext ? (int) ($_GET['show'] ?? 0) : 0;
+    $selectedShopTab = $isShopAppContext ? (string) ($_GET['tab'] ?? 'info') : 'info';
+    if (!in_array($selectedShopTab, ['info', 'initial', 'revisions', 'paperwork'], true)) {
+        $selectedShopTab = 'info';
+    }
     $activeLogoLightPath = $logoLightPath;
     $activeLogoDarkPath = $logoDarkPath;
     if ($isLxContext) {
@@ -124,15 +129,25 @@ function render_page(string $title, callable $body, ?array $user = null): void
                 <div class="container-xl">
                     <ul class="navbar-nav">
                         <?php if ($isLxAppContext): ?>
-                            <?php nav_item('/dash/home', 'Back Home', $path); ?>
-                            <?php nav_item('/lx/app', 'LX Orders', $path); ?>
-                            <?php nav_item('/dash/shows', 'Shows', $path); ?>
-                            <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
+                            <?php if ($selectedShopShowId > 0): ?>
+                                <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
+                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/lx/app?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                <?php endforeach; ?>
+                                <li class="nav-item"><a class="nav-link" href="/lx/app"><span class="nav-link-title">Exit Show</span></a></li>
+                            <?php else: ?>
+                                <?php nav_item('/lx/app', 'LX Home', $path); ?>
+                                <?php nav_item('/dash/home', 'Back Home', $path); ?>
+                            <?php endif; ?>
                         <?php elseif ($isSndAppContext): ?>
-                            <?php nav_item('/dash/home', 'Back Home', $path); ?>
-                            <?php nav_item('/snd/app', 'SND Orders', $path); ?>
-                            <?php nav_item('/dash/shows', 'Shows', $path); ?>
-                            <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
+                            <?php if ($selectedShopShowId > 0): ?>
+                                <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
+                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/snd/app?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                <?php endforeach; ?>
+                                <li class="nav-item"><a class="nav-link" href="/snd/app"><span class="nav-link-title">Exit Show</span></a></li>
+                            <?php else: ?>
+                                <?php nav_item('/snd/app', 'SND Home', $path); ?>
+                                <?php nav_item('/dash/home', 'Back Home', $path); ?>
+                            <?php endif; ?>
                         <?php else: ?>
                             <?php nav_item('/dash/home', 'Dashboard', $path); ?>
                             <?php nav_item('/dash/shows', 'Shows', $path); ?>
