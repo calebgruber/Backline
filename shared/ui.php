@@ -65,7 +65,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
 </head>
 <body class="<?= e($bodyRouteClass) ?>">
 <div id="global-preloader" class="preloader-backdrop">
-    <div class="spinner-border text-primary" role="status"></div>
+    <div class="preloader-spinner" role="status" aria-label="Loading"></div>
 </div>
 <div class="page">
     <header class="navbar navbar-expand-md d-print-none">

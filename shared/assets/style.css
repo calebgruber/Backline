@@ -6,9 +6,19 @@ html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-light { display: none; 
 html[data-bs-theme="dark"][data-has-dark-logo="1"] .logo-dark { display: inline-block; }
 html[data-bs-theme="light"] .logo-dark { display: none; }
 html[data-has-light-logo="0"][data-has-dark-logo="1"] .logo-dark { display: inline-block; }
-.preloader-backdrop { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: grid; place-items: center; z-index: 2000; transition: opacity .25s ease; }
-html[data-bs-theme="dark"] .preloader-backdrop { background: rgba(15, 23, 42, .92); }
+.preloader-backdrop { position: fixed; inset: 0; background: #fff; display: grid; place-items: center; z-index: 2000; transition: opacity .25s ease; }
+html[data-bs-theme="dark"] .preloader-backdrop { background: #0b1220; }
 .preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
+.preloader-spinner {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #ff7a18 0deg, #ff9f43 130deg, #ffb347 230deg, #ff7a18 360deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
+    animation: preloader-spin .8s linear infinite;
+}
+@keyframes preloader-spin { to { transform: rotate(1turn); } }
 .theme-toggle-btn { border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .theme-toggle-btn:hover, .theme-toggle-btn:focus { border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .profile-sticky-card { position: sticky; top: 1rem; }
