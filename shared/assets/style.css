@@ -1,4 +1,17 @@
-body { font-family: Inter, system-ui, sans-serif; }
+body {
+    font-family: Inter, system-ui, sans-serif;
+    background: linear-gradient(135deg, #dcecff 0%, #eaf4ff 45%, #f3f8ff 100%);
+    background-attachment: fixed;
+}
+html[data-bs-theme="dark"] body {
+    background: linear-gradient(135deg, #0f223e 0%, #142845 45%, #13233d 100%);
+    background-attachment: fixed;
+}
+.page,
+.page-wrapper,
+.page-body {
+    background: transparent !important;
+}
 .app-wordmark { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 1.125rem; }
 .app-logo { max-height: 38px; width: auto; }
 .logo-dark { display: none; }
