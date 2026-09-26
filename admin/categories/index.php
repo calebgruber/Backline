@@ -168,12 +168,24 @@ render_page('Categories', function () use ($categoriesByShop): void {
           onEnd: async () => {
             const shopType = list.getAttribute('data-shop') || '';
             const ids = Array.from(list.querySelectorAll('[data-category-id]')).map((el) => Number(el.getAttribute('data-category-id')));
+            list.querySelectorAll('[data-category-id]').forEach((row, idx) => {
+              const sortInput = row.querySelector('input[name="sort_order"]');
+              if (sortInput instanceof HTMLInputElement) sortInput.value = String(idx + 1);
+            });
             const body = new URLSearchParams();
             body.set('_csrf', '<?= e(csrf_token()) ?>');
             body.set('action', 'reorder_categories');
             body.set('shop_type', shopType);
             body.set('ordered_ids', JSON.stringify(ids));
-            await fetch('/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+            const response = await fetch('/admin/categories', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body.toString(),
+            });
+            if (!response.ok) {
+              alert('Could not save new category order. Please try again.');
+            }
           }
         });
       });

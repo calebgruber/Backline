@@ -164,7 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $cats = db()->query('SELECT id, shop_type, name FROM inventory_categories ORDER BY shop_type, sort_order, name')->fetchAll();
-$items = db()->query('SELECT ii.*, ic.name AS category_name FROM inventory_items ii LEFT JOIN inventory_categories ic ON ic.id = ii.category_id ORDER BY ii.shop_type, ii.sort_order, ii.name')->fetchAll();
+$items = db()->query('SELECT ii.*, ic.name AS category_name, ic.sort_order AS category_sort_order
+    FROM inventory_items ii
+    LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+    ORDER BY ii.shop_type, COALESCE(ic.sort_order, 2147483647), COALESCE(ic.name, ""), ii.sort_order, ii.id')->fetchAll();
 $catsByShop = ['lx' => [], 'snd' => []];
 foreach ($cats as $cat) {
     $catsByShop[$cat['shop_type']][] = $cat;
@@ -178,10 +181,6 @@ foreach ($items as $item) {
     }
     $itemsGroupedByShopCategory[$shop][$group][] = $item;
 }
-foreach (['lx', 'snd'] as $shopType) {
-    ksort($itemsGroupedByShopCategory[$shopType]);
-}
-
 render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCategory): void {
     $shops = [
         'lx' => 'Lighting Inventory',
@@ -397,12 +396,24 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
           onEnd: async () => {
             const shopType = group.getAttribute('data-shop');
             const ids = Array.from(group.querySelectorAll('tr[data-item-id]')).map((tr) => Number(tr.getAttribute('data-item-id')));
+            group.querySelectorAll('tr[data-item-id]').forEach((tr, idx) => {
+              const sortInput = tr.querySelector('input[name="sort_order"]');
+              if (sortInput instanceof HTMLInputElement) sortInput.value = String(idx + 1);
+            });
             const body = new URLSearchParams();
             body.set('_csrf', '<?= e(csrf_token()) ?>');
             body.set('action', 'reorder_items');
             body.set('shop_type', shopType || '');
             body.set('ordered_ids', JSON.stringify(ids));
-            await fetch('/admin/inventory', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+            const response = await fetch('/admin/inventory', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body.toString(),
+            });
+            if (!response.ok) {
+              alert('Could not save new item order. Please try again.');
+            }
           }
         });
       });
