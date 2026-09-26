@@ -260,11 +260,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
-                                <thead><tr><th>Category</th><th>Name</th><?php if ($shopKey === 'snd'): ?><th>SKU</th><?php endif; ?><th>Qty</th><th>Unit</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
+                                <thead><tr><th class="w-1"></th><th>Category</th><th>Name</th><?php if ($shopKey === 'snd'): ?><th>SKU</th><?php endif; ?><th>Qty</th><th>Unit</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                                 <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tbody>
                                     <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-category-name="<?= e($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
-                                        <td colspan="<?= $shopKey === 'snd' ? '9' : '8' ?>">
+                                        <td colspan="<?= $shopKey === 'snd' ? '10' : '9' ?>">
                                             <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-right me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
                                         </td>
                                     </tr>
@@ -272,6 +272,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                 <tbody class="category-item-group" id="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-shop="<?= e($shopKey) ?>" style="display:none;">
                                     <?php foreach ($groupItems as $item): ?>
                                         <tr data-item-id="<?= (int) $item['id'] ?>">
+                                            <td>
+                                                <button type="button" class="btn btn-icon btn-ghost-secondary drag-handle" title="Drag to reorder" aria-label="Drag to reorder">
+                                                    <i class="ti ti-grip-vertical"></i>
+                                                </button>
+                                            </td>
                                             <td>
                                                 <select class="form-select" name="category_id" form="item-update-<?= (int) $item['id'] ?>">
                                                     <option value="">No category</option>
@@ -378,7 +383,9 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
       document.querySelectorAll('.category-item-group').forEach((group) => {
         new Sortable(group, {
           animation: 120,
-          handle: 'td',
+          handle: '.drag-handle',
+          ghostClass: 'sortable-ghost',
+          chosenClass: 'sortable-chosen',
           onEnd: async () => {
             const shopType = group.getAttribute('data-shop');
             const ids = Array.from(group.querySelectorAll('tr[data-item-id]')).map((tr) => Number(tr.getAttribute('data-item-id')));

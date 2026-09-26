@@ -111,14 +111,19 @@ render_page('Categories', function () use ($categoriesByShop): void {
                             <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
                                 <div class="list-group-item" data-category-id="<?= (int) $cat['id'] ?>">
                                     <div class="row g-2 align-items-center">
-                                        <div class="col-md-5 d-flex align-items-center gap-2">
+                                        <div class="col-auto">
+                                            <button type="button" class="btn btn-icon btn-ghost-secondary drag-handle" title="Drag to reorder" aria-label="Drag to reorder">
+                                                <i class="ti ti-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                        <div class="col-md-4 d-flex align-items-center gap-2">
                                             <i class="ti ti-folder text-primary"></i>
                                             <input class="form-control" name="name" value="<?= e($cat['name']) ?>" form="cat-update-<?= (int) $cat['id'] ?>" required>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <input class="form-control" type="number" name="sort_order" value="<?= (int) $cat['sort_order'] ?>" form="cat-update-<?= (int) $cat['id'] ?>">
                                         </div>
-                                        <div class="col-md-4 text-end">
+                                        <div class="col-md text-end">
                                             <form id="cat-update-<?= (int) $cat['id'] ?>" method="post" class="d-inline-block">
                                                 <?= csrf_input() ?>
                                                 <input type="hidden" name="action" value="update">
@@ -149,6 +154,9 @@ render_page('Categories', function () use ($categoriesByShop): void {
       document.querySelectorAll('.category-manager-list').forEach((list) => {
         new Sortable(list, {
           animation: 120,
+          handle: '.drag-handle',
+          ghostClass: 'sortable-ghost',
+          chosenClass: 'sortable-chosen',
           onEnd: async () => {
             const shopType = list.getAttribute('data-shop') || '';
             const ids = Array.from(list.querySelectorAll('[data-category-id]')).map((el) => Number(el.getAttribute('data-category-id')));
