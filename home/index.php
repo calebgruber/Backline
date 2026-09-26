@@ -30,9 +30,24 @@ render_page('Backline', function (): void {
         </div>
     </div>
     <div class="row row-cards mt-4">
-        <div class="col-md-4"><div class="card"><div class="card-body"><h3 class="card-title">Dual Shop Apps</h3><p class="text-secondary">Separate LX and SND order systems with shared admin controls and permissions.</p></div></div></div>
-        <div class="col-md-4"><div class="card"><div class="card-body"><h3 class="card-title">Revision Tracking</h3><p class="text-secondary">Track initial orders through every revision so teams always know current pull/return state.</p></div></div></div>
-        <div class="col-md-4"><div class="card"><div class="card-body"><h3 class="card-title">Professional Exports</h3><p class="text-secondary">Generate clean paperwork aligned to your brand for handoff to shop teams.</p></div></div></div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">Dual Shop Apps</h3></div>
+                <div class="card-body"><p class="text-secondary mb-0">Separate LX and SND order systems with shared admin controls and permissions.</p></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">Revision Tracking</h3></div>
+                <div class="card-body"><p class="text-secondary mb-0">Track initial orders through every revision so teams always know current pull/return state.</p></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">Professional Exports</h3></div>
+                <div class="card-body"><p class="text-secondary mb-0">Generate clean paperwork aligned to your brand for handoff to shop teams.</p></div>
+            </div>
+        </div>
     </div>
     <?php
 });

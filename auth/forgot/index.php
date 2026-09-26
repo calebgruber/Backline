@@ -39,8 +39,10 @@ render_page('Forgot Password', function (): void {
     ?>
     <form class="card card-md" method="post">
         <?= csrf_input() ?>
+        <div class="card-header">
+            <h2 class="card-title">Forgot password</h2>
+        </div>
         <div class="card-body">
-            <h2 class="card-title text-center mb-4">Forgot password</h2>
             <p class="text-secondary mb-4">Enter your email and we’ll send a reset link.</p>
             <div class="mb-3">
                 <label class="form-label">Email address</label>
