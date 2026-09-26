@@ -2,3 +2,39 @@
 .alert {
   border-left: 5px solid var(--tblr-alert-color)!important;
 }
+
+.card-title-enhanced {
+  border-left: 5px solid var(--card-accent-color);
+}
+
+.card-title-enhanced .card-header {
+  overflow: visible;
+  padding-top: 0;
+  padding-left: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.card-title-enhanced .card-title-pill {
+  padding: .35rem 1rem;
+  border-radius: 0 999px 999px 0;
+  background: rgba(var(--card-accent-rgb), .25);
+  color: var(--card-accent-color);
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  max-width: 100%;
+}
+
+.card-title-enhanced .card-header .card-title-pill {
+  margin-left: 0;
+  padding-left: calc(1rem + 5px);
+}
+
+.card-title-icon {
+  font-size: 1.05em;
+  line-height: 1;
+  color: var(--card-accent-color);
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}

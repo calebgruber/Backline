@@ -114,15 +114,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
 <body class="<?= e($bodyRouteClass) ?>">
 <?php if ($tablerThemeJsSrc !== ''): ?><script src="<?= e($tablerThemeJsSrc) ?>"></script><?php endif; ?>
 <div id="global-preloader" class="preloader-backdrop">
-    <div class="preloader-panel text-center">
-        <div id="global-preloader-text" class="preloader-text">Preparing application</div>
-        <div class="progress progress-sm mt-2">
-            <div class="progress-bar progress-bar-indeterminate"></div>
-        </div>
-        <div class="placeholder-glow mt-3">
-            <span class="placeholder col-8"></span>
-        </div>
-    </div>
+    <div class="preloader-spinner" role="status" aria-label="Loading"></div>
+    <div id="global-preloader-text" class="preloader-text">Loading…</div>
 </div>
 <?php if ($isPlainAuthPage): ?>
 <div class="page page-center">
@@ -287,6 +280,61 @@ function render_page(string $title, callable $body, ?array $user = null): void
   });
 })();
 
+(() => {
+  const hexToRgb = (hex) => {
+    const normalized = hex.replace('#', '');
+    if (normalized.length !== 6) return null;
+    const num = Number.parseInt(normalized, 16);
+    if (Number.isNaN(num)) return null;
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255].join(', ');
+  };
+
+  const palette = ['#206bc4', '#2fb344', '#f76707', '#e03131', '#7950f2', '#0ca678', '#d63384', '#5f3dc4', '#15aabf', '#be4bdb'];
+  const iconMap = [
+    { match: /(inventory|item|stock|shop)/i, icon: 'inventory_2' },
+    { match: /(category|categories|folder|resource)/i, icon: 'folder' },
+    { match: /(user|users|profile|account)/i, icon: 'person' },
+    { match: /(setting|config|branding)/i, icon: 'settings' },
+    { match: /(show|dash|home|launch)/i, icon: 'dashboard' },
+    { match: /(sound|snd)/i, icon: 'graphic_eq' },
+    { match: /(light|lx)/i, icon: 'light_mode' },
+    { match: /(migration|database)/i, icon: 'database' }
+  ];
+  const pickIcon = (title) => {
+    const found = iconMap.find((row) => row.match.test(title));
+    return found ? found.icon : 'widgets';
+  };
+  const hash = (text) => {
+    let value = 0;
+    for (let i = 0; i < text.length; i += 1) value = ((value << 5) - value) + text.charCodeAt(i);
+    return Math.abs(value);
+  };
+
+  document.querySelectorAll('.card').forEach((card) => {
+    const title = card.querySelector('.card-title');
+    if (!title) return;
+    const titleText = (title.textContent || '').trim();
+    if (!titleText) return;
+    const customColor = card.getAttribute('data-card-color') || '';
+    const customIcon = card.getAttribute('data-card-icon') || '';
+    const isColorValid = /^#[0-9a-fA-F]{6}$/.test(customColor);
+    const isIconValid = /^[a-z0-9_]{1,48}$/i.test(customIcon);
+    const color = isColorValid ? customColor : palette[hash(titleText) % palette.length];
+    const rgb = hexToRgb(color);
+    const iconName = isIconValid ? customIcon : pickIcon(titleText);
+    card.style.setProperty('--card-accent-color', color);
+    if (rgb) card.style.setProperty('--card-accent-rgb', rgb);
+    card.classList.add('card-title-enhanced');
+    title.classList.add('card-title-pill');
+    if (!title.querySelector('.card-title-icon')) {
+      title.classList.add('d-flex', 'align-items-center', 'gap-2');
+      const icon = document.createElement('span');
+      icon.className = 'card-title-icon material-symbols-outlined';
+      icon.textContent = iconName;
+      title.prepend(icon);
+    }
+  });
+})();
 </script>
 </body>
 </html>
