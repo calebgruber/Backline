@@ -1,16 +1,45 @@
+:root,
+html[data-bs-theme="light"],
+html[data-bs-theme="dark"] {
+    --tblr-primary: #4f8dff;
+    --tblr-body-color: #e6edf7;
+    --tblr-body-color-rgb: 230, 237, 247;
+    --tblr-secondary-color: #b7c6df;
+    --tblr-border-color: #32445f;
+    --tblr-bg-surface: #1f2d42;
+    --tblr-bg-surface-secondary: #24354d;
+    --tblr-bg-surface-tertiary: #283b56;
+}
 body {
     font-family: Inter, system-ui, sans-serif;
-    background: linear-gradient(135deg, #dcecff 0%, #eaf4ff 45%, #f3f8ff 100%);
+    background: linear-gradient(135deg, #15253a 0%, #1c2e46 45%, #203551 100%);
     background-attachment: fixed;
-}
-html[data-bs-theme="dark"] body {
-    background: linear-gradient(135deg, #0f223e 0%, #142845 45%, #13233d 100%);
-    background-attachment: fixed;
+    color: var(--tblr-body-color);
 }
 .page,
 .page-wrapper,
 .page-body {
     background: transparent !important;
+}
+.navbar,
+.card,
+.table,
+.dropdown-menu,
+.modal-content,
+.form-control,
+.form-select {
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+}
+.navbar,
+.card,
+.form-control,
+.form-select,
+.table {
+    border-color: var(--tblr-border-color);
+}
+.text-secondary {
+    color: #b7c6df !important;
 }
 .app-wordmark { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 1.125rem; }
 .app-logo { max-height: 38px; width: auto; }
