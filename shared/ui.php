@@ -52,6 +52,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $loginBackgroundDarkPath = $path === '/auth/login' && $loginBackgroundDarkFile ? '/uploads/branding/' . basename($loginBackgroundDarkFile) : '';
     $isLxContext = path_starts_with($path, '/lx') || path_starts_with($path, '/dash/lx');
     $isSndContext = path_starts_with($path, '/snd') || path_starts_with($path, '/dash/sound');
+    $isPlainAuthPage = path_starts_with($path, '/auth/') || $path === '/setup';
     $isLxAppContext = path_starts_with($path, '/lx/app') || path_starts_with($path, '/dash/lx');
     $isSndAppContext = path_starts_with($path, '/snd/app') || path_starts_with($path, '/dash/sound');
     $isShopAppContext = $isLxAppContext || $isSndAppContext;
@@ -123,6 +124,16 @@ function render_page(string $title, callable $body, ?array $user = null): void
         </div>
     </div>
 </div>
+<?php if ($isPlainAuthPage): ?>
+<div class="page page-center">
+    <div class="container container-tight py-4">
+        <?php foreach ($flash as $message): ?>
+            <div class="alert alert-<?= e($message['type']) ?>" role="alert"><?= e($message['message']) ?></div>
+        <?php endforeach; ?>
+        <?php $body(); ?>
+    </div>
+</div>
+<?php else: ?>
 <div class="page">
     <header class="navbar navbar-expand-md d-print-none">
         <div class="container-xl">
@@ -225,6 +236,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
         </div>
     </div>
 </div>
+<?php endif; ?>
 <script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script src="/shared/assets/preloader.js"></script>
@@ -275,62 +287,6 @@ function render_page(string $title, callable $body, ?array $user = null): void
   });
 })();
 
-(() => {
-  const hexToRgb = (hex) => {
-    const normalized = hex.replace('#', '');
-    if (normalized.length !== 6) return null;
-    const num = Number.parseInt(normalized, 16);
-    if (Number.isNaN(num)) return null;
-    return [(num >> 16) & 255, (num >> 8) & 255, num & 255].join(', ');
-  }
-;
-
-  const palette = ['#206bc4', '#2fb344', '#f76707', '#e03131', '#7950f2', '#0ca678', '#d63384', '#5f3dc4', '#15aabf', '#be4bdb'];
-  const iconMap = [
-    { match: /(inventory|item|stock|shop)/i, icon: 'inventory_2' },
-    { match: /(category|categories|folder|resource)/i, icon: 'folder' },
-    { match: /(user|users|profile|account)/i, icon: 'person' },
-    { match: /(setting|config|branding)/i, icon: 'settings' },
-    { match: /(show|dash|home|launch)/i, icon: 'dashboard' },
-    { match: /(sound|snd)/i, icon: 'graphic_eq' },
-    { match: /(light|lx)/i, icon: 'light_mode' },
-    { match: /(migration|database)/i, icon: 'database' }
-  ];
-  const pickIcon = (title) => {
-    const found = iconMap.find((row) => row.match.test(title));
-    return found ? found.icon : 'widgets';
-  };
-  const hash = (text) => {
-    let value = 0;
-    for (let i = 0; i < text.length; i += 1) value = ((value << 5) - value) + text.charCodeAt(i);
-    return Math.abs(value);
-  };
-
-  document.querySelectorAll('.card').forEach((card) => {
-    const title = card.querySelector('.card-title');
-    if (!title) return;
-    const titleText = (title.textContent || '').trim();
-    if (!titleText) return;
-    const customColor = card.getAttribute('data-card-color') || '';
-    const customIcon = card.getAttribute('data-card-icon') || '';
-    const isColorValid = /^#[0-9a-fA-F]{6}$/.test(customColor);
-    const isIconValid = /^[a-z0-9_]{1,48}$/i.test(customIcon);
-    const color = isColorValid ? customColor : palette[hash(titleText) % palette.length];
-    const rgb = hexToRgb(color);
-    const iconName = isIconValid ? customIcon : pickIcon(titleText);
-    card.style.setProperty('--card-accent-color', color);
-    if (rgb) card.style.setProperty('--card-accent-rgb', rgb);
-    card.classList.add('card-title-enhanced');
-    title.classList.add('card-title-pill');
-    if (!title.querySelector('.card-title-icon')) {
-      title.classList.add('d-flex', 'align-items-center', 'gap-2');
-      const icon = document.createElement('span');
-      icon.className = 'card-title-icon material-symbols-outlined';
-      icon.textContent = iconName;
-      title.prepend(icon);
-    }
-  });
-})();
 </script>
 </body>
 </html>

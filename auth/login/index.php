@@ -43,29 +43,32 @@ render_page('Login', function (): void {
     $loginCardColor = (string) app_setting('branding.login_card_color', '');
     $loginCardIcon = (string) app_setting('branding.login_card_icon', '');
     ?>
-    <div class="row justify-content-center mt-6">
-        <div class="col-md-5">
-            <div class="card" data-card-color="<?= e($loginCardColor) ?>" data-card-icon="<?= e($loginCardIcon) ?>">
-                <div class="card-header"><h3 class="card-title">Login</h3></div>
-                <div class="card-body">
-                    <?php if ($logoLightPath || $logoDarkPath): ?>
-                        <div class="text-center mb-4">
-                            <?php if ($logoLightPath): ?><img src="<?= e($logoLightPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-light"><?php endif; ?>
-                            <?php if ($logoDarkPath): ?><img src="<?= e($logoDarkPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-dark"><?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                    <form method="post" autocomplete="on">
-                        <?= csrf_input() ?>
-                        <div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
-                        <div class="mb-3"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <a href="/auth/forgot">Forgot password?</a>
-                            <button class="btn btn-primary">Sign in</button>
-                        </div>
-                    </form>
-                </div>
+    <div class="text-center mb-4">
+        <a href="/" class="navbar-brand navbar-brand-autodark">
+            <?php if ($logoLightPath): ?><img src="<?= e($logoLightPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-light"><?php endif; ?>
+            <?php if ($logoDarkPath): ?><img src="<?= e($logoDarkPath) ?>" alt="<?= e($appName) ?> logo" class="auth-page-logo logo-dark"><?php endif; ?>
+            <?php if (!$logoLightPath && !$logoDarkPath): ?><span class="h2"><?= e($appName) ?></span><?php endif; ?>
+        </a>
+    </div>
+    <form class="card card-md" method="post" autocomplete="on" data-card-color="<?= e($loginCardColor) ?>" data-card-icon="<?= e($loginCardIcon) ?>">
+        <?= csrf_input() ?>
+        <div class="card-body">
+            <h2 class="h2 text-center mb-4">Sign in to your account</h2>
+            <div class="mb-3">
+                <label class="form-label">Email address</label>
+                <input class="form-control" type="email" name="email" required autocomplete="email">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">
+                    Password
+                    <span class="form-label-description"><a href="/auth/forgot">Forgot password?</a></span>
+                </label>
+                <input class="form-control" type="password" name="password" required autocomplete="current-password">
+            </div>
+            <div class="form-footer">
+                <button class="btn btn-primary w-100">Sign in</button>
             </div>
         </div>
-    </div>
+    </form>
     <?php
 });

@@ -77,45 +77,47 @@ render_page('Setup', function () use ($error): void {
         echo '<div class="alert alert-danger">' . e($error) . '</div>';
     }
     ?>
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Initial Setup</h3></div>
-                <div class="card-body">
-                    <form method="post">
-                        <?= csrf_input() ?>
-                        <h4>Database</h4>
-                        <div class="row g-3">
-                            <div class="col-md-6"><input class="form-control" name="db_host" placeholder="Host" required value="127.0.0.1"></div>
-                            <div class="col-md-6"><input class="form-control" name="db_port" placeholder="Port" required value="3306"></div>
-                            <div class="col-md-6"><input class="form-control" name="db_name" placeholder="Database" required></div>
-                            <div class="col-md-6"><input class="form-control" name="db_user" placeholder="User" required></div>
-                            <div class="col-12"><input class="form-control" type="password" name="db_pass" placeholder="Password"></div>
-                        </div>
-                        <hr>
-                        <h4>Branding</h4>
-                        <div class="row g-3">
-                            <div class="col-md-6"><input class="form-control" name="app_name" placeholder="App Name" value="Backline"></div>
-                            <div class="col-md-6"><input class="form-control" name="made_in" placeholder="Made In" value="USA"></div>
-                            <div class="col-md-6"><input class="form-control" name="mail_from_name" placeholder="Mail From Name" value="Backline"></div>
-                            <div class="col-md-6"><input class="form-control" name="mail_from_email" placeholder="Mail From Email" value="noreply@example.com"></div>
-                        </div>
-                        <hr>
-                        <h4>Admin User</h4>
-                        <div class="row g-3">
-                            <div class="col-md-6"><input class="form-control" name="admin_name" placeholder="Name" required></div>
-                            <div class="col-md-6"><input type="email" class="form-control" name="admin_email" placeholder="Email" required></div>
-                            <div class="col-12">
-                                <input type="password" class="form-control js-password-strength-input" name="admin_password" placeholder="Password" required minlength="12">
-                                <div class="progress progress-sm mt-2"><div class="progress-bar js-password-strength-bar" style="width:0%"></div></div>
-                                <div class="small text-secondary mt-1 js-password-strength-text">Strength: Too weak</div>
-                            </div>
-                        </div>
-                        <div class="mt-4 d-flex justify-content-end"><button class="btn btn-primary">Complete Setup</button></div>
-                    </form>
+    <form class="card card-lg" method="post">
+        <div class="card-body">
+            <?= csrf_input() ?>
+            <h2 class="card-title mb-4">Initial Setup</h2>
+            <div class="mb-3">
+                <label class="form-label">Database</label>
+                <div class="row g-3">
+                    <div class="col-md-6"><input class="form-control" name="db_host" placeholder="Host" required value="127.0.0.1"></div>
+                    <div class="col-md-6"><input class="form-control" name="db_port" placeholder="Port" required value="3306"></div>
+                    <div class="col-md-6"><input class="form-control" name="db_name" placeholder="Database" required></div>
+                    <div class="col-md-6"><input class="form-control" name="db_user" placeholder="User" required></div>
+                    <div class="col-12"><input class="form-control" type="password" name="db_pass" placeholder="Password"></div>
                 </div>
             </div>
+            <hr class="my-4">
+            <div class="mb-3">
+                <label class="form-label">Branding</label>
+                <div class="row g-3">
+                    <div class="col-md-6"><input class="form-control" name="app_name" placeholder="App Name" value="Backline"></div>
+                    <div class="col-md-6"><input class="form-control" name="made_in" placeholder="Made In" value="USA"></div>
+                    <div class="col-md-6"><input class="form-control" name="mail_from_name" placeholder="Mail From Name" value="Backline"></div>
+                    <div class="col-md-6"><input class="form-control" name="mail_from_email" placeholder="Mail From Email" value="noreply@example.com"></div>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="mb-3">
+                <label class="form-label">Admin User</label>
+                <div class="row g-3">
+                    <div class="col-md-6"><input class="form-control" name="admin_name" placeholder="Name" required></div>
+                    <div class="col-md-6"><input type="email" class="form-control" name="admin_email" placeholder="Email" required></div>
+                    <div class="col-12">
+                        <input type="password" class="form-control js-password-strength-input" name="admin_password" placeholder="Password" required minlength="12">
+                        <div class="progress progress-sm mt-2"><div class="progress-bar js-password-strength-bar" style="width:0%"></div></div>
+                        <div class="small text-secondary mt-1 js-password-strength-text">Strength: Too weak</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-footer">
+                <button class="btn btn-primary w-100">Complete Setup</button>
+            </div>
         </div>
-    </div>
+    </form>
     <?php
 });

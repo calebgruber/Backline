@@ -37,8 +37,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 render_page('Forgot Password', function (): void {
     ?>
-    <div class="row justify-content-center mt-6"><div class="col-md-5"><div class="card"><div class="card-header"><h3 class="card-title">Reset Password</h3></div><div class="card-body">
-    <form method="post"><?= csrf_input() ?><div class="mb-3"><input class="form-control" type="email" name="email" placeholder="Email" required></div><button class="btn btn-primary">Send reset link</button></form>
-    </div></div></div></div>
+    <form class="card card-md" method="post">
+        <?= csrf_input() ?>
+        <div class="card-body">
+            <h2 class="card-title text-center mb-4">Forgot password</h2>
+            <p class="text-secondary mb-4">Enter your email and we’ll send a reset link.</p>
+            <div class="mb-3">
+                <label class="form-label">Email address</label>
+                <input class="form-control" type="email" name="email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-footer">
+                <button class="btn btn-primary w-100">Send reset link</button>
+            </div>
+        </div>
+        <div class="hr-text">or</div>
+        <div class="card-body">
+            <a href="/auth/login" class="btn btn-outline-secondary w-100">Back to sign in</a>
+        </div>
+    </form>
     <?php
 });
