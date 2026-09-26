@@ -47,8 +47,8 @@ document.addEventListener('click', (e) => {
   let label = '';
   try {
     const target = new URL(anchor.href, window.location.href);
-    const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app');
-    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app');
+    const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app') || window.location.pathname.startsWith('/dash/lx') || window.location.pathname.startsWith('/dash/sound');
+    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app') || target.pathname.startsWith('/dash/lx') || target.pathname.startsWith('/dash/sound');
     if (inApp && target.origin === window.location.origin && !targetIsApp) label = 'Exiting app…';
   } catch {
     label = '';
@@ -65,8 +65,8 @@ document.addEventListener('keydown', (e) => {
   let label = '';
   try {
     const target = new URL(active.href, window.location.href);
-    const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app');
-    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app');
+    const inApp = window.location.pathname.startsWith('/lx/app') || window.location.pathname.startsWith('/snd/app') || window.location.pathname.startsWith('/dash/lx') || window.location.pathname.startsWith('/dash/sound');
+    const targetIsApp = target.pathname.startsWith('/lx/app') || target.pathname.startsWith('/snd/app') || target.pathname.startsWith('/dash/lx') || target.pathname.startsWith('/dash/sound');
     if (inApp && target.origin === window.location.origin && !targetIsApp) label = 'Exiting app…';
   } catch {
     label = '';

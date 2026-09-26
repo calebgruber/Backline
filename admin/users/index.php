@@ -15,21 +15,26 @@ if (!function_exists('app_config')) {
 }
 
 $user = require_permission('users.manage');
+$roleOptions = [
+    'lighting_major' => 'Lighting Major',
+    'sound_major' => 'Sound Major',
+    'lighting_shop' => 'Lighting Shop',
+    'sound_shop' => 'Sound Shop',
+    'admin' => 'Admin',
+];
+$rolePermissionMap = [
+    'lighting_major' => ['lx.access'],
+    'sound_major' => ['snd.access'],
+    'lighting_shop' => ['lx.shop'],
+    'sound_shop' => ['snd.shop'],
+    'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
     $isSuperAdmin = (int) ($user['is_super_admin'] ?? 0) === 1;
     $canManageAllPerms = $isSuperAdmin || user_has_permission($user, 'admin.access');
-    $actorPerms = [];
-    if (!$canManageAllPerms) {
-        $actorPermRows = db()->prepare('SELECT p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ?');
-        $actorPermRows->execute([(int) $user['id']]);
-        foreach ($actorPermRows->fetchAll() as $permRow) {
-            $actorPerms[] = (string) $permRow['key_name'];
-        }
-    }
-
     if ($action === 'invite') {
         $name = post('name');
         $email = mb_strtolower(post('email'));
@@ -44,11 +49,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$name, $email, password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT)]);
         $newUserId = (int) db()->lastInsertId();
 
-        foreach (['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'] as $perm) {
-            if (!isset($_POST['perm_' . $perm])) {
-                continue;
+        $selectedRoles = $_POST['roles'] ?? [];
+        if (!is_array($selectedRoles)) {
+            $selectedRoles = [];
+        }
+        $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedPermissions = [];
+        foreach ($selectedRoles as $roleKey) {
+            foreach ($rolePermissionMap[$roleKey] as $permissionKey) {
+                $selectedPermissions[$permissionKey] = true;
             }
-            if (!$canManageAllPerms && !in_array($perm, $actorPerms, true)) {
+        }
+        foreach (array_keys($selectedPermissions) as $perm) {
+            if (!$canManageAllPerms && $perm !== 'lx.access' && $perm !== 'snd.access' && $perm !== 'lx.shop' && $perm !== 'snd.shop') {
                 continue;
             }
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
@@ -110,14 +123,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('danger', 'Only super admins can edit super admin permissions.');
             redirect('/admin/users');
         }
-        $selectedPerms = [];
-        foreach (array_keys($_POST) as $key) {
-            if (str_starts_with((string) $key, 'perm_')) {
-                $selectedPerms[] = substr((string) $key, 5);
+        $selectedRoles = $_POST['roles'] ?? [];
+        if (!is_array($selectedRoles)) {
+            $selectedRoles = [];
+        }
+        $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedPermSet = [];
+        foreach ($selectedRoles as $roleKey) {
+            foreach ($rolePermissionMap[$roleKey] as $permissionKey) {
+                $selectedPermSet[$permissionKey] = true;
             }
         }
+        $selectedPerms = array_keys($selectedPermSet);
         if (!$canManageAllPerms) {
-            $selectedPerms = array_values(array_intersect($selectedPerms, $actorPerms));
+            $selectedPerms = array_values(array_intersect($selectedPerms, ['lx.access', 'snd.access', 'lx.shop', 'snd.shop']));
         }
 
         db()->beginTransaction();
@@ -137,8 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             db()->commit();
-            flash_set('success', 'User permissions updated.');
-            audit_log((int) $user['id'], 'user', 'permissions_update', $target, ['permissions' => $selectedPerms]);
+            flash_set('success', 'User roles updated.');
+            audit_log((int) $user['id'], 'user', 'permissions_update', $target, ['roles' => $selectedRoles, 'permissions' => $selectedPerms]);
         } catch (Throwable) {
             if (db()->inTransaction()) {
                 db()->rollBack();
@@ -151,15 +170,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = db()->query('SELECT id, name, email, created_at FROM users WHERE deleted_at IS NULL ORDER BY id DESC')->fetchAll();
-$permissionRows = db()->query('SELECT id, key_name FROM permissions ORDER BY key_name')->fetchAll();
 $userPermissionRows = db()->query('SELECT up.user_id, p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id')->fetchAll();
 $userPermMap = [];
 foreach ($userPermissionRows as $row) {
     $userPermMap[(int) $row['user_id']][] = (string) $row['key_name'];
 }
 
-render_page('Users', function () use ($users, $permissionRows, $userPermMap): void {
-    $perms = array_map(static fn ($r) => (string) $r['key_name'], $permissionRows);
+render_page('Users', function () use ($users, $userPermMap, $roleOptions, $rolePermissionMap): void {
+    $userRoleMap = [];
+    foreach ($users as $u) {
+        $uid = (int) $u['id'];
+        $userPerms = $userPermMap[$uid] ?? [];
+        $assignedRoles = [];
+        foreach ($rolePermissionMap as $roleKey => $requiredPerms) {
+            $matches = true;
+            foreach ($requiredPerms as $requiredPerm) {
+                if (!in_array($requiredPerm, $userPerms, true)) {
+                    $matches = false;
+                    break;
+                }
+            }
+            if ($matches) {
+                $assignedRoles[] = $roleKey;
+            }
+        }
+        $userRoleMap[$uid] = $assignedRoles;
+    }
     ?>
     <div class="row row-cards">
         <div class="col-lg-5">
@@ -170,10 +206,13 @@ render_page('Users', function () use ($users, $permissionRows, $userPermMap): vo
                     <div class="mb-3"><input class="form-control" name="name" placeholder="Name" required></div>
                     <div class="mb-3"><input class="form-control" type="email" name="email" placeholder="Email" required></div>
                     <div class="mb-3">
-                        <label class="form-label">Permissions</label>
-                        <?php foreach ($perms as $perm): ?>
-                            <label class="form-check"><input class="form-check-input" type="checkbox" name="perm_<?= e($perm) ?>"><span class="form-check-label"><?= e($perm) ?></span></label>
-                        <?php endforeach; ?>
+                        <label class="form-label">Roles</label>
+                        <select class="form-select" name="roles[]" multiple size="5">
+                            <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
+                                <option value="<?= e($roleKey) ?>"><?= e($roleLabel) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-hint">Use Ctrl/Cmd click to select multiple roles.</div>
                     </div>
                     <button class="btn btn-primary">Send invite</button>
                 </form>
@@ -186,7 +225,7 @@ render_page('Users', function () use ($users, $permissionRows, $userPermMap): vo
                     <td><?= e($u['name']) ?></td>
                     <td><?= e($u['email']) ?></td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#perms-<?= (int) $u['id'] ?>">Permissions</button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#perms-<?= (int) $u['id'] ?>">Roles</button>
                         <form method="post" onsubmit="return confirm('Delete user?')" class="d-inline"><?= csrf_input() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
                     </td>
                 </tr>
@@ -196,16 +235,17 @@ render_page('Users', function () use ($users, $permissionRows, $userPermMap): vo
                             <?= csrf_input() ?>
                             <input type="hidden" name="action" value="update_permissions">
                             <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
-                            <?php foreach ($perms as $perm): ?>
-                                <div class="col-md-4">
-                                    <label class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="perm_<?= e($perm) ?>" <?= in_array($perm, $userPermMap[(int) $u['id']] ?? [], true) ? 'checked' : '' ?>>
-                                        <span class="form-check-label"><?= e($perm) ?></span>
-                                    </label>
-                                </div>
-                            <?php endforeach; ?>
                             <div class="col-12">
-                                <button class="btn btn-primary btn-sm">Save Permissions</button>
+                                <label class="form-label">Roles</label>
+                                <select class="form-select" name="roles[]" multiple size="5">
+                                    <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
+                                        <option value="<?= e($roleKey) ?>" <?= in_array($roleKey, $userRoleMap[(int) $u['id']] ?? [], true) ? 'selected' : '' ?>><?= e($roleLabel) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-hint">Use Ctrl/Cmd click to select multiple roles.</div>
+                            </div>
+                            <div class="col-12">
+                                <button class="btn btn-primary btn-sm">Save Roles</button>
                             </div>
                         </form>
                     </td>

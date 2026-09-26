@@ -19,9 +19,14 @@ if (!function_exists('shop_revision_label')) {
 if (!function_exists('render_shop_app_page')) {
     function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
+        $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
-            ? db()->query('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL ORDER BY show_name')
+            ? (function () use ($shopType) {
+                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
+                $stmt->execute([$shopType]);
+                return $stmt;
+            })()
             : (function () use ($user, $shopType) {
                 $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
                 $stmt->execute([(int) $user['id'], $shopType]);
@@ -61,7 +66,7 @@ if (!function_exists('render_shop_app_page')) {
 
             if ($selectedShowId <= 0) {
                 flash_set('warning', 'Select a show first.');
-                redirect('/' . $shopType . '/app');
+                redirect($appPath);
             }
 
             if ($action === 'create_initial') {
@@ -178,7 +183,7 @@ if (!function_exists('render_shop_app_page')) {
                 flash_set('info', 'Label printing is not wired yet.');
             }
 
-            redirect('/' . $shopType . '/app?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+            redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
         }
 
         $order = null;
@@ -240,7 +245,7 @@ if (!function_exists('render_shop_app_page')) {
             }
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3">
@@ -256,7 +261,7 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="card-body d-flex flex-column">
                                     <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
                                     <div class="mt-auto">
-                                        <a class="btn btn-primary btn-sm" href="/<?= e($shopType) ?>/app?show=<?= (int) $show['id'] ?>&tab=info">Open Show</a>
+                                        <a class="btn btn-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $show['id'] ?>&tab=info">Open Show</a>
                                     </div>
                                 </div>
                             </div>
@@ -272,7 +277,7 @@ if (!function_exists('render_shop_app_page')) {
                         <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
                         <?php if ($selectedShow): ?>
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-outline-secondary btn-sm" href="/<?= e($shopType) ?>/app">Exit Show</a>
+                                <a class="btn btn-outline-secondary btn-sm" href="<?= e($appPath) ?>">Exit Show</a>
                                 <form method="post" class="d-inline-block">
                                     <?= csrf_input() ?>
                                     <input type="hidden" name="action" value="export_latest">
@@ -390,7 +395,7 @@ if (!function_exists('render_shop_app_page')) {
                                 <button class="btn btn-outline-primary btn-sm">Add Revision</button>
                             </form>
                             <?php foreach ($revisions as $rev): ?>
-                                <a class="btn btn-sm <?= ((int) $rev['id'] === (int) $selectedRevisionId) ? 'btn-primary' : 'btn-outline-primary' ?>" href="/<?= e($shopType) ?>/app?show=<?= (int) $selectedShowId ?>&tab=revisions&revision=<?= (int) $rev['id'] ?>">
+                                <a class="btn btn-sm <?= ((int) $rev['id'] === (int) $selectedRevisionId) ? 'btn-primary' : 'btn-outline-primary' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=revisions&revision=<?= (int) $rev['id'] ?>">
                                     <?= e((string) $rev['revision_label']) ?>
                                 </a>
                             <?php endforeach; ?>

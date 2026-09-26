@@ -33,8 +33,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $loginBackgroundDarkPath = $path === '/auth/login' && $loginBackgroundDarkFile ? '/uploads/branding/' . basename($loginBackgroundDarkFile) : '';
     $isLxContext = path_starts_with($path, '/lx');
     $isSndContext = path_starts_with($path, '/snd');
-    $isLxAppContext = path_starts_with($path, '/lx/app');
-    $isSndAppContext = path_starts_with($path, '/snd/app');
+    $isLxAppContext = path_starts_with($path, '/lx/app') || path_starts_with($path, '/dash/lx');
+    $isSndAppContext = path_starts_with($path, '/snd/app') || path_starts_with($path, '/dash/sound');
     $isShopAppContext = $isLxAppContext || $isSndAppContext;
     $selectedShopShowId = $isShopAppContext ? (int) ($_GET['show'] ?? 0) : 0;
     $selectedShopTab = $isShopAppContext ? (string) ($_GET['tab'] ?? 'info') : 'info';
@@ -43,8 +43,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
     }
     if ($selectedShopShowId > 0 && $user && $isShopAppContext) {
         if (user_has_permission($user, 'admin.access')) {
-            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL LIMIT 1');
-            $shopShowAccess->execute([$selectedShopShowId]);
+            $shopScope = $isLxAppContext ? 'lx' : 'snd';
+            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) LIMIT 1');
+            $shopShowAccess->execute([$selectedShopShowId, $shopScope]);
         } else {
             $shopScope = $isLxAppContext ? 'lx' : 'snd';
             $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) LIMIT 1');
@@ -145,21 +146,21 @@ function render_page(string $title, callable $body, ?array $user = null): void
                         <?php if ($isLxAppContext): ?>
                             <?php if ($selectedShopShowId > 0): ?>
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
-                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/lx/app?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/lx?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
                                 <?php endforeach; ?>
-                                <li class="nav-item"><a class="nav-link" href="/lx/app"><span class="nav-link-title">Exit Show</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="/dash/lx"><span class="nav-link-title">Exit Show</span></a></li>
                             <?php else: ?>
-                                <?php nav_item('/lx/app', 'LX Home', $path); ?>
+                                <?php nav_item('/dash/lx', 'LX Home', $path); ?>
                                 <?php nav_item('/dash/home', 'Back Home', $path); ?>
                             <?php endif; ?>
                         <?php elseif ($isSndAppContext): ?>
                             <?php if ($selectedShopShowId > 0): ?>
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
-                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/snd/app?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/sound?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
                                 <?php endforeach; ?>
-                                <li class="nav-item"><a class="nav-link" href="/snd/app"><span class="nav-link-title">Exit Show</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="/dash/sound"><span class="nav-link-title">Exit Show</span></a></li>
                             <?php else: ?>
-                                <?php nav_item('/snd/app', 'SND Home', $path); ?>
+                                <?php nav_item('/dash/sound', 'SND Home', $path); ?>
                                 <?php nav_item('/dash/home', 'Back Home', $path); ?>
                             <?php endif; ?>
                         <?php else: ?>
@@ -169,8 +170,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
                             <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
                             <?php if (user_has_permission($user, 'categories.manage')) nav_item('/admin/categories', 'Categories', $path); ?>
                             <?php if (user_has_permission($user, 'users.manage')) nav_item('/admin/users', 'Users', $path); ?>
-                            <?php nav_item('/lx', 'LX', $path); ?>
-                            <?php nav_item('/snd', 'SND', $path); ?>
+                            <?php if (user_has_permission($user, 'lx.access')) nav_item('/dash/lx', 'LX', $path); ?>
+                            <?php if (user_has_permission($user, 'snd.access')) nav_item('/dash/sound', 'Sound', $path); ?>
                             <?php nav_item('/resources', 'Resources', $path); ?>
                         <?php endif; ?>
                     </ul>

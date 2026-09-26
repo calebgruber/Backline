@@ -41,10 +41,10 @@ render_page('Dashboard', function () use ($user): void {
         <?php endif; ?>
         <div class="col-md-4"><a href="/resources" class="card card-link"><div class="card-body"><strong>Resources</strong><p class="text-secondary mb-0">Browse Lighting, Sound, Backline Manuals.</p></div></a></div>
         <?php if (user_has_permission($user, 'lx.access')): ?>
-        <div class="col-md-4"><a href="/lx" class="card card-link"><div class="card-body"><strong>LX App</strong><p class="text-secondary mb-0">Open launcher for Lighting app.</p></div></a></div>
+        <div class="col-md-4"><a href="/dash/lx" class="card card-link"><div class="card-body"><strong>LX App</strong><p class="text-secondary mb-0">Open lighting show workspace.</p></div></a></div>
         <?php endif; ?>
         <?php if (user_has_permission($user, 'snd.access')): ?>
-        <div class="col-md-4"><a href="/snd" class="card card-link"><div class="card-body"><strong>SND App</strong><p class="text-secondary mb-0">Open launcher for Sound app.</p></div></a></div>
+        <div class="col-md-4"><a href="/dash/sound" class="card card-link"><div class="card-body"><strong>Sound App</strong><p class="text-secondary mb-0">Open sound show workspace.</p></div></a></div>
         <?php endif; ?>
     </div>
     <?php
