@@ -28,10 +28,22 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $tablerLocalDistDir = __DIR__ . '/assets/Tabler/dist';
     $hasLocalTablerCss = file_exists($tablerLocalDistDir . '/css/tabler.min.css');
     $hasLocalTablerThemesCss = file_exists($tablerLocalDistDir . '/css/tabler-themes.min.css');
+    $hasLocalTablerVendorsCss = file_exists($tablerLocalDistDir . '/css/tabler-vendors.min.css');
+    $hasLocalTablerFlagsCss = file_exists($tablerLocalDistDir . '/css/tabler-flags.min.css');
+    $hasLocalTablerSocialsCss = file_exists($tablerLocalDistDir . '/css/tabler-socials.min.css');
+    $hasLocalTablerPaymentsCss = file_exists($tablerLocalDistDir . '/css/tabler-payments.min.css');
+    $hasLocalTablerMarketingCss = file_exists($tablerLocalDistDir . '/css/tabler-marketing.min.css');
     $hasLocalTablerJs = file_exists($tablerLocalDistDir . '/js/tabler.min.js');
+    $hasLocalTablerThemeJs = file_exists($tablerLocalDistDir . '/js/tabler-theme.min.js');
     $tablerCssHref = $hasLocalTablerCss ? '/shared/assets/Tabler/dist/css/tabler.min.css' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css';
     $tablerThemesCssHref = $hasLocalTablerThemesCss ? '/shared/assets/Tabler/dist/css/tabler-themes.min.css' : '';
+    $tablerVendorsCssHref = $hasLocalTablerVendorsCss ? '/shared/assets/Tabler/dist/css/tabler-vendors.min.css' : '';
+    $tablerFlagsCssHref = $hasLocalTablerFlagsCss ? '/shared/assets/Tabler/dist/css/tabler-flags.min.css' : '';
+    $tablerSocialsCssHref = $hasLocalTablerSocialsCss ? '/shared/assets/Tabler/dist/css/tabler-socials.min.css' : '';
+    $tablerPaymentsCssHref = $hasLocalTablerPaymentsCss ? '/shared/assets/Tabler/dist/css/tabler-payments.min.css' : '';
+    $tablerMarketingCssHref = $hasLocalTablerMarketingCss ? '/shared/assets/Tabler/dist/css/tabler-marketing.min.css' : '';
     $tablerJsSrc = $hasLocalTablerJs ? '/shared/assets/Tabler/dist/js/tabler.min.js' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js';
+    $tablerThemeJsSrc = $hasLocalTablerThemeJs ? '/shared/assets/Tabler/dist/js/tabler-theme.min.js' : '';
     $bodyRouteClass = 'route-' . trim(str_replace('/', '-', $path), '-');
     if ($bodyRouteClass === 'route-') {
         $bodyRouteClass = 'route-root';
@@ -88,15 +100,28 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet">
     <link href="<?= e($tablerCssHref) ?>" rel="stylesheet">
     <?php if ($tablerThemesCssHref !== ''): ?><link href="<?= e($tablerThemesCssHref) ?>" rel="stylesheet"><?php endif; ?>
+    <?php if ($tablerVendorsCssHref !== ''): ?><link href="<?= e($tablerVendorsCssHref) ?>" rel="stylesheet"><?php endif; ?>
+    <?php if ($tablerFlagsCssHref !== ''): ?><link href="<?= e($tablerFlagsCssHref) ?>" rel="stylesheet"><?php endif; ?>
+    <?php if ($tablerSocialsCssHref !== ''): ?><link href="<?= e($tablerSocialsCssHref) ?>" rel="stylesheet"><?php endif; ?>
+    <?php if ($tablerPaymentsCssHref !== ''): ?><link href="<?= e($tablerPaymentsCssHref) ?>" rel="stylesheet"><?php endif; ?>
+    <?php if ($tablerMarketingCssHref !== ''): ?><link href="<?= e($tablerMarketingCssHref) ?>" rel="stylesheet"><?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
     <?php if ($hasFavicon): ?><link rel="icon" href="<?= e($faviconPath) ?>"><?php endif; ?>
     <link href="/shared/assets/style.css" rel="stylesheet">
     <link href="/shared/assets/custom.css" rel="stylesheet">
 </head>
 <body class="<?= e($bodyRouteClass) ?>">
+<?php if ($tablerThemeJsSrc !== ''): ?><script src="<?= e($tablerThemeJsSrc) ?>"></script><?php endif; ?>
 <div id="global-preloader" class="preloader-backdrop">
-    <div class="preloader-spinner" role="status" aria-label="Loading"></div>
-    <div id="global-preloader-text" class="preloader-text">Loading…</div>
+    <div class="preloader-panel text-center">
+        <div id="global-preloader-text" class="preloader-text">Preparing application</div>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar progress-bar-indeterminate"></div>
+        </div>
+        <div class="placeholder-glow mt-3">
+            <span class="placeholder col-8"></span>
+        </div>
+    </div>
 </div>
 <div class="page">
     <header class="navbar navbar-expand-md d-print-none">
@@ -203,6 +228,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
 <script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script src="/shared/assets/preloader.js"></script>
+<script src="/shared/assets/password-strength.js"></script>
 <script>
 (() => {
   const html = document.documentElement;

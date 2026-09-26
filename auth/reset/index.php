@@ -63,7 +63,7 @@ render_page('Set Password', function () use ($token, $error): void {
     }
     ?>
     <div class="row justify-content-center mt-6"><div class="col-md-5"><div class="card"><div class="card-header"><h3 class="card-title">Set Password</h3></div><div class="card-body">
-    <form method="post"><?= csrf_input() ?><input type="hidden" name="token" value="<?= e($token) ?>"><div class="mb-3"><input class="form-control" type="password" name="password" required minlength="12" placeholder="New password"></div><button class="btn btn-primary">Save password</button></form>
+    <form method="post"><?= csrf_input() ?><input type="hidden" name="token" value="<?= e($token) ?>"><div class="mb-3"><input class="form-control js-password-strength-input" type="password" name="password" required minlength="12" placeholder="New password"><div class="progress progress-sm mt-2"><div class="progress-bar js-password-strength-bar" style="width:0%"></div></div><div class="small text-secondary mt-1 js-password-strength-text">Strength: Too weak</div></div><button class="btn btn-primary">Save password</button></form>
     </div></div></div></div>
     <?php
 });

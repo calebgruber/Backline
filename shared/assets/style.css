@@ -17,6 +17,17 @@ html[data-has-light-logo="0"][data-has-dark-logo="1"] .logo-dark { display: inli
 .preloader-backdrop { position: fixed; inset: 0; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; transition: opacity .25s ease; }
 html[data-bs-theme="dark"] .preloader-backdrop { background: #0b1220; }
 .preloader-backdrop.hidden { opacity: 0; pointer-events: none; }
+.preloader-panel {
+    width: min(92vw, 440px);
+    padding: 1.25rem 1.25rem 1rem;
+    border: 1px solid var(--tblr-border-color);
+    border-radius: .85rem;
+    background: var(--tblr-bg-surface);
+    box-shadow: 0 14px 34px rgba(9, 20, 46, .14);
+}
+html[data-bs-theme="dark"] .preloader-panel {
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .45);
+}
 .preloader-spinner {
     width: 84px;
     height: 84px;
@@ -27,7 +38,6 @@ html[data-bs-theme="dark"] .preloader-backdrop { background: #0b1220; }
     animation: preloader-spin .8s linear infinite;
 }
 .preloader-text {
-    margin-top: .9rem;
     font-weight: 600;
     font-size: .95rem;
     color: var(--tblr-body-color);

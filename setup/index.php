@@ -105,7 +105,11 @@ render_page('Setup', function () use ($error): void {
                         <div class="row g-3">
                             <div class="col-md-6"><input class="form-control" name="admin_name" placeholder="Name" required></div>
                             <div class="col-md-6"><input type="email" class="form-control" name="admin_email" placeholder="Email" required></div>
-                            <div class="col-12"><input type="password" class="form-control" name="admin_password" placeholder="Password" required minlength="12"></div>
+                            <div class="col-12">
+                                <input type="password" class="form-control js-password-strength-input" name="admin_password" placeholder="Password" required minlength="12">
+                                <div class="progress progress-sm mt-2"><div class="progress-bar js-password-strength-bar" style="width:0%"></div></div>
+                                <div class="small text-secondary mt-1 js-password-strength-text">Strength: Too weak</div>
+                            </div>
                         </div>
                         <div class="mt-4 d-flex justify-content-end"><button class="btn btn-primary">Complete Setup</button></div>
                     </form>
