@@ -16,8 +16,8 @@ if (!function_exists('app_config')) {
 
 $user = require_auth();
 $isAdmin = user_has_permission($user, 'admin.access');
-$canLx = $isAdmin || user_has_permission($user, 'lx.access');
-$canSnd = $isAdmin || user_has_permission($user, 'snd.access');
+$canLx = $isAdmin || user_has_permission($user, 'lx.access') || user_has_permission($user, 'lx.shop');
+$canSnd = $isAdmin || user_has_permission($user, 'snd.access') || user_has_permission($user, 'snd.shop');
 $allowedShowScopes = [];
 if ($canLx && $canSnd) {
     $allowedShowScopes = ['both', 'lx', 'snd'];
@@ -160,12 +160,18 @@ foreach ($shows as $show) {
     }
 }
 
-render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedShowScopes): void {
+render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedShowScopes, $canLx, $canSnd): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
     $showScopeValue = strtolower(trim((string) $value('show_scope')));
     if (!in_array($showScopeValue, $allowedShowScopes, true)) {
         $showScopeValue = $allowedShowScopes[0] ?? 'both';
     }
+    $scopeLabelMap = [
+        'both' => 'Both LX + SND',
+        'lx' => 'LX only',
+        'snd' => 'SND only',
+    ];
+    $currentScopeLabel = $scopeLabelMap[$showScopeValue] ?? 'Select scope';
     $assistantCombinedName = trim((string) ($editingShow['assistant_snd_designer_name'] ?? '')) !== ''
         ? (string) ($editingShow['assistant_snd_designer_name'] ?? '')
         : (string) ($editingShow['ald_name'] ?? '');
@@ -203,17 +209,19 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
                             <div class="col-md-6"><input class="form-control" name="theatre_name" placeholder="Theatre Name" value="<?= e((string) $value('theatre_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
                             <div class="col-md-6">
-                                <select class="form-select" name="show_scope" required>
-                                    <?php if (in_array('both', $allowedShowScopes, true)): ?>
-                                        <option value="both" <?= $showScopeValue === 'both' ? 'selected' : '' ?>>Both LX + SND</option>
-                                    <?php endif; ?>
-                                    <?php if (in_array('lx', $allowedShowScopes, true)): ?>
-                                        <option value="lx" <?= $showScopeValue === 'lx' ? 'selected' : '' ?>>LX only</option>
-                                    <?php endif; ?>
-                                    <?php if (in_array('snd', $allowedShowScopes, true)): ?>
-                                        <option value="snd" <?= $showScopeValue === 'snd' ? 'selected' : '' ?>>SND only</option>
-                                    <?php endif; ?>
-                                </select>
+                                <input type="hidden" name="show_scope" id="show-scope-value" value="<?= e($showScopeValue) ?>">
+                                <details class="role-dropdown">
+                                    <summary class="form-select role-dropdown-summary" id="show-scope-summary"><?= e($currentScopeLabel) ?></summary>
+                                    <div class="role-dropdown-menu">
+                                        <?php foreach ($allowedShowScopes as $scopeKey): ?>
+                                            <?php $scopeLabel = $scopeLabelMap[$scopeKey] ?? strtoupper($scopeKey); ?>
+                                            <label class="form-check mb-1">
+                                                <input class="form-check-input js-show-scope-option" type="radio" name="show_scope_radio" value="<?= e($scopeKey) ?>" <?= $showScopeValue === $scopeKey ? 'checked' : '' ?>>
+                                                <span class="form-check-label"><?= e($scopeLabel) ?></span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </details>
                             </div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_combined_name" placeholder="Assistant LD / Assistant Sound Designer" value="<?= e($assistantCombinedName) ?>" required></div>
@@ -273,9 +281,16 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
                                     </td>
                                     <td><?= e($show['owner_email']) ?></td>
                                     <td class="text-end">
-                                        <a class="btn btn-sm btn-outline-primary" href="/dash/shows?edit=<?= (int) $show['id'] ?>">Edit</a>
-                                        <?php if ($isAdmin): ?>
-                                            <form method="post" class="d-inline-block ms-1" onsubmit="return confirm('Delete show?')">
+                                       <?php $scope = strtolower((string) ($show['show_scope'] ?? 'both')); ?>
+                                       <?php if ($canLx && in_array($scope, ['lx', 'both'], true)): ?>
+                                           <a class="btn btn-sm btn-primary" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
+                                       <?php endif; ?>
+                                       <?php if ($canSnd && in_array($scope, ['snd', 'both'], true)): ?>
+                                           <a class="btn btn-sm btn-primary ms-1" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
+                                       <?php endif; ?>
+                                       <a class="btn btn-sm btn-outline-primary" href="/dash/shows?edit=<?= (int) $show['id'] ?>">Edit</a>
+                                       <?php if ($isAdmin): ?>
+                                           <form method="post" class="d-inline-block ms-1" onsubmit="return confirm('Delete show?')">
                                                 <?= csrf_input() ?>
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="show_id" value="<?= (int) $show['id'] ?>">
@@ -292,5 +307,20 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
             </div>
         </div>
     </div>
+    <script>
+    (() => {
+      const hiddenInput = document.getElementById('show-scope-value');
+      const summary = document.getElementById('show-scope-summary');
+      if (!hiddenInput || !summary) return;
+      document.querySelectorAll('.js-show-scope-option').forEach((option) => {
+        option.addEventListener('change', () => {
+          if (!(option instanceof HTMLInputElement) || !option.checked) return;
+          hiddenInput.value = option.value;
+          const labelEl = option.closest('label')?.querySelector('.form-check-label');
+          summary.textContent = (labelEl?.textContent || '').trim() || option.value;
+        });
+      });
+    })();
+    </script>
     <?php
 }, $user);

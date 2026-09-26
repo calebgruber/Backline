@@ -16,8 +16,8 @@ if (!function_exists('app_config')) {
 
 $user = require_auth();
 $canAdmin = user_has_permission($user, 'admin.access');
-$canLx = user_has_permission($user, 'lx.access');
-$canSnd = user_has_permission($user, 'snd.access');
+$canLx = user_has_permission($user, 'lx.access') || user_has_permission($user, 'lx.shop');
+$canSnd = user_has_permission($user, 'snd.access') || user_has_permission($user, 'snd.shop');
 $nameParts = preg_split('/\s+/', trim((string) ($user['name'] ?? ''))) ?: [];
 $firstName = trim((string) ($nameParts[0] ?? 'Friend'));
 if ($firstName === '') {
