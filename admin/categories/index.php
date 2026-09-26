@@ -107,12 +107,12 @@ render_page('Categories', function () use ($categoriesByShop): void {
                                 <div class="col-md-3"><button class="btn btn-primary w-100"><i class="ti ti-folder-plus me-1"></i>Create Folder</button></div>
                             </form>
                         </div>
-                        <div class="list-group list-group-flush category-manager-list" id="category-list-<?= e($shopKey) ?>" data-shop="<?= e($shopKey) ?>">
+                        <div class="list-group list-group-flush category-manager-list" id="category-list-<?= e($shopKey) ?>" data-shop="<?= e($shopKey) ?>" data-sortable='{"animation":150,"handle":".sortable-handle"}'>
                             <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
                                 <div class="list-group-item" data-category-id="<?= (int) $cat['id'] ?>">
                                     <div class="row g-2 align-items-center">
                                         <div class="col-auto">
-                                            <button type="button" class="btn btn-icon btn-ghost-secondary drag-handle" title="Drag to reorder" aria-label="Drag to reorder">
+                                            <button type="button" class="btn btn-icon btn-ghost-secondary sortable-handle cursor-move" title="Drag to reorder" aria-label="Drag to reorder">
                                                 <i class="ti ti-grip-vertical"></i>
                                             </button>
                                         </div>
@@ -152,9 +152,15 @@ render_page('Categories', function () use ($categoriesByShop): void {
 
     <script>
       document.querySelectorAll('.category-manager-list').forEach((list) => {
+        let config = { animation: 150, handle: '.sortable-handle' };
+        const rawConfig = list.getAttribute('data-sortable') || '';
+        if (rawConfig) {
+          try {
+            config = { ...config, ...JSON.parse(rawConfig) };
+          } catch {}
+        }
         new Sortable(list, {
-          animation: 120,
-          handle: '.drag-handle',
+          ...config,
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',
           onEnd: async () => {

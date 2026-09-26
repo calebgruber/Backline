@@ -35,6 +35,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $hasLocalTablerMarketingCss = file_exists($tablerLocalDistDir . '/css/tabler-marketing.min.css');
     $hasLocalTablerJs = file_exists($tablerLocalDistDir . '/js/tabler.min.js');
     $hasLocalTablerThemeJs = file_exists($tablerLocalDistDir . '/js/tabler-theme.min.js');
+    $hasLocalSortableJs = file_exists($tablerLocalDistDir . '/libs/sortablejs/Sortable.min.js');
     $tablerCssHref = $hasLocalTablerCss ? '/shared/assets/Tabler/dist/css/tabler.min.css' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css';
     $tablerThemesCssHref = $hasLocalTablerThemesCss ? '/shared/assets/Tabler/dist/css/tabler-themes.min.css' : '';
     $tablerVendorsCssHref = $hasLocalTablerVendorsCss ? '/shared/assets/Tabler/dist/css/tabler-vendors.min.css' : '';
@@ -44,6 +45,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $tablerMarketingCssHref = $hasLocalTablerMarketingCss ? '/shared/assets/Tabler/dist/css/tabler-marketing.min.css' : '';
     $tablerJsSrc = $hasLocalTablerJs ? '/shared/assets/Tabler/dist/js/tabler.min.js' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js';
     $tablerThemeJsSrc = $hasLocalTablerThemeJs ? '/shared/assets/Tabler/dist/js/tabler-theme.min.js' : '';
+    $sortableJsSrc = $hasLocalSortableJs ? '/shared/assets/Tabler/dist/libs/sortablejs/Sortable.min.js' : 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js';
     $bodyRouteClass = 'route-' . trim(str_replace('/', '-', $path), '-');
     if ($bodyRouteClass === 'route-') {
         $bodyRouteClass = 'route-root';
@@ -231,7 +233,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
 </div>
 <?php endif; ?>
 <script src="<?= e($tablerJsSrc) ?>"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="<?= e($sortableJsSrc) ?>"></script>
 <script src="/shared/assets/preloader.js"></script>
 <script src="/shared/assets/password-strength.js"></script>
 <script>

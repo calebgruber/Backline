@@ -269,11 +269,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                         </td>
                                     </tr>
                                 </tbody>
-                                <tbody class="category-item-group" id="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-shop="<?= e($shopKey) ?>" style="display:none;">
+                                <tbody class="category-item-group" id="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-shop="<?= e($shopKey) ?>" data-sortable='{"animation":150,"handle":".sortable-handle"}' style="display:none;">
                                     <?php foreach ($groupItems as $item): ?>
                                         <tr data-item-id="<?= (int) $item['id'] ?>">
                                             <td>
-                                                <button type="button" class="btn btn-icon btn-ghost-secondary drag-handle" title="Drag to reorder" aria-label="Drag to reorder">
+                                                <button type="button" class="btn btn-icon btn-ghost-secondary sortable-handle cursor-move" title="Drag to reorder" aria-label="Drag to reorder">
                                                     <i class="ti ti-grip-vertical"></i>
                                                 </button>
                                             </td>
@@ -381,9 +381,15 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
       });
 
       document.querySelectorAll('.category-item-group').forEach((group) => {
+        let config = { animation: 150, handle: '.sortable-handle' };
+        const rawConfig = group.getAttribute('data-sortable') || '';
+        if (rawConfig) {
+          try {
+            config = { ...config, ...JSON.parse(rawConfig) };
+          } catch {}
+        }
         new Sortable(group, {
-          animation: 120,
-          handle: '.drag-handle',
+          ...config,
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',
           onEnd: async () => {

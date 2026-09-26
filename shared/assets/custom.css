@@ -78,11 +78,13 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   border-left: 5px solid var(--card-accent-color);
 }
 
-.drag-handle {
+.drag-handle,
+.sortable-handle {
   cursor: grab;
 }
 
-.drag-handle:active {
+.drag-handle:active,
+.sortable-handle:active {
   cursor: grabbing;
 }
 
