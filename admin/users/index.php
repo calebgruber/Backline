@@ -29,6 +29,28 @@ $rolePermissionMap = [
     'sound_shop' => ['snd.shop'],
     'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
 ];
+$permissionDescriptions = [
+    'admin.access' => 'Admin dashboard and settings',
+    'inventory.manage' => 'Manage inventory',
+    'categories.manage' => 'Manage inventory categories',
+    'users.manage' => 'Manage users',
+    'shows.delete' => 'Delete shows',
+    'resources.manage' => 'Manage resources library',
+    'lx.access' => 'Access lighting app',
+    'snd.access' => 'Access sound app',
+    'lx.shop' => 'Lighting shop role',
+    'snd.shop' => 'Sound shop role',
+];
+$allRolePermissions = [];
+foreach ($rolePermissionMap as $permissions) {
+    foreach ($permissions as $permissionKey) {
+        $allRolePermissions[$permissionKey] = true;
+    }
+}
+$seedPermissionStmt = db()->prepare('INSERT IGNORE INTO permissions (key_name, description_text, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+foreach (array_keys($allRolePermissions) as $permissionKey) {
+    $seedPermissionStmt->execute([$permissionKey, $permissionDescriptions[$permissionKey] ?? null]);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
@@ -196,6 +218,28 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
         }
         $userRoleMap[$uid] = $assignedRoles;
     }
+    $renderRoleDropdown = static function (array $roleOptions, array $selectedRoles): void {
+        $selectedLabels = [];
+        foreach ($selectedRoles as $roleKey) {
+            if (isset($roleOptions[$roleKey])) {
+                $selectedLabels[] = $roleOptions[$roleKey];
+            }
+        }
+        $summary = empty($selectedLabels) ? 'Select roles' : implode(', ', $selectedLabels);
+        ?>
+        <details class="role-dropdown">
+            <summary class="form-select role-dropdown-summary"><?= e($summary) ?></summary>
+            <div class="role-dropdown-menu">
+                <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
+                    <label class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" name="roles[]" value="<?= e($roleKey) ?>" <?= in_array($roleKey, $selectedRoles, true) ? 'checked' : '' ?>>
+                        <span class="form-check-label"><?= e($roleLabel) ?></span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </details>
+        <?php
+    };
     ?>
     <div class="row row-cards">
         <div class="col-lg-5">
@@ -207,12 +251,8 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
                     <div class="mb-3"><input class="form-control" type="email" name="email" placeholder="Email" required></div>
                     <div class="mb-3">
                         <label class="form-label">Roles</label>
-                        <select class="form-select" name="roles[]" multiple size="5">
-                            <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
-                                <option value="<?= e($roleKey) ?>"><?= e($roleLabel) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="form-hint">Use Ctrl/Cmd click to select multiple roles.</div>
+                        <?php $renderRoleDropdown($roleOptions, []); ?>
+                        <div class="form-hint">Open the dropdown and check all roles that apply.</div>
                     </div>
                     <button class="btn btn-primary">Send invite</button>
                 </form>
@@ -237,12 +277,8 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
                             <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
                             <div class="col-12">
                                 <label class="form-label">Roles</label>
-                                <select class="form-select" name="roles[]" multiple size="5">
-                                    <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
-                                        <option value="<?= e($roleKey) ?>" <?= in_array($roleKey, $userRoleMap[(int) $u['id']] ?? [], true) ? 'selected' : '' ?>><?= e($roleLabel) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-hint">Use Ctrl/Cmd click to select multiple roles.</div>
+                                <?php $renderRoleDropdown($roleOptions, $userRoleMap[(int) $u['id']] ?? []); ?>
+                                <div class="form-hint">Open the dropdown and check all roles that apply.</div>
                             </div>
                             <div class="col-12">
                                 <button class="btn btn-primary btn-sm">Save Roles</button>
