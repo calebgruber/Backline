@@ -24,15 +24,22 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $hasLightLogo = $logoLightFile !== null;
     $hasDarkLogo = $logoDarkFile !== null;
     $hasFavicon = $faviconFile !== null;
-    $theme = ($_COOKIE['theme_preference'] ?? 'light') === 'dark' ? 'dark' : 'light';
+    $theme = ($_COOKIE['theme_preference'] ?? 'dark') === 'dark' ? 'dark' : 'light';
+    $tablerLocalDistDir = __DIR__ . '/assets/Tabler/dist';
+    $hasLocalTablerCss = file_exists($tablerLocalDistDir . '/css/tabler.min.css');
+    $hasLocalTablerThemesCss = file_exists($tablerLocalDistDir . '/css/tabler-themes.min.css');
+    $hasLocalTablerJs = file_exists($tablerLocalDistDir . '/js/tabler.min.js');
+    $tablerCssHref = $hasLocalTablerCss ? '/shared/assets/Tabler/dist/css/tabler.min.css' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css';
+    $tablerThemesCssHref = $hasLocalTablerThemesCss ? '/shared/assets/Tabler/dist/css/tabler-themes.min.css' : '';
+    $tablerJsSrc = $hasLocalTablerJs ? '/shared/assets/Tabler/dist/js/tabler.min.js' : 'https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js';
     $bodyRouteClass = 'route-' . trim(str_replace('/', '-', $path), '-');
     if ($bodyRouteClass === 'route-') {
         $bodyRouteClass = 'route-root';
     }
     $loginBackgroundLightPath = $path === '/auth/login' && $loginBackgroundLightFile ? '/uploads/branding/' . basename($loginBackgroundLightFile) : '';
     $loginBackgroundDarkPath = $path === '/auth/login' && $loginBackgroundDarkFile ? '/uploads/branding/' . basename($loginBackgroundDarkFile) : '';
-    $isLxContext = path_starts_with($path, '/lx');
-    $isSndContext = path_starts_with($path, '/snd');
+    $isLxContext = path_starts_with($path, '/lx') || path_starts_with($path, '/dash/lx');
+    $isSndContext = path_starts_with($path, '/snd') || path_starts_with($path, '/dash/sound');
     $isLxAppContext = path_starts_with($path, '/lx/app') || path_starts_with($path, '/dash/lx');
     $isSndAppContext = path_starts_with($path, '/snd/app') || path_starts_with($path, '/dash/sound');
     $isShopAppContext = $isLxAppContext || $isSndAppContext;
@@ -70,7 +77,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $brandAltText = $isLxContext ? 'Backline LX logo' : ($isSndContext ? 'Backline SND logo' : $appName . ' logo');
     ?>
 <!doctype html>
-<html lang="en" data-bs-theme="<?= e($theme) ?>" data-has-dark-logo="<?= $activeHasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $activeHasLightLogo ? '1' : '0' ?>">
+<html lang="en" data-bs-theme="<?= e($theme) ?>" data-bs-theme-base="slate" data-bs-theme-primary="blue" data-has-dark-logo="<?= $activeHasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $activeHasLightLogo ? '1' : '0' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -79,7 +86,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="<?= e($tablerCssHref) ?>" rel="stylesheet">
+    <?php if ($tablerThemesCssHref !== ''): ?><link href="<?= e($tablerThemesCssHref) ?>" rel="stylesheet"><?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
     <?php if ($hasFavicon): ?><link rel="icon" href="<?= e($faviconPath) ?>"><?php endif; ?>
     <link href="/shared/assets/style.css" rel="stylesheet">
@@ -192,7 +200,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
         </div>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script src="/shared/assets/preloader.js"></script>
 <script>
