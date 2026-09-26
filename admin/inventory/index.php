@@ -273,9 +273,9 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                     <?php foreach ($groupItems as $item): ?>
                                         <tr data-item-id="<?= (int) $item['id'] ?>">
                                             <td>
-                                                <button type="button" class="btn btn-icon btn-ghost-secondary sortable-handle cursor-move" title="Drag to reorder" aria-label="Drag to reorder">
+                                                <span class="sortable-handle cursor-move text-secondary d-inline-flex align-items-center" title="Drag to reorder" aria-hidden="true">
                                                     <i class="ti ti-grip-vertical"></i>
-                                                </button>
+                                                </span>
                                             </td>
                                             <td>
                                                 <select class="form-select" name="category_id" form="item-update-<?= (int) $item['id'] ?>">
@@ -381,6 +381,8 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
       });
 
       document.querySelectorAll('.category-item-group').forEach((group) => {
+        const SortableLib = window.Sortable;
+        if (!SortableLib) return;
         let config = { animation: 150, handle: '.sortable-handle' };
         const rawConfig = group.getAttribute('data-sortable') || '';
         if (rawConfig) {
@@ -388,7 +390,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
             config = { ...config, ...JSON.parse(rawConfig) };
           } catch {}
         }
-        new Sortable(group, {
+        new SortableLib(group, {
           ...config,
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',

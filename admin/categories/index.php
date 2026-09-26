@@ -112,9 +112,9 @@ render_page('Categories', function () use ($categoriesByShop): void {
                                 <div class="list-group-item" data-category-id="<?= (int) $cat['id'] ?>">
                                     <div class="row g-2 align-items-center">
                                         <div class="col-auto">
-                                            <button type="button" class="btn btn-icon btn-ghost-secondary sortable-handle cursor-move" title="Drag to reorder" aria-label="Drag to reorder">
+                                            <span class="sortable-handle cursor-move text-secondary d-inline-flex align-items-center" title="Drag to reorder" aria-hidden="true">
                                                 <i class="ti ti-grip-vertical"></i>
-                                            </button>
+                                            </span>
                                         </div>
                                         <div class="col-md-4 d-flex align-items-center gap-2">
                                             <i class="ti ti-folder text-primary"></i>
@@ -152,6 +152,8 @@ render_page('Categories', function () use ($categoriesByShop): void {
 
     <script>
       document.querySelectorAll('.category-manager-list').forEach((list) => {
+        const SortableLib = window.Sortable;
+        if (!SortableLib) return;
         let config = { animation: 150, handle: '.sortable-handle' };
         const rawConfig = list.getAttribute('data-sortable') || '';
         if (rawConfig) {
@@ -159,7 +161,7 @@ render_page('Categories', function () use ($categoriesByShop): void {
             config = { ...config, ...JSON.parse(rawConfig) };
           } catch {}
         }
-        new Sortable(list, {
+        new SortableLib(list, {
           ...config,
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',

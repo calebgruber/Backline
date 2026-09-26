@@ -232,8 +232,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     </div>
 </div>
 <?php endif; ?>
-<script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="<?= e($sortableJsSrc) ?>"></script>
+<script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="/shared/assets/preloader.js"></script>
 <script src="/shared/assets/password-strength.js"></script>
 <script>
