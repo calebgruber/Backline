@@ -16,16 +16,30 @@ if (!function_exists('app_config')) {
 
 $user = require_auth();
 $isAdmin = user_has_permission($user, 'admin.access');
+$canLx = $isAdmin || user_has_permission($user, 'lx.access');
+$canSnd = $isAdmin || user_has_permission($user, 'snd.access');
+$allowedShowScopes = [];
+if ($canLx && $canSnd) {
+    $allowedShowScopes = ['both', 'lx', 'snd'];
+} elseif ($canLx) {
+    $allowedShowScopes = ['lx'];
+} elseif ($canSnd) {
+    $allowedShowScopes = ['snd'];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
 
     if ($action === 'save') {
+        if (empty($allowedShowScopes)) {
+            flash_set('danger', 'You do not have access to create or edit show scopes.');
+            redirect('/dash/shows');
+        }
         $showId = (int) post('show_id', '0');
         $showScope = strtolower(trim((string) post('show_scope', 'both')));
-        if (!in_array($showScope, ['lx', 'snd', 'both'], true)) {
-            $showScope = 'both';
+        if (!in_array($showScope, $allowedShowScopes, true)) {
+            $showScope = $allowedShowScopes[0];
         }
         $assistantCombinedName = post('assistant_combined_name');
         $assistantCombinedEmail = post('assistant_combined_email', '');
@@ -146,11 +160,11 @@ foreach ($shows as $show) {
     }
 }
 
-render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
+render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedShowScopes): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
     $showScopeValue = strtolower(trim((string) $value('show_scope')));
-    if (!in_array($showScopeValue, ['lx', 'snd', 'both'], true)) {
-        $showScopeValue = 'both';
+    if (!in_array($showScopeValue, $allowedShowScopes, true)) {
+        $showScopeValue = $allowedShowScopes[0] ?? 'both';
     }
     $assistantCombinedName = trim((string) ($editingShow['assistant_snd_designer_name'] ?? '')) !== ''
         ? (string) ($editingShow['assistant_snd_designer_name'] ?? '')
@@ -190,9 +204,15 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin): void {
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
                             <div class="col-md-6">
                                 <select class="form-select" name="show_scope" required>
-                                    <option value="both" <?= $showScopeValue === 'both' ? 'selected' : '' ?>>Both LX + SND</option>
-                                    <option value="lx" <?= $showScopeValue === 'lx' ? 'selected' : '' ?>>LX only</option>
-                                    <option value="snd" <?= $showScopeValue === 'snd' ? 'selected' : '' ?>>SND only</option>
+                                    <?php if (in_array('both', $allowedShowScopes, true)): ?>
+                                        <option value="both" <?= $showScopeValue === 'both' ? 'selected' : '' ?>>Both LX + SND</option>
+                                    <?php endif; ?>
+                                    <?php if (in_array('lx', $allowedShowScopes, true)): ?>
+                                        <option value="lx" <?= $showScopeValue === 'lx' ? 'selected' : '' ?>>LX only</option>
+                                    <?php endif; ?>
+                                    <?php if (in_array('snd', $allowedShowScopes, true)): ?>
+                                        <option value="snd" <?= $showScopeValue === 'snd' ? 'selected' : '' ?>>SND only</option>
+                                    <?php endif; ?>
                                 </select>
                             </div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>

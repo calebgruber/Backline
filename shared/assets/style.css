@@ -92,11 +92,14 @@ html[data-bs-theme="dark"] .launch-screen-panel {
 }
 
 .dashboard-hero-title {
-    font-size: 1.4rem;
+    font-size: 2.1rem;
     font-weight: 700;
+    line-height: 1.2;
 }
 .dashboard-hero-name {
     color: #ff8a00;
+    font-size: 1.1em;
+    font-weight: 800;
 }
 
 .role-dropdown { position: relative; }

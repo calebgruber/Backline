@@ -15,6 +15,25 @@ if (!function_exists('app_config')) {
 }
 
 $user = require_auth();
+$roleOptions = [
+    'admin.access' => ['label' => 'Admin', 'class' => 'bg-red-lt'],
+    'lx.access' => ['label' => 'Lighting Major', 'class' => 'bg-blue-lt'],
+    'snd.access' => ['label' => 'Sound Major', 'class' => 'bg-indigo-lt'],
+    'lx.shop' => ['label' => 'Lighting Shop', 'class' => 'bg-cyan-lt'],
+    'snd.shop' => ['label' => 'Sound Shop', 'class' => 'bg-purple-lt'],
+];
+$roleBadges = [];
+if ((int) ($user['is_super_admin'] ?? 0) === 1) {
+    $roleBadges[] = ['label' => 'Super Admin', 'class' => 'bg-red-lt'];
+}
+$permStmt = db()->prepare('SELECT p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ?');
+$permStmt->execute([(int) $user['id']]);
+$permissionKeys = array_values(array_unique(array_map('strval', $permStmt->fetchAll(PDO::FETCH_COLUMN))));
+foreach ($roleOptions as $permissionKey => $meta) {
+    if (in_array($permissionKey, $permissionKeys, true)) {
+        $roleBadges[] = $meta;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
@@ -57,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-render_page('Profile', function () use ($user): void {
+render_page('Profile', function () use ($user, $roleBadges): void {
     ?>
     <div class="row row-cards">
         <div class="col-lg-4">
@@ -66,6 +85,13 @@ render_page('Profile', function () use ($user): void {
                     <span class="avatar avatar-xl rounded-3 mb-3" style="background-image:url(https://api.dicebear.com/9.x/thumbs/svg?seed=<?= urlencode((string) $user['email']) ?>)"></span>
                     <h3 class="mb-1"><?= e($user['name']) ?></h3>
                     <p class="text-secondary mb-0"><?= e($user['email']) ?></p>
+                    <?php if ($roleBadges): ?>
+                        <div class="mt-3 d-flex flex-wrap justify-content-center gap-2">
+                            <?php foreach ($roleBadges as $badge): ?>
+                                <span class="badge <?= e((string) $badge['class']) ?>"><?= e((string) $badge['label']) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
