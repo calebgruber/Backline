@@ -72,7 +72,11 @@ function run_pending_migrations(): array
 
         $name = $migration['name'] ?? $key;
         try {
-            db()->beginTransaction();
+            $startedTransaction = false;
+            if (!db()->inTransaction()) {
+                db()->beginTransaction();
+                $startedTransaction = true;
+            }
             foreach ($migration['sql'] as $sql) {
                 db()->exec($sql);
             }
@@ -81,7 +85,9 @@ function run_pending_migrations(): array
                 VALUES (?, "applied", NOW(), NULL, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE status="applied", applied_at=NOW(), error_text=NULL, updated_at=NOW()');
             $stmt->execute([$key]);
-            db()->commit();
+            if ($startedTransaction && db()->inTransaction()) {
+                db()->commit();
+            }
             $results[] = ['key' => $key, 'name' => $name, 'status' => 'applied'];
         } catch (Throwable $e) {
             if (db()->inTransaction()) {
