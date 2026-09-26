@@ -113,3 +113,8 @@ html[data-bs-theme="dark"] .launch-screen-panel {
     max-height: 220px;
     overflow: auto;
 }
+
+.card-title-enhanced .card-title-pill {
+    margin-top: -2.5rem;
+    margin-left: -2.5rem;
+}
