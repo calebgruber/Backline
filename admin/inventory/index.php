@@ -60,6 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $shop = post('shop_type');
 
     if ($action === 'create_item') {
+        $requestedSortOrder = (int) post('sort_order', '0');
+        if ($requestedSortOrder <= 0) {
+            $nextSortStmt = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_items WHERE shop_type = ?');
+            $nextSortStmt->execute([$shop]);
+            $requestedSortOrder = (int) $nextSortStmt->fetchColumn();
+        }
         $stmt = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
         $stmt->execute([
@@ -72,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             '',
             post('description'),
             isset($_POST['is_spacer']) ? 1 : 0,
-            (int) post('sort_order', '0'),
+            $requestedSortOrder,
         ]);
         flash_set('success', strtoupper($shop) . ' item created.');
     }
@@ -127,19 +133,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'import') {
         $rows = parse_import_rows($shop, post('import_text'));
+        $nextCategorySortStmt = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_categories WHERE shop_type = ?');
+        $nextCategorySortStmt->execute([$shop]);
+        $nextCategorySortOrder = (int) $nextCategorySortStmt->fetchColumn();
+        $nextItemSortStmt = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_items WHERE shop_type = ?');
+        $nextItemSortStmt->execute([$shop]);
+        $nextItemSortOrder = (int) $nextItemSortStmt->fetchColumn();
         db()->beginTransaction();
         foreach ($rows as $row) {
             $catStmt = db()->prepare('SELECT id FROM inventory_categories WHERE shop_type = ? AND name = ? LIMIT 1');
             $catStmt->execute([$shop, $row['category']]);
             $catId = $catStmt->fetchColumn();
             if (!$catId && $row['category'] !== '') {
-                $insCat = db()->prepare('INSERT INTO inventory_categories (shop_type, name, sort_order, created_at, updated_at) VALUES (?, ?, 0, NOW(), NOW())');
-                $insCat->execute([$shop, $row['category']]);
+                $insCat = db()->prepare('INSERT INTO inventory_categories (shop_type, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                $insCat->execute([$shop, $row['category'], $nextCategorySortOrder]);
                 $catId = (int) db()->lastInsertId();
+                $nextCategorySortOrder++;
             }
             $ins = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NOW(), NOW())');
-            $ins->execute([$shop, $catId ?: null, $row['name'], $row['sku'], $row['shop_quantity'], $row['unit'], '', $row['description']]);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())');
+            $ins->execute([$shop, $catId ?: null, $row['name'], $row['sku'], $row['shop_quantity'], $row['unit'], '', $row['description'], $nextItemSortOrder]);
+            $nextItemSortOrder++;
         }
         db()->commit();
         flash_set('success', strtoupper($shop) . ' import complete: ' . count($rows) . ' rows.');
@@ -395,8 +409,9 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
           chosenClass: 'sortable-chosen',
           onEnd: async () => {
             const shopType = group.getAttribute('data-shop');
-            const ids = Array.from(group.querySelectorAll('tr[data-item-id]')).map((tr) => Number(tr.getAttribute('data-item-id')));
-            group.querySelectorAll('tr[data-item-id]').forEach((tr, idx) => {
+            const shopRows = Array.from(document.querySelectorAll('.category-item-group[data-shop="' + shopType + '"] tr[data-item-id]'));
+            const ids = shopRows.map((tr) => Number(tr.getAttribute('data-item-id')));
+            shopRows.forEach((tr, idx) => {
               const sortInput = tr.querySelector('input[name="sort_order"]');
               if (sortInput instanceof HTMLInputElement) sortInput.value = String(idx + 1);
             });

@@ -22,8 +22,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $shop = post('shop_type');
 
     if ($action === 'create') {
+        $requestedSortOrder = (int) post('sort_order', '0');
+        if ($requestedSortOrder <= 0) {
+            $nextSortStmt = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_categories WHERE shop_type = ?');
+            $nextSortStmt->execute([$shop]);
+            $requestedSortOrder = (int) $nextSortStmt->fetchColumn();
+        }
         $stmt = db()->prepare('INSERT INTO inventory_categories (shop_type, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
-        $stmt->execute([$shop, post('name'), (int) post('sort_order', '0')]);
+        $stmt->execute([$shop, post('name'), $requestedSortOrder]);
         flash_set('success', strtoupper($shop) . ' category created.');
     }
 

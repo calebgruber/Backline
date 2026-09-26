@@ -61,10 +61,42 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
     </div>
     <?php if ($canAdmin): ?>
         <div class="row row-cards mb-3">
-            <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-secondary small">Active Users</div><div class="h1 mb-0"><?= (int) $dashboardMetrics['users'] ?></div></div></div></div>
-            <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-secondary small">Total Shows</div><div class="h1 mb-0"><?= (int) $dashboardMetrics['shows'] ?></div></div></div></div>
-            <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-secondary small">LX / SND / Both</div><div class="h2 mb-0"><?= (int) $dashboardMetrics['lx_only'] ?> / <?= (int) $dashboardMetrics['snd_only'] ?> / <?= (int) $dashboardMetrics['both'] ?></div></div></div></div>
-            <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-secondary small">Resources</div><div class="h1 mb-0">Ready</div></div></div></div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Active Users</h3></div>
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <span class="avatar avatar-md bg-blue-lt"><i class="ti ti-users"></i></span>
+                        <div class="h1 mb-0"><?= (int) $dashboardMetrics['users'] ?></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Total Shows</h3></div>
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <span class="avatar avatar-md bg-indigo-lt"><i class="ti ti-layout-grid"></i></span>
+                        <div class="h1 mb-0"><?= (int) $dashboardMetrics['shows'] ?></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">LX / SND / Both</h3></div>
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <span class="avatar avatar-md bg-orange-lt"><i class="ti ti-adjustments"></i></span>
+                        <div class="h2 mb-0"><?= (int) $dashboardMetrics['lx_only'] ?> / <?= (int) $dashboardMetrics['snd_only'] ?> / <?= (int) $dashboardMetrics['both'] ?></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Resources</h3></div>
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <span class="avatar avatar-md bg-green-lt"><i class="ti ti-book"></i></span>
+                        <div class="h1 mb-0">Ready</div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="card">
             <div class="card-header"><h3 class="card-title">Shows</h3></div>
