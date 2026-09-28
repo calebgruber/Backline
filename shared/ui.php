@@ -100,6 +100,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.6.0/dist/css/tabler-payments.min.css" integrity="sha384-UAjeDaIjCHhwML5gnhuab2m5f1czCNpfi/x1H11P/lJtAtBNH2wTHzCp5q2xj6n5" crossorigin="anonymous" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet">
     <link href="<?= e($tablerCssHref) ?>" rel="stylesheet">
     <?php if ($tablerThemesCssHref !== ''): ?><link href="<?= e($tablerThemesCssHref) ?>" rel="stylesheet"><?php endif; ?>
