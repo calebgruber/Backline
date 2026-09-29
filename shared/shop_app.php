@@ -177,7 +177,72 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($action === 'export_latest' && $selectedShowId > 0) {
-                flash_set('info', 'Paperwork export is not wired yet.');
+                $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
+                $orderStmt->execute([$selectedShowId, $shopType]);
+                $orderId = (int) ($orderStmt->fetchColumn() ?: 0);
+                if ($orderId <= 0) {
+                    flash_set('warning', 'No order exists to export yet.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+                }
+
+                $revisionStmt = db()->prepare('SELECT id, revision_label, revised_at FROM order_revisions WHERE order_id = ? ORDER BY revision_number DESC LIMIT 1');
+                $revisionStmt->execute([$orderId]);
+                $latestRevision = $revisionStmt->fetch();
+                if (!$latestRevision) {
+                    flash_set('warning', 'No revisions exist to export yet.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+                }
+
+                $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.action_code
+                    FROM order_lines ol
+                    JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+                    LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+                    WHERE ol.revision_id = ? AND ii.is_spacer = 0
+                    ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ol.sort_order, ii.name');
+                $lineStmt->execute([(int) $latestRevision['id']]);
+                $exportLines = $lineStmt->fetchAll();
+
+                $showName = trim((string) ($selectedShow['show_name'] ?? ('show-' . $selectedShowId)));
+                $safeShowName = preg_replace('/[^A-Za-z0-9._-]+/', '_', $showName) ?: ('show-' . $selectedShowId);
+                $filename = $safeShowName . '-' . strtoupper($shopType) . '-shop-order-' . strtolower((string) ($latestRevision['revision_label'] ?? 'rev')) . '.csv';
+
+                header('Content-Type: text/csv; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                header('Pragma: no-cache');
+                header('Expires: 0');
+
+                $out = fopen('php://output', 'wb');
+                if ($out === false) {
+                    exit;
+                }
+                fputcsv($out, ['Show', $showName]);
+                fputcsv($out, ['Shop', strtoupper($shopType)]);
+                fputcsv($out, ['Revision', (string) ($latestRevision['revision_label'] ?? '')]);
+                fputcsv($out, ['Revised At', (string) ($latestRevision['revised_at'] ?? '')]);
+                fputcsv($out, []);
+                $headers = ['Category', 'Item', 'Qty', 'Spares', 'Unit', 'Action', 'Specific Pull Date', 'Note'];
+                if ($shopType === 'snd') {
+                    array_splice($headers, 2, 0, ['SKU']);
+                }
+                fputcsv($out, $headers);
+                foreach ($exportLines as $line) {
+                    $row = [
+                        (string) ($line['category_name'] ?: 'Uncategorized'),
+                        (string) ($line['item_name'] ?? ''),
+                    ];
+                    if ($shopType === 'snd') {
+                        $row[] = (string) ($line['sku'] ?? '');
+                    }
+                    $row[] = (int) ($line['qty'] ?? 0);
+                    $row[] = (int) ($line['spares'] ?? 0);
+                    $row[] = (string) ($line['unit'] ?? '');
+                    $row[] = (string) ($line['action_code'] ?? 'blank');
+                    $row[] = (string) ($line['specific_pull_date'] ?? '');
+                    $row[] = (string) ($line['line_note'] ?? '');
+                    fputcsv($out, $row);
+                }
+                fclose($out);
+                exit;
             }
             if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
                 flash_set('info', 'Label printing is not wired yet.');

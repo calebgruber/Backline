@@ -210,8 +210,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
                             <?php if (user_has_permission($user, 'inventory.manage')) nav_item('/admin/inventory', 'Inventory', $path); ?>
                             <?php if (user_has_permission($user, 'categories.manage')) nav_item('/admin/categories', 'Categories', $path); ?>
                             <?php if (user_has_permission($user, 'users.manage')) nav_item('/admin/users', 'Users', $path); ?>
-                            <?php if (user_has_permission($user, 'lx.access')) nav_item('/dash/lx', 'LX', $path); ?>
-                            <?php if (user_has_permission($user, 'snd.access')) nav_item('/dash/sound', 'Sound', $path); ?>
+                            <?php if (user_has_permission($user, 'lx.access') || user_has_permission($user, 'lx.shop')) nav_item('/dash/lx', 'LX', $path); ?>
+                            <?php if (user_has_permission($user, 'snd.access') || user_has_permission($user, 'snd.shop')) nav_item('/dash/sound', 'Sound', $path); ?>
                             <?php nav_item('/resources', 'Resources', $path); ?>
                         <?php endif; ?>
                     </ul>

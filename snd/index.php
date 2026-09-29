@@ -14,5 +14,12 @@ if (!function_exists('app_config')) {
     require_once $bootstrapRoot . '/shared/bootstrap.php';
 }
 
-$user = require_permission('snd.access');
+$user = require_auth();
+if (!user_has_permission($user, 'snd.access') && !user_has_permission($user, 'snd.shop')) {
+    http_response_code(403);
+    render_page('Forbidden', function () use ($user): void {
+        echo '<div class="alert alert-danger">You do not have permission for this action.</div>';
+    }, $user);
+    exit;
+}
 redirect('/dash/sound');
