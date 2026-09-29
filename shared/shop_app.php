@@ -483,14 +483,14 @@ if (!function_exists('render_shop_app_page')) {
                     $ensureStmt->execute([$selectedRevisionId, $shopType, $selectedRevisionId]);
 
                     if ($hasReturnDateColumn) {
-                        $lineStmt = db()->prepare('SELECT ol.*, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                        $lineStmt = db()->prepare('SELECT ol.*, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ii.shop_quantity, ic.name AS category_name
                             FROM order_lines ol
                             JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                             LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
                             WHERE ol.revision_id = ? AND ii.is_spacer = 0
                             ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ' . ($hasSubcategoryColumn ? 'COALESCE(ii.subcategory_name, "")' : '""') . ', ii.sort_order, ii.name');
                     } else {
-                        $lineStmt = db()->prepare('SELECT ol.*, NULL AS specific_return_date, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                        $lineStmt = db()->prepare('SELECT ol.*, NULL AS specific_return_date, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ii.shop_quantity, ic.name AS category_name
                             FROM order_lines ol
                             JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                             LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
@@ -847,13 +847,13 @@ if (!function_exists('render_shop_app_page')) {
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
-                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
+                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 90px">Shop Has</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
                                             <?php foreach ($linesByCategory as $category => $subGroups): ?>
                                                 <?php $lineCount = 0; foreach ($subGroups as $subLinesForCount) { $lineCount += count($subLinesForCount); } ?>
                                                 <?php $categoryKey = 'rev-cat-' . substr(md5($category), 0, 12); ?>
                                                 <tbody>
                                                     <tr class="category-header-row shop-category-header" data-target="<?= e($categoryKey) ?>" data-expanded="0">
-                                                        <td colspan="8">
+                                                        <td colspan="9">
                                                             <button type="button" class="btn btn-ghost-secondary btn-sm js-toggle-category">
                                                                 <span class="shop-category-toggle-icon me-1">▶</span>
                                                                 <strong><?= e($category) ?></strong>
@@ -864,7 +864,7 @@ if (!function_exists('render_shop_app_page')) {
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($subGroups as $subcategory => $lines): ?>
-                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="9"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
                                                     <?php foreach ($lines as $line): ?>
                                                         <?php
                                                         $searchBlob = strtolower(trim(implode(' ', [
@@ -879,7 +879,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             $lineActionCode = 'note';
                                                         }
                                                         ?>
-                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-shop-qty="<?= (int) ($line['shop_quantity'] ?? 0) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -887,7 +887,8 @@ if (!function_exists('render_shop_app_page')) {
                                                                 <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
                                                             </td>
                                                             <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
-                                                            <td><span class="badge bg-azure-lt js-row-total">0</span></td>
+                                                            <td><span class="badge bg-azure-lt js-row-total">0</span><div class="small text-danger js-overpull-warning d-none"></div></td>
+                                                            <td><span class="badge bg-secondary-lt js-shop-qty"><?= (int) ($line['shop_quantity'] ?? 0) ?></span></td>
                                                             <td>
                                                                 <select class="form-select js-live-field js-action-field" name="action_code[]">
                                                                     <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
@@ -970,7 +971,7 @@ if (!function_exists('render_shop_app_page')) {
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
-                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
+                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 90px">Shop Has</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
                                             <?php foreach ($linesByCategory as $category => $subGroups): ?>
                                                 <?php $lineCount = 0; foreach ($subGroups as $subLinesForCount) { $lineCount += count($subLinesForCount); } ?>
                                                 <?php $categoryKey = 'init-cat-' . substr(md5($category), 0, 12); ?>
@@ -987,7 +988,7 @@ if (!function_exists('render_shop_app_page')) {
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($subGroups as $subcategory => $lines): ?>
-                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="7"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
                                                     <?php foreach ($lines as $line): ?>
                                                         <?php
                                                         $searchBlob = strtolower(trim(implode(' ', [
@@ -1002,7 +1003,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             $lineActionCode = 'note';
                                                         }
                                                         ?>
-                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-shop-qty="<?= (int) ($line['shop_quantity'] ?? 0) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -1010,7 +1011,8 @@ if (!function_exists('render_shop_app_page')) {
                                                                 <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
                                                             </td>
                                                             <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
-                                                            <td><span class="badge bg-azure-lt js-row-total">0</span></td>
+                                                            <td><span class="badge bg-azure-lt js-row-total">0</span><div class="small text-danger js-overpull-warning d-none"></div></td>
+                                                            <td><span class="badge bg-secondary-lt js-shop-qty"><?= (int) ($line['shop_quantity'] ?? 0) ?></span></td>
                                                             <input type="hidden" name="action_code[]" value="blank">
                                                             <td>
                                                                 <details>
@@ -1065,9 +1067,22 @@ if (!function_exists('render_shop_app_page')) {
                                 const qty = Number.parseInt(row.querySelector('.js-qty')?.value || '0', 10) || 0;
                                 const spares = Number.parseInt(row.querySelector('.js-spares')?.value || '0', 10) || 0;
                                 const total = qty + spares;
+                                const shopQty = Number.parseInt(row.getAttribute('data-shop-qty') || '0', 10) || 0;
                                 const totalEl = row.querySelector('.js-row-total');
                                 if (totalEl) {
                                     totalEl.textContent = String(total);
+                                }
+                                const warningEl = row.querySelector('.js-overpull-warning');
+                                if (warningEl instanceof HTMLElement) {
+                                    if (shopQty >= 0 && total > shopQty) {
+                                        warningEl.textContent = `Over by ${total - shopQty}`;
+                                        warningEl.classList.remove('d-none');
+                                        row.classList.add('shop-overpull');
+                                    } else {
+                                        warningEl.textContent = '';
+                                        warningEl.classList.add('d-none');
+                                        row.classList.remove('shop-overpull');
+                                    }
                                 }
                                 grandTotal += total;
                             });

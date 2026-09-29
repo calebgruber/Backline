@@ -130,6 +130,14 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   background: #DCEBFA !important;
 }
 
+.shop-line-row.shop-overpull td {
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, .6);
+}
+
+html[data-bs-theme="dark"] .shop-line-row.shop-overpull td {
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, .75);
+}
+
 html[data-bs-theme="dark"] .shop-line-row.shop-action-add td {
   background: #1f3a2a !important;
   color: #d9fbe3 !important;
