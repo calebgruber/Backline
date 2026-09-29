@@ -1049,6 +1049,16 @@ if (!function_exists('render_shop_app_page')) {
                         }
 
                         const saveTimers = new Map();
+                        const normalizeSearchText = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                        const matchesRelativeSearch = (haystackRaw, queryRaw) => {
+                            const haystack = normalizeSearchText(haystackRaw);
+                            const query = normalizeSearchText(queryRaw);
+                            if (query === '') return true;
+                            if (haystack.includes(query)) return true;
+                            const terms = query.split(/\s+/).filter(Boolean);
+                            if (!terms.length) return true;
+                            return terms.every((term) => haystack.includes(term));
+                        };
                         const updateEditorTotals = (editor) => {
                             let grandTotal = 0;
                             editor.querySelectorAll('.shop-line-row').forEach((row) => {
@@ -1077,7 +1087,7 @@ if (!function_exists('render_shop_app_page')) {
                         };
 
                         const applyFilters = (editor) => {
-                            const search = (editor.querySelector('.js-line-search')?.value || '').trim().toLowerCase();
+                            const search = (editor.querySelector('.js-line-search')?.value || '').trim();
                             const categoryFilter = (editor.querySelector('.js-category-filter')?.value || '').trim();
                             const hasFilter = search !== '' || categoryFilter !== '';
 
@@ -1086,8 +1096,8 @@ if (!function_exists('render_shop_app_page')) {
                                 const header = editor.querySelector(`.shop-category-header[data-target="${group.id}"]`);
                                 let visibleRows = 0;
                                 group.querySelectorAll('.shop-line-row').forEach((row) => {
-                                    const haystack = (row.getAttribute('data-search') || '').toLowerCase();
-                                    const matchesSearch = search === '' || haystack.includes(search);
+                                    const haystack = (row.getAttribute('data-search') || '');
+                                    const matchesSearch = matchesRelativeSearch(haystack, search);
                                     const matchesCategory = categoryFilter === '' || groupCategory === categoryFilter;
                                     const shouldShow = matchesSearch && matchesCategory;
                                     row.style.display = shouldShow ? '' : 'none';

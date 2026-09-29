@@ -864,6 +864,7 @@ $showImagePath = trim((string) ($show['show_image_url'] ?? ''));
 $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') === '1' ? export_url($showImagePath) : '';
 $crewPrimaryLabel = show_concentration($show) === 'sound' ? 'Sound Designer' : 'Electrician';
 $crewAssistantLabel = show_concentration($show) === 'sound' ? 'Assistant Sound Designer' : 'Assistant Electrician';
+$productionLabel = show_concentration($show) === 'sound' ? 'Production Audio' : 'Production Electrician';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1407,7 +1408,7 @@ $crewAssistantLabel = show_concentration($show) === 'sound' ? 'Assistant Sound D
               </div>
             </div>
             <div class="cover-entry">
-              <div class="cover-entry-label">Production Electrician · <?= h(export_value((string) ($show['production_electrician_name'] ?? ''))) ?></div>
+              <div class="cover-entry-label"><?= h($productionLabel) ?> · <?= h(export_value((string) ($show['production_electrician_name'] ?? ''))) ?></div>
               <div class="cover-entry-meta">
                 <div><?= h(export_value((string) ($show['production_electrician_email'] ?? ''))) ?></div>
                 <div><?= h(export_value((string) ($show['production_electrician_phone'] ?? ''))) ?></div>
