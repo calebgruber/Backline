@@ -14,4 +14,4 @@ if (!function_exists('app_config')) {
     require_once $bootstrapRoot . '/shared/bootstrap.php';
 }
 
-require __DIR__ . '/../../../snd/app/index.php';
+require __DIR__ . '/../../snd/app/index.php';
