@@ -127,8 +127,8 @@ if (!function_exists('render_shop_app_page')) {
                         $newRevisionId = (int) db()->lastInsertId();
 
                         if ($latest) {
-                            $copyStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, created_at, updated_at)
-                                SELECT ?, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, NOW(), NOW()
+                            $copyStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
+                                SELECT ?, inventory_item_id, qty, spares, line_note, NULL, NULL, action_code, sort_order, NOW(), NOW()
                                 FROM order_lines WHERE revision_id = ?');
                             $copyStmt->execute([$newRevisionId, (int) $latest['id']]);
                         }
@@ -154,19 +154,22 @@ if (!function_exists('render_shop_app_page')) {
                     $spares = $_POST['spares'] ?? [];
                     $notes = $_POST['line_note'] ?? [];
                     $pullDates = $_POST['specific_pull_date'] ?? [];
+                    $returnDates = $_POST['specific_return_date'] ?? [];
                     $actions = $_POST['action_code'] ?? [];
-                    $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                    $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
                     foreach ($lineIds as $idx => $lineId) {
                         $actionCode = (string) ($actions[$idx] ?? 'blank');
                         if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
                             $actionCode = 'blank';
                         }
                         $pullDate = trim((string) ($pullDates[$idx] ?? ''));
+                        $returnDate = trim((string) ($returnDates[$idx] ?? ''));
                         $upd->execute([
                             (int) ($qty[$idx] ?? 0),
                             (int) ($spares[$idx] ?? 0),
                             trim((string) ($notes[$idx] ?? '')),
                             $pullDate === '' ? null : $pullDate,
+                            $returnDate === '' ? null : $returnDate,
                             $actionCode,
                             (int) $lineId,
                             $revisionId,
@@ -174,6 +177,40 @@ if (!function_exists('render_shop_app_page')) {
                     }
                     flash_set('success', 'Revision lines saved.');
                 }
+            }
+
+            if ($action === 'save_line_live') {
+                $orderId = (int) post('order_id');
+                $revisionId = (int) post('revision_id');
+                $lineId = (int) post('line_id');
+                $checkStmt = db()->prepare('SELECT r.id FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
+                $checkStmt->execute([$revisionId, $orderId, $selectedShowId, $shopType]);
+                if ($checkStmt->fetchColumn() && $lineId > 0) {
+                    $actionCode = (string) post('action_code', 'blank');
+                    if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
+                        $actionCode = 'blank';
+                    }
+                    $pullDate = trim((string) post('specific_pull_date', ''));
+                    $returnDate = trim((string) post('specific_return_date', ''));
+                    $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                    $upd->execute([
+                        (int) post('qty', 0),
+                        (int) post('spares', 0),
+                        trim((string) post('line_note', '')),
+                        $pullDate === '' ? null : $pullDate,
+                        $returnDate === '' ? null : $returnDate,
+                        $actionCode,
+                        $lineId,
+                        $revisionId,
+                    ]);
+                    header('Content-Type: application/json');
+                    echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+                    exit;
+                }
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => false], JSON_THROW_ON_ERROR);
+                exit;
             }
 
             if ($action === 'export_latest' && $selectedShowId > 0) {
@@ -193,12 +230,12 @@ if (!function_exists('render_shop_app_page')) {
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
 
-                $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.action_code
+                $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.specific_return_date, ol.action_code
                     FROM order_lines ol
                     JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                     LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
                     WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                    ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ol.sort_order, ii.name');
+                    ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
                 $lineStmt->execute([(int) $latestRevision['id']]);
                 $exportLines = $lineStmt->fetchAll();
 
@@ -220,7 +257,7 @@ if (!function_exists('render_shop_app_page')) {
                 fputcsv($out, ['Revision', (string) ($latestRevision['revision_label'] ?? '')]);
                 fputcsv($out, ['Revised At', (string) ($latestRevision['revised_at'] ?? '')]);
                 fputcsv($out, []);
-                $headers = ['Category', 'Item', 'Qty', 'Spares', 'Unit', 'Action', 'Specific Pull Date', 'Note'];
+                $headers = ['Category', 'Item', 'Qty', 'Spares', 'Unit', 'Action', 'Note'];
                 if ($shopType === 'snd') {
                     array_splice($headers, 2, 0, ['SKU']);
                 }
@@ -237,8 +274,20 @@ if (!function_exists('render_shop_app_page')) {
                     $row[] = (int) ($line['spares'] ?? 0);
                     $row[] = (string) ($line['unit'] ?? '');
                     $row[] = (string) ($line['action_code'] ?? 'blank');
-                    $row[] = (string) ($line['specific_pull_date'] ?? '');
-                    $row[] = (string) ($line['line_note'] ?? '');
+                    $noteParts = [];
+                    $lineNote = trim((string) ($line['line_note'] ?? ''));
+                    if ($lineNote !== '') {
+                        $noteParts[] = $lineNote;
+                    }
+                    $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
+                    if ($pullDate !== '') {
+                        $noteParts[] = 'Pull: ' . $pullDate;
+                    }
+                    $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
+                    if ($returnDate !== '') {
+                        $noteParts[] = 'Return: ' . $returnDate;
+                    }
+                    $row[] = implode(' | ', $noteParts);
                     fputcsv($out, $row);
                 }
                 fclose($out);
@@ -282,8 +331,8 @@ if (!function_exists('render_shop_app_page')) {
                 }
 
                 if ($selectedRevisionId > 0) {
-                    $ensureStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, created_at, updated_at)
-                        SELECT ?, ii.id, 0, 0, "", NULL, "blank", ii.sort_order, NOW(), NOW()
+                    $ensureStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
+                        SELECT ?, ii.id, 0, 0, "", NULL, NULL, "blank", ii.sort_order, NOW(), NOW()
                         FROM inventory_items ii
                         WHERE ii.shop_type = ? AND ii.is_spacer = 0
                         AND NOT EXISTS (
@@ -296,7 +345,7 @@ if (!function_exists('render_shop_app_page')) {
                         JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                         LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
                         WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ol.sort_order, ii.name');
+                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
                     $lineStmt->execute([$selectedRevisionId]);
                     $lines = $lineStmt->fetchAll();
                     foreach ($lines as $line) {
@@ -342,7 +391,7 @@ if (!function_exists('render_shop_app_page')) {
                         <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
                         <?php if ($selectedShow): ?>
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-outline-secondary btn-sm" href="<?= e($appPath) ?>">Exit Show</a>
+                                <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
                                 <form method="post" class="d-inline-block">
                                     <?= csrf_input() ?>
                                     <input type="hidden" name="action" value="export_latest">
@@ -469,7 +518,7 @@ if (!function_exists('render_shop_app_page')) {
                     <?php if ($selectedRevisionId > 0): ?>
                         <div class="card">
                             <div class="card-header"><h3 class="card-title">Revision Lines</h3></div>
-                            <div class="card-body p-0">
+                            <div class="card-body p-0 js-shop-lines-editor">
                                 <form method="post">
                                     <?= csrf_input() ?>
                                     <input type="hidden" name="action" value="save_lines">
@@ -477,34 +526,86 @@ if (!function_exists('render_shop_app_page')) {
                                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                                     <input type="hidden" name="revision_id" value="<?= (int) $selectedRevisionId ?>">
                                     <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <div class="card-body border-bottom">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-5">
+                                                <label class="form-label">Live Search</label>
+                                                <input type="search" class="form-control js-line-search" placeholder="Search items, SKU, or notes">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Filter Category</label>
+                                                <select class="form-select js-category-filter">
+                                                    <option value="">All Categories</option>
+                                                    <?php foreach (array_keys($linesByCategory) as $categoryName): ?>
+                                                        <option value="<?= e(strtolower($categoryName)) ?>"><?= e($categoryName) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4 text-md-end">
+                                                <div class="small text-secondary">Total (Qty + Spares)</div>
+                                                <div class="h3 mb-0"><span class="badge bg-azure-lt js-grand-total">0</span></div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="small text-secondary js-save-status">All changes auto-save as you type.</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
-                                            <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Spares</th><th>Action</th><th>Pull Date</th><th>Note</th></tr></thead>
-                                            <tbody>
+                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
                                             <?php foreach ($linesByCategory as $category => $lines): ?>
-                                                <tr class="category-header-row"><td colspan="7"><strong><?= e($category) ?></strong></td></tr>
+                                                <?php $categoryKey = 'rev-cat-' . substr(md5($category), 0, 12); ?>
+                                                <tbody>
+                                                    <tr class="category-header-row shop-category-header" data-target="<?= e($categoryKey) ?>" data-expanded="0">
+                                                        <td colspan="8">
+                                                            <button type="button" class="btn btn-ghost-secondary btn-sm js-toggle-category">
+                                                                <span class="shop-category-toggle-icon me-1">▶</span>
+                                                                <strong><?= e($category) ?></strong>
+                                                                <span class="badge bg-secondary-lt ms-2"><?= count($lines) ?></span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                                <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($lines as $line): ?>
-                                                    <tr>
+                                                    <?php
+                                                    $searchBlob = strtolower(trim(implode(' ', [
+                                                        (string) $category,
+                                                        (string) ($line['item_name'] ?? ''),
+                                                        (string) ($line['sku'] ?? ''),
+                                                        (string) ($line['line_note'] ?? ''),
+                                                    ])));
+                                                    ?>
+                                                    <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
                                                         <td><?= e($category) ?></td>
                                                         <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                         <td>
                                                             <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
-                                                            <input class="form-control" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                            <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
                                                         </td>
-                                                        <td><input class="form-control" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td><span class="badge bg-azure-lt js-row-total">0</span></td>
                                                         <td>
-                                                            <select class="form-select" name="action_code[]">
+                                                            <select class="form-select js-live-field" name="action_code[]">
                                                                 <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
                                                                     <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </td>
-                                                        <td><input class="form-control" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>"></td>
-                                                        <td><input class="form-control" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                        <td>
+                                                            <details>
+                                                                <summary class="text-primary">Pull/Return</summary>
+                                                                <div class="mt-2 d-grid gap-2">
+                                                                    <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
+                                                                    <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
+                                                                </div>
+                                                            </details>
+                                                        </td>
+                                                        <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
                                                     </tr>
                                                 <?php endforeach; ?>
+                                                </tbody>
                                             <?php endforeach; ?>
-                                            </tbody>
                                         </table>
                                     </div>
                                     <div class="card-body border-top">
@@ -531,7 +632,7 @@ if (!function_exists('render_shop_app_page')) {
                     <?php elseif ($selectedRevisionId > 0): ?>
                         <div class="card">
                             <div class="card-header"><h3 class="card-title">Initial Order</h3></div>
-                            <div class="card-body p-0">
+                            <div class="card-body p-0 js-shop-lines-editor">
                                 <form method="post">
                                     <?= csrf_input() ?>
                                     <input type="hidden" name="action" value="save_lines">
@@ -539,34 +640,86 @@ if (!function_exists('render_shop_app_page')) {
                                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                                     <input type="hidden" name="revision_id" value="<?= (int) $selectedRevisionId ?>">
                                     <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <div class="card-body border-bottom">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-5">
+                                                <label class="form-label">Live Search</label>
+                                                <input type="search" class="form-control js-line-search" placeholder="Search items, SKU, or notes">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Filter Category</label>
+                                                <select class="form-select js-category-filter">
+                                                    <option value="">All Categories</option>
+                                                    <?php foreach (array_keys($linesByCategory) as $categoryName): ?>
+                                                        <option value="<?= e(strtolower($categoryName)) ?>"><?= e($categoryName) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4 text-md-end">
+                                                <div class="small text-secondary">Total (Qty + Spares)</div>
+                                                <div class="h3 mb-0"><span class="badge bg-azure-lt js-grand-total">0</span></div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="small text-secondary js-save-status">All changes auto-save as you type.</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
-                                            <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Spares</th><th>Action</th><th>Pull Date</th><th>Note</th></tr></thead>
-                                            <tbody>
+                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
                                             <?php foreach ($linesByCategory as $category => $lines): ?>
-                                                <tr class="category-header-row"><td colspan="7"><strong><?= e($category) ?></strong></td></tr>
+                                                <?php $categoryKey = 'init-cat-' . substr(md5($category), 0, 12); ?>
+                                                <tbody>
+                                                    <tr class="category-header-row shop-category-header" data-target="<?= e($categoryKey) ?>" data-expanded="0">
+                                                        <td colspan="8">
+                                                            <button type="button" class="btn btn-ghost-secondary btn-sm js-toggle-category">
+                                                                <span class="shop-category-toggle-icon me-1">▶</span>
+                                                                <strong><?= e($category) ?></strong>
+                                                                <span class="badge bg-secondary-lt ms-2"><?= count($lines) ?></span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                                <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($lines as $line): ?>
-                                                    <tr>
+                                                    <?php
+                                                    $searchBlob = strtolower(trim(implode(' ', [
+                                                        (string) $category,
+                                                        (string) ($line['item_name'] ?? ''),
+                                                        (string) ($line['sku'] ?? ''),
+                                                        (string) ($line['line_note'] ?? ''),
+                                                    ])));
+                                                    ?>
+                                                    <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
                                                         <td><?= e($category) ?></td>
                                                         <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                         <td>
                                                             <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
-                                                            <input class="form-control" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                            <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
                                                         </td>
-                                                        <td><input class="form-control" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                        <td><span class="badge bg-azure-lt js-row-total">0</span></td>
                                                         <td>
-                                                            <select class="form-select" name="action_code[]">
+                                                            <select class="form-select js-live-field" name="action_code[]">
                                                                 <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
                                                                     <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </td>
-                                                        <td><input class="form-control" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>"></td>
-                                                        <td><input class="form-control" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                        <td>
+                                                            <details>
+                                                                <summary class="text-primary">Pull/Return</summary>
+                                                                <div class="mt-2 d-grid gap-2">
+                                                                    <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
+                                                                    <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
+                                                                </div>
+                                                            </details>
+                                                        </td>
+                                                        <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
                                                     </tr>
                                                 <?php endforeach; ?>
+                                                </tbody>
                                             <?php endforeach; ?>
-                                            </tbody>
                                         </table>
                                     </div>
                                     <div class="card-body border-top">
@@ -581,6 +734,169 @@ if (!function_exists('render_shop_app_page')) {
                 <?php else: ?>
                     <div class="card"><div class="card-body text-secondary"><?= e($scaffoldCopy) ?></div></div>
                 <?php endif; ?>
+                <script>
+                    (() => {
+                        const editors = document.querySelectorAll('.js-shop-lines-editor');
+                        if (!editors.length) {
+                            return;
+                        }
+
+                        const saveTimers = new Map();
+                        const updateEditorTotals = (editor) => {
+                            let grandTotal = 0;
+                            editor.querySelectorAll('.shop-line-row').forEach((row) => {
+                                const qty = Number.parseInt(row.querySelector('.js-qty')?.value || '0', 10) || 0;
+                                const spares = Number.parseInt(row.querySelector('.js-spares')?.value || '0', 10) || 0;
+                                const total = qty + spares;
+                                const totalEl = row.querySelector('.js-row-total');
+                                if (totalEl) {
+                                    totalEl.textContent = String(total);
+                                }
+                                grandTotal += total;
+                            });
+                            const grandEl = editor.querySelector('.js-grand-total');
+                            if (grandEl) {
+                                grandEl.textContent = String(grandTotal);
+                            }
+                        };
+
+                        const applyFilters = (editor) => {
+                            const search = (editor.querySelector('.js-line-search')?.value || '').trim().toLowerCase();
+                            const categoryFilter = (editor.querySelector('.js-category-filter')?.value || '').trim();
+                            const hasFilter = search !== '' || categoryFilter !== '';
+
+                            editor.querySelectorAll('.shop-category-group').forEach((group) => {
+                                const groupCategory = (group.getAttribute('data-category') || '').toLowerCase();
+                                const header = editor.querySelector(`.shop-category-header[data-target="${group.id}"]`);
+                                let visibleRows = 0;
+                                group.querySelectorAll('.shop-line-row').forEach((row) => {
+                                    const haystack = (row.getAttribute('data-search') || '').toLowerCase();
+                                    const matchesSearch = search === '' || haystack.includes(search);
+                                    const matchesCategory = categoryFilter === '' || groupCategory === categoryFilter;
+                                    const shouldShow = matchesSearch && matchesCategory;
+                                    row.style.display = shouldShow ? '' : 'none';
+                                    if (shouldShow) {
+                                        visibleRows++;
+                                    }
+                                });
+
+                                if (!header) {
+                                    return;
+                                }
+
+                                if (visibleRows === 0) {
+                                    header.style.display = 'none';
+                                    group.style.display = 'none';
+                                    return;
+                                }
+
+                                header.style.display = '';
+                                if (hasFilter) {
+                                    group.style.display = '';
+                                } else {
+                                    group.style.display = header.getAttribute('data-expanded') === '1' ? '' : 'none';
+                                }
+                            });
+                        };
+
+                        const saveRow = (editor, row) => {
+                            const form = editor.querySelector('form');
+                            if (!form) {
+                                return;
+                            }
+                            const saveStatus = editor.querySelector('.js-save-status');
+                            if (saveStatus) {
+                                saveStatus.textContent = 'Saving…';
+                            }
+                            const params = new URLSearchParams();
+                            params.set('_csrf', form.querySelector('input[name="_csrf"]')?.value || '');
+                            params.set('action', 'save_line_live');
+                            params.set('show_id', form.querySelector('input[name="show_id"]')?.value || '');
+                            params.set('order_id', form.querySelector('input[name="order_id"]')?.value || '');
+                            params.set('revision_id', form.querySelector('input[name="revision_id"]')?.value || '');
+                            params.set('current_tab', form.querySelector('input[name="current_tab"]')?.value || '');
+                            params.set('line_id', row.querySelector('input[name="line_id[]"]')?.value || '');
+                            params.set('qty', row.querySelector('input[name="qty[]"]')?.value || '0');
+                            params.set('spares', row.querySelector('input[name="spares[]"]')?.value || '0');
+                            params.set('action_code', row.querySelector('select[name="action_code[]"]')?.value || 'blank');
+                            params.set('specific_pull_date', row.querySelector('input[name="specific_pull_date[]"]')?.value || '');
+                            params.set('specific_return_date', row.querySelector('input[name="specific_return_date[]"]')?.value || '');
+                            params.set('line_note', row.querySelector('input[name="line_note[]"]')?.value || '');
+
+                            fetch(window.location.pathname + window.location.search, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                body: params.toString(),
+                            }).then((response) => {
+                                if (!response.ok) {
+                                    throw new Error('save failed');
+                                }
+                                if (saveStatus) {
+                                    saveStatus.textContent = 'Saved';
+                                }
+                            }).catch(() => {
+                                if (saveStatus) {
+                                    saveStatus.textContent = 'Autosave failed. Use Save button.';
+                                }
+                            });
+                        };
+
+                        editors.forEach((editor) => {
+                            updateEditorTotals(editor);
+                            applyFilters(editor);
+                            editor.querySelectorAll('.shop-category-header .js-toggle-category').forEach((btn) => {
+                                btn.addEventListener('click', () => {
+                                    const header = btn.closest('.shop-category-header');
+                                    if (!header) {
+                                        return;
+                                    }
+                                    const target = header.getAttribute('data-target');
+                                    if (!target) {
+                                        return;
+                                    }
+                                    const group = editor.querySelector('#' + target);
+                                    if (!group) {
+                                        return;
+                                    }
+                                    const nextExpanded = header.getAttribute('data-expanded') === '1' ? '0' : '1';
+                                    header.setAttribute('data-expanded', nextExpanded);
+                                    const icon = header.querySelector('.shop-category-toggle-icon');
+                                    if (icon) {
+                                        icon.textContent = nextExpanded === '1' ? '▼' : '▶';
+                                    }
+                                    if ((editor.querySelector('.js-line-search')?.value || '').trim() !== '' || (editor.querySelector('.js-category-filter')?.value || '').trim() !== '') {
+                                        return;
+                                    }
+                                    group.style.display = nextExpanded === '1' ? '' : 'none';
+                                });
+                            });
+
+                            const searchInput = editor.querySelector('.js-line-search');
+                            const categoryInput = editor.querySelector('.js-category-filter');
+                            searchInput?.addEventListener('input', () => applyFilters(editor));
+                            categoryInput?.addEventListener('change', () => applyFilters(editor));
+
+                            editor.querySelectorAll('.shop-line-row').forEach((row) => {
+                                row.querySelectorAll('.js-live-field').forEach((field) => {
+                                    const handler = () => {
+                                        updateEditorTotals(editor);
+                                        const lineId = row.getAttribute('data-line-id') || '';
+                                        if (saveTimers.has(lineId)) {
+                                            window.clearTimeout(saveTimers.get(lineId));
+                                        }
+                                        const timeoutId = window.setTimeout(() => saveRow(editor, row), 350);
+                                        saveTimers.set(lineId, timeoutId);
+                                    };
+                                    field.addEventListener('input', handler);
+                                    field.addEventListener('change', handler);
+                                });
+                            });
+                        });
+                    })();
+                </script>
             <?php endif; ?>
             <?php
         }, $user);
