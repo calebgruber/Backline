@@ -91,3 +91,134 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
 .sortable-ghost {
   opacity: .55;
 }
+
+.shop-workspace-banner {
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: .75rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, .88), rgba(15, 23, 42, .78));
+}
+
+.shop-workspace-banner .h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.shop-workspace-banner .h3 {
+  color: #94a3b8 !important;
+}
+
+.paperwork-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0 2rem;
+}
+
+.paperwork-page {
+  width: 8.5in;
+  min-height: 11in;
+  background: #fff;
+  color: #111827;
+  border-radius: .5rem;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, .35);
+  padding: .45in;
+}
+
+.paperwork-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .2in;
+}
+
+.paperwork-title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.paperwork-subtitle {
+  font-size: .95rem;
+  color: #4b5563;
+}
+
+.paperwork-org {
+  font-size: .85rem;
+  color: #6b7280;
+}
+
+.paperwork-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.paperwork-table th,
+.paperwork-table td {
+  border: 1px solid #d1d5db;
+  padding: .24rem .33rem;
+  font-size: .72rem;
+  vertical-align: top;
+}
+
+.paperwork-table th {
+  background: #f3f4f6;
+  text-align: left;
+}
+
+.paperwork-category-row {
+  background: #e5e7eb;
+  font-weight: 700;
+}
+
+.paperwork-notes {
+  margin-top: .22in;
+}
+
+.paperwork-notes h3 {
+  font-size: .95rem;
+  margin-bottom: .3rem;
+}
+
+.paperwork-notes ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.paperwork-notes li {
+  font-size: .74rem;
+  margin-bottom: .2rem;
+}
+
+.paperwork-footer {
+  margin-top: .22in;
+  font-size: .72rem;
+  color: #4b5563;
+}
+
+@media print {
+  .navbar,
+  .preloader-backdrop,
+  .paperwork-preview-actions,
+  .shop-workspace-banner,
+  .alert {
+    display: none !important;
+  }
+
+  .page-body,
+  .container-xl {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .paperwork-preview-wrap {
+    padding: 0 !important;
+  }
+
+  .paperwork-page {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: auto !important;
+    min-height: auto !important;
+    padding: 0 !important;
+  }
+}

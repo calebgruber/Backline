@@ -279,90 +279,8 @@ if (!function_exists('render_shop_app_page')) {
                     flash_set('warning', 'No revisions exist to export yet.');
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
-                $latestRevision['revision_label'] = shop_revision_label((int) ($latestRevision['revision_number'] ?? 1));
-
-                if ($hasReturnDateColumn) {
-                    $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.specific_return_date, ol.action_code
-                        FROM order_lines ol
-                        JOIN inventory_items ii ON ii.id = ol.inventory_item_id
-                        LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
-                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
-                } else {
-                    $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, NULL AS specific_return_date, ol.action_code
-                        FROM order_lines ol
-                        JOIN inventory_items ii ON ii.id = ol.inventory_item_id
-                        LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
-                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
-                }
-                $lineStmt->execute([(int) $latestRevision['id']]);
-                $exportLines = $lineStmt->fetchAll();
-
-                $showName = trim((string) ($selectedShow['show_name'] ?? ('show-' . $selectedShowId)));
-                $safeShowName = preg_replace('/[^A-Za-z0-9._-]+/', '_', $showName) ?: ('show-' . $selectedShowId);
-                $filename = $safeShowName . '-' . strtoupper($shopType) . '-shop-order-' . strtolower((string) ($latestRevision['revision_label'] ?? 'rev')) . '.html';
-                $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
-                    ? require __DIR__ . '/paperwork_export_settings_reference.php'
-                    : ['current_export_settings' => []];
-                $layout = $paperworkSettings['current_export_settings'] ?? [];
-                $headerText = (string) ($layout['layout.header_text'] ?? 'Production Electrician Shop Order');
-                $orgText = (string) ($layout['layout.organization_text'] ?? '');
-                $footerText = (string) ($layout['layout.footer_text'] ?? 'Prepared in Backline');
-                $defaultNotes = preg_split('/\r\n|\r|\n/', (string) ($layout['layout.export_notes'] ?? '')) ?: [];
-                $defaultNotes = array_values(array_filter(array_map(static fn ($n): string => trim((string) $n), $defaultNotes), static fn ($n): bool => $n !== ''));
-
-                header('Content-Type: text/html; charset=UTF-8');
-                header('Content-Disposition: attachment; filename="' . $filename . '"');
-                header('Pragma: no-cache');
-                header('Expires: 0');
-
-                echo '<!doctype html><html><head><meta charset="utf-8"><title>' . e($showName) . ' ' . e((string) $latestRevision['revision_label']) . '</title>';
-                echo '<style>body{font-family:Arial,sans-serif;color:#111;padding:20px}h1,h2,h3{margin:0}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.meta{color:#555;font-size:12px}.rev{margin-top:4px;font-size:18px;font-weight:700}.cat{margin-top:14px;background:#E5E7EB;padding:8px 10px;font-weight:700}.tbl{width:100%;border-collapse:collapse}.tbl th,.tbl td{border:1px solid #d1d5db;padding:6px 8px;font-size:12px;vertical-align:top}.tbl th{background:#F3F4F6;text-align:left}.notes{margin-top:18px}.notes li{margin:4px 0}.footer{margin-top:22px;font-size:11px;color:#666}</style>';
-                echo '</head><body>';
-                echo '<div class="top"><div><h1>' . e($headerText) . '</h1><div class="rev">' . e($showName) . ' · Revision ' . e((string) $latestRevision['revision_label']) . '</div><div class="meta">Shop: ' . e(strtoupper($shopType)) . ' · Revised: ' . e((string) ($latestRevision['revised_at'] ?? '')) . '</div></div><div class="meta">' . e($orgText) . '</div></div>';
-
-                $currentCategory = null;
-                echo '<table class="tbl"><thead><tr><th style="width:20%">Category</th><th>Item</th>' . ($shopType === 'snd' ? '<th style="width:12%">SKU</th>' : '') . '<th style="width:7%">Used</th><th style="width:7%">Spare</th><th style="width:7%">Total</th><th style="width:8%">Unit</th><th style="width:9%">Action</th><th style="width:30%">Notes</th></tr></thead><tbody>';
-                foreach ($exportLines as $line) {
-                    $category = (string) ($line['category_name'] ?: 'Uncategorized');
-                    $noteParts = [];
-                    $lineNote = trim((string) ($line['line_note'] ?? ''));
-                    if ($lineNote !== '') {
-                        $noteParts[] = $lineNote;
-                    }
-                    $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
-                    if ($pullDate !== '') {
-                        $noteParts[] = 'Pull: ' . $pullDate;
-                    }
-                    $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
-                    if ($returnDate !== '') {
-                        $noteParts[] = 'Return: ' . $returnDate;
-                    }
-                    if ($currentCategory !== $category) {
-                        $currentCategory = $category;
-                        echo '<tr><td colspan="' . ($shopType === 'snd' ? '9' : '8') . '" class="cat">' . e($category) . '</td></tr>';
-                    }
-                    $qty = (int) ($line['qty'] ?? 0);
-                    $spares = (int) ($line['spares'] ?? 0);
-                    echo '<tr><td>' . e($category) . '</td><td>' . e((string) ($line['item_name'] ?? '')) . '</td>';
-                    if ($shopType === 'snd') {
-                        echo '<td>' . e((string) ($line['sku'] ?? '')) . '</td>';
-                    }
-                    echo '<td>' . $qty . '</td><td>' . $spares . '</td><td>' . ($qty + $spares) . '</td><td>' . e((string) ($line['unit'] ?? '')) . '</td><td>' . e((string) ($line['action_code'] ?? 'blank')) . '</td><td>' . e(implode(' | ', $noteParts)) . '</td></tr>';
-                }
-                echo '</tbody></table>';
-
-                if ($defaultNotes) {
-                    echo '<div class="notes"><h3>Important Notes</h3><ul>';
-                    foreach ($defaultNotes as $note) {
-                        echo '<li>' . e($note) . '</li>';
-                    }
-                    echo '</ul></div>';
-                }
-                echo '<div class="footer">' . e($footerText) . '</div>';
-                echo '</body></html>';
-                exit;
+                $latestRevisionId = (int) ($latestRevision['id'] ?? 0);
+                redirect($appPath . '?show=' . $selectedShowId . '&tab=paperwork&preview=1&revision=' . $latestRevisionId);
             }
             if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
                 flash_set('info', 'Label printing is not wired yet.');
@@ -456,7 +374,7 @@ if (!function_exists('render_shop_app_page')) {
         render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
-                <div class="card mb-3">
+                <div class="card mb-3 paperwork-preview-actions">
                     <div class="card-body">
                         <h3 class="card-title mb-2"><?= e($heading) ?></h3>
                         <p class="text-secondary mb-0">Welcome. Select a show card to open its workspace.</p>
@@ -492,7 +410,7 @@ if (!function_exists('render_shop_app_page')) {
                 }
                 ?>
                 <?php if ($selectedShow): ?>
-                    <div class="mb-3 p-3 p-md-4 border rounded-3 bg-body-tertiary">
+                    <div class="shop-workspace-banner mb-3">
                         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
                             <div>
                                 <a class="btn btn-outline-danger" href="/dash/home">Exit Show</a>
@@ -502,13 +420,7 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="h3 mb-0 text-secondary">Revision <?= e($currentRevisionLabel) ?></div>
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
-                                <form method="post" class="d-inline-block">
-                                    <?= csrf_input() ?>
-                                    <input type="hidden" name="action" value="export_latest">
-                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                    <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
-                                    <button class="btn btn-outline-primary btn-sm" type="submit">Export Latest Paperwork</button>
-                                </form>
+                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1">Export Latest Paperwork</a>
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
                                         <?= csrf_input() ?>
@@ -599,9 +511,104 @@ if (!function_exists('render_shop_app_page')) {
                         </div>
                     </div>
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
-                    <div class="card"><div class="card-body text-secondary">
-                        <p class="mb-0">Paperwork views are coming next. Use the show actions above to export latest paperwork.</p>
-                    </div></div>
+                    <?php
+                    $previewMode = (string) ($_GET['preview'] ?? '') === '1';
+                    $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
+                        ? require __DIR__ . '/paperwork_export_settings_reference.php'
+                        : ['current_export_settings' => []];
+                    $layout = $paperworkSettings['current_export_settings'] ?? [];
+                    $headerText = (string) ($layout['layout.header_text'] ?? 'Production Electrician Shop Order');
+                    $organizationText = (string) ($layout['layout.organization_text'] ?? '');
+                    $footerText = (string) ($layout['layout.footer_text'] ?? 'Prepared in Backline');
+                    $defaultNotes = preg_split('/\r\n|\r|\n/', (string) ($layout['layout.export_notes'] ?? '')) ?: [];
+                    $defaultNotes = array_values(array_filter(array_map(static fn ($n): string => trim((string) $n), $defaultNotes), static fn ($n): bool => $n !== ''));
+                    $isInitialRevision = $currentRevisionLabel === '1.1';
+                    $backTab = $isInitialRevision ? 'initial' : 'revisions';
+                    ?>
+                    <?php if (!$previewMode): ?>
+                        <div class="card"><div class="card-body text-secondary">
+                            <p class="mb-0">Use “Export Latest Paperwork” to open print preview.</p>
+                        </div></div>
+                    <?php else: ?>
+                        <div class="card mb-3">
+                            <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                                <a class="btn btn-outline-secondary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($backTab) ?><?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Back to Show</a>
+                                <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
+                            </div>
+                        </div>
+                        <div class="paperwork-preview-wrap">
+                            <div class="paperwork-page">
+                                <div class="paperwork-top">
+                                    <div>
+                                        <h2 class="paperwork-title"><?= e($headerText) ?></h2>
+                                        <div class="paperwork-subtitle"><?= e((string) $selectedShow['show_name']) ?> · Revision <?= e($currentRevisionLabel) ?></div>
+                                    </div>
+                                    <div class="paperwork-org"><?= e($organizationText) ?></div>
+                                </div>
+                                <table class="paperwork-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Item</th>
+                                            <?php if ($shopType === 'snd'): ?><th>SKU</th><?php endif; ?>
+                                            <th>Used</th>
+                                            <th>Spare</th>
+                                            <th>Total</th>
+                                            <th>Unit</th>
+                                            <th>Action</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($linesByCategory as $category => $lines): ?>
+                                            <tr><td colspan="<?= $shopType === 'snd' ? '9' : '8' ?>" class="paperwork-category-row"><?= e($category) ?></td></tr>
+                                            <?php foreach ($lines as $line): ?>
+                                                <?php
+                                                $noteParts = [];
+                                                $lineNote = trim((string) ($line['line_note'] ?? ''));
+                                                if ($lineNote !== '') {
+                                                    $noteParts[] = $lineNote;
+                                                }
+                                                $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
+                                                if ($pullDate !== '') {
+                                                    $noteParts[] = 'Pull: ' . $pullDate;
+                                                }
+                                                $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
+                                                if ($returnDate !== '') {
+                                                    $noteParts[] = 'Return: ' . $returnDate;
+                                                }
+                                                $qty = (int) ($line['qty'] ?? 0);
+                                                $spares = (int) ($line['spares'] ?? 0);
+                                                ?>
+                                                <tr>
+                                                    <td><?= e((string) $category) ?></td>
+                                                    <td><?= e((string) ($line['item_name'] ?? '')) ?></td>
+                                                    <?php if ($shopType === 'snd'): ?><td><?= e((string) ($line['sku'] ?? '')) ?></td><?php endif; ?>
+                                                    <td><?= $qty ?></td>
+                                                    <td><?= $spares ?></td>
+                                                    <td><?= $qty + $spares ?></td>
+                                                    <td><?= e((string) ($line['unit'] ?? '')) ?></td>
+                                                    <td><?= e((string) ($line['action_code'] ?? 'blank')) ?></td>
+                                                    <td><?= e(implode(' | ', $noteParts)) ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                <?php if ($defaultNotes): ?>
+                                    <div class="paperwork-notes">
+                                        <h3>Important Notes</h3>
+                                        <ul>
+                                            <?php foreach ($defaultNotes as $note): ?>
+                                                <li><?= e($note) ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="paperwork-footer"><?= e($footerText) ?></div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title">Revisions</h3></div>

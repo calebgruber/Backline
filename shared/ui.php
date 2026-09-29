@@ -188,7 +188,6 @@ function render_page(string $title, callable $body, ?array $user = null): void
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
                                     <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/lx?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
                                 <?php endforeach; ?>
-                                <li class="nav-item"><a class="nav-link" href="/dash/lx"><span class="nav-link-title">Exit Show</span></a></li>
                             <?php else: ?>
                                 <?php nav_item('/dash/lx', 'LX Home', $path); ?>
                                 <?php nav_item('/dash/home', 'Back Home', $path); ?>
@@ -198,7 +197,6 @@ function render_page(string $title, callable $body, ?array $user = null): void
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
                                     <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/sound?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
                                 <?php endforeach; ?>
-                                <li class="nav-item"><a class="nav-link" href="/dash/sound"><span class="nav-link-title">Exit Show</span></a></li>
                             <?php else: ?>
                                 <?php nav_item('/dash/sound', 'SND Home', $path); ?>
                                 <?php nav_item('/dash/home', 'Back Home', $path); ?>
