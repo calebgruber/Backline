@@ -21,16 +21,171 @@ $paperworkExportSettingsReference = file_exists(__DIR__ . '/paperwork_export_set
     ? require __DIR__ . '/paperwork_export_settings_reference.php'
     : null;
 
-require_once __DIR__ . '/shared/config.php';
-require_once __DIR__ . '/shared/db.php';
-require_once __DIR__ . '/shared/app.php';
-require_once __DIR__ . '/shared/ui.php';
+if (!function_exists('app_config')) {
+    require_once __DIR__ . '/bootstrap.php';
+}
+$user = require_auth();
 
-require_login();
+if (!function_exists('h')) {
+    function h(?string $value): string
+    {
+        return e($value);
+    }
+}
 
-if (!schema_ready()) {
-    header('Location: ' . url_for('setup'));
-    exit;
+if (!function_exists('concentration_label')) {
+    function concentration_label(string $concentration): string
+    {
+        return strtolower($concentration) === 'sound' ? 'Sound' : 'Lighting';
+    }
+}
+
+if (!function_exists('show_concentration')) {
+    function show_concentration(array $show): string
+    {
+        return (string) ($show['concentration'] ?? 'lighting');
+    }
+}
+
+if (!function_exists('find_show')) {
+    function find_show(int $showId): ?array
+    {
+        $stmt = db()->prepare('SELECT * FROM shows WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+        $stmt->execute([$showId]);
+        $show = $stmt->fetch();
+        if (!$show) {
+            return null;
+        }
+        $assistants = json_decode((string) ($show['assistants_json'] ?? ''), true);
+        $show['ld_name'] = (string) ($show['lead_designer_name'] ?? '');
+        $show['ld_email'] = (string) ($show['lead_designer_email'] ?? '');
+        $show['ld_phone'] = (string) ($show['lead_designer_phone'] ?? '');
+        $show['assistant_ld_name'] = (string) ($show['ald_name'] ?? '');
+        $show['assistant_ld_email'] = (string) ($show['ald_email'] ?? '');
+        $show['assistant_ld_phone'] = (string) ($show['ald_phone'] ?? '');
+        $show['assistant_shop_manager_name'] = (string) (($assistants['assistant_shop_manager']['name'] ?? '') ?: '');
+        $show['assistant_shop_manager_email'] = (string) (($assistants['assistant_shop_manager']['email'] ?? '') ?: '');
+        $show['assistant_shop_manager_phone'] = (string) (($assistants['assistant_shop_manager']['phone'] ?? '') ?: '');
+        $show['concentration'] = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'sound' : 'lighting';
+        $show['show_image_url'] = (string) ($show['show_image_path'] ?? '');
+        return $show;
+    }
+}
+
+if (!function_exists('find_revision')) {
+    function find_revision(int $revisionId): ?array
+    {
+        $stmt = db()->prepare('SELECT r.*, o.show_id FROM order_revisions r JOIN orders o ON o.id = r.order_id WHERE r.id = ? LIMIT 1');
+        $stmt->execute([$revisionId]);
+        $rev = $stmt->fetch();
+        if (!$rev) {
+            return null;
+        }
+        $rev['revision_index'] = (int) ($rev['revision_number'] ?? 1);
+        $rev['revision_date'] = (string) ($rev['revised_at'] ?? '');
+        $rev['is_initial'] = ((int) ($rev['revision_number'] ?? 0) === 1) ? 1 : 0;
+        return $rev;
+    }
+}
+
+if (!function_exists('find_latest_revision')) {
+    function find_latest_revision(int $showId): ?array
+    {
+        $stmt = db()->prepare('SELECT r.*, o.show_id FROM order_revisions r JOIN orders o ON o.id = r.order_id WHERE o.show_id = ? AND o.order_kind = "initial" ORDER BY r.revision_number DESC LIMIT 1');
+        $stmt->execute([$showId]);
+        $rev = $stmt->fetch();
+        if (!$rev) {
+            return null;
+        }
+        $rev['revision_index'] = (int) ($rev['revision_number'] ?? 1);
+        $rev['revision_date'] = (string) ($rev['revised_at'] ?? '');
+        $rev['is_initial'] = ((int) ($rev['revision_number'] ?? 0) === 1) ? 1 : 0;
+        return $rev;
+    }
+}
+
+if (!function_exists('list_revisions')) {
+    function list_revisions(int $showId): array
+    {
+        $stmt = db()->prepare('SELECT r.*, o.show_id FROM order_revisions r JOIN orders o ON o.id = r.order_id WHERE o.show_id = ? AND o.order_kind = "initial" ORDER BY r.revision_number ASC');
+        $stmt->execute([$showId]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $row['revision_index'] = (int) ($row['revision_number'] ?? 1);
+            $row['revision_date'] = (string) ($row['revised_at'] ?? '');
+            $row['is_initial'] = ((int) ($row['revision_number'] ?? 0) === 1) ? 1 : 0;
+        }
+        unset($row);
+        return $rows;
+    }
+}
+
+if (!function_exists('revision_display_code')) {
+    function revision_display_code(array $revision): string
+    {
+        return '1.' . (int) ($revision['revision_number'] ?? 1);
+    }
+}
+
+if (!function_exists('catalog_for_revision')) {
+    function catalog_for_revision(int $revisionId): array
+    {
+        $stmt = db()->prepare('SELECT ii.*, ic.name AS category_name, ol.qty, ol.spares, ol.action_code, ol.line_note, ol.specific_pull_date, ol.specific_return_date
+            FROM order_lines ol
+            JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+            LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+            WHERE ol.revision_id = ?
+            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+        $stmt->execute([$revisionId]);
+        $rows = $stmt->fetchAll();
+        $catalog = [];
+        foreach ($rows as $row) {
+            $category = trim((string) ($row['category_name'] ?? '')) ?: 'Uncategorized';
+            if (!isset($catalog[$category])) {
+                $catalog[$category] = ['name' => $category, 'items' => []];
+            }
+            $catalog[$category]['items'][] = [
+                'id' => (int) $row['id'],
+                'name' => (string) ($row['name'] ?? ''),
+                'description' => (string) ($row['description'] ?? ''),
+                'is_spacer' => (int) ($row['is_spacer'] ?? 0),
+                'line' => [
+                    'inventory_item_id' => (int) $row['id'],
+                    'rent_quantity' => (int) ($row['qty'] ?? 0),
+                    'spare_quantity' => (int) ($row['spares'] ?? 0),
+                    'total_quantity' => (int) ($row['qty'] ?? 0) + (int) ($row['spares'] ?? 0),
+                    'action' => ((string) ($row['action_code'] ?? 'blank')) === 'notes' ? 'note' : (string) ($row['action_code'] ?? ''),
+                    'line_note' => (string) ($row['line_note'] ?? ''),
+                    'pickup_date' => (string) ($row['specific_pull_date'] ?? ''),
+                    'return_date' => (string) ($row['specific_return_date'] ?? ''),
+                ],
+            ];
+        }
+        return array_values($catalog);
+    }
+}
+
+if (!function_exists('export_layout_settings')) {
+    function export_layout_settings(int $showId): array
+    {
+        $ref = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
+            ? require __DIR__ . '/paperwork_export_settings_reference.php'
+            : ['current_export_settings' => [], 'show_override_keys' => []];
+        $layout = $ref['current_export_settings'] ?? [];
+        $globalRaw = app_setting('paperwork.global_layout_overrides', []);
+        $global = is_array($globalRaw) ? $globalRaw : (json_decode((string) $globalRaw, true) ?: []);
+        $layout = array_replace($layout, is_array($global) ? $global : []);
+        $stmt = db()->prepare('SELECT value_json FROM show_settings WHERE show_id = ? AND key_name = ? LIMIT 1');
+        $stmt->execute([$showId, 'paperwork.layout_overrides']);
+        $showRaw = $stmt->fetchColumn();
+        if (is_string($showRaw) && $showRaw !== '') {
+            $decoded = json_decode($showRaw, true);
+            if (is_array($decoded)) {
+                $layout = array_replace($layout, $decoded);
+            }
+        }
+        return $layout;
+    }
 }
 
 $showId = isset($_GET['show_id']) ? (int) $_GET['show_id'] : 0;
@@ -61,21 +216,29 @@ function export_type_labels(string $type, string $concentration = 'lighting'): a
 
 function export_previous_revision(array $revision): ?array
 {
-    $stmt = db()->prepare(
-        'SELECT * FROM show_revisions WHERE show_id = ? AND revision_index < ? ORDER BY revision_index DESC LIMIT 1'
-    );
+    $stmt = db()->prepare('SELECT r.*, o.show_id FROM order_revisions r JOIN orders o ON o.id = r.order_id WHERE o.show_id = ? AND r.revision_number < ? AND o.order_kind = "initial" ORDER BY r.revision_number DESC LIMIT 1');
     $stmt->execute([(int) $revision['show_id'], (int) $revision['revision_index']]);
     $row = $stmt->fetch();
+    if ($row) {
+        $row['revision_index'] = (int) ($row['revision_number'] ?? 1);
+        $row['revision_date'] = (string) ($row['revised_at'] ?? '');
+    }
     return $row ?: null;
 }
 
 function export_revision_line_map(int $revisionId): array
 {
-    $stmt = db()->prepare('SELECT * FROM revision_items WHERE revision_id = ?');
+    $stmt = db()->prepare('SELECT * FROM order_lines WHERE revision_id = ?');
     $stmt->execute([$revisionId]);
     $map = [];
     foreach ($stmt->fetchAll() as $row) {
-        $map[(int) $row['inventory_item_id']] = $row;
+        $map[(int) $row['inventory_item_id']] = [
+            'rent_quantity' => (int) ($row['qty'] ?? 0),
+            'spare_quantity' => (int) ($row['spares'] ?? 0),
+            'total_quantity' => (int) ($row['qty'] ?? 0) + (int) ($row['spares'] ?? 0),
+            'line_note' => (string) ($row['line_note'] ?? ''),
+            'action' => (string) ($row['action_code'] ?? ''),
+        ];
     }
     return $map;
 }
@@ -574,8 +737,8 @@ $summaryRows = !empty($revision['is_initial']) ? [] : export_summary_rows($catal
 $summaryPages = !empty($revision['is_initial']) ? [] : export_summary_pages($summaryRows, $layout);
 $equipmentPages = export_equipment_pages($equipmentRows, $layout);
 $notes = export_notes_list($layout);
-$backTab = !empty($revision['is_initial']) ? 'orders' : 'revisions';
-$editorUrl = url_for('show?show_id=' . $showId . '&tab=' . $backTab . '&mode=edit&revision_id=' . (int) $revision['id'] . '&export_type=' . rawurlencode((string) $type));
+$shopRoute = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'dash/sound' : 'dash/lx';
+$editorUrl = url_for($shopRoute . '?show_id=' . $showId . '&tab=paperwork&revision_id=' . (int) $revision['id']);
 $renderSummaryPage = empty($revision['is_initial']);
 $pageNumbers = ['cover' => 1, 'details' => 2, 'summary' => [], 'equipment' => []];
 $nextPageNumber = 3;
@@ -1080,7 +1243,7 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
 <body>
   <div class="toolbar">
     <a href="<?= h($editorUrl) ?>">Back</a>
-    <button type="button" onclick="window.print()">Print / Save PDF</button>
+    <button type="button" id="downloadPdfButton">Download PDF</button>
   </div>
   <div class="document">
     <section class="page cover-page">
@@ -1380,5 +1543,30 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
     </section>
     <?php endforeach; ?>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script>
+    (function () {
+      const button = document.getElementById('downloadPdfButton');
+      if (!button) return;
+      button.addEventListener('click', function () {
+        const root = document.querySelector('.document');
+        if (!root || typeof html2pdf === 'undefined') return;
+        const showName = <?= json_encode((string) ($show['show_name'] ?? 'show')) ?>;
+        const revisionCode = <?= json_encode((string) $revisionCode) ?>;
+        const filename = `${showName.replace(/[^a-z0-9-_]+/gi, '_')}_rev_${revisionCode}.pdf`;
+        button.disabled = true;
+        html2pdf().set({
+          margin: [0, 0, 0, 0],
+          filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, scrollX: 0, scrollY: 0 },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] }
+        }).from(root).save().finally(function () {
+          button.disabled = false;
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
