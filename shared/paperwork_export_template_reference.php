@@ -292,10 +292,14 @@ function export_equipment_rows(array $catalog, string $type): array
             }
 
             $line = $item['line'];
+            $hasTotal = (int) ($line['total_quantity'] ?? 0) > 0;
+            $hasAction = in_array((string) ($line['action'] ?? ''), ['add', 'return', 'exchange', 'note'], true);
+            $hasNote = trim((string) ($line['line_note'] ?? '')) !== '';
+            $hasDates = trim((string) ($line['pickup_date'] ?? '')) !== '' || trim((string) ($line['return_date'] ?? '')) !== '';
             $include = match ($type) {
                 'spares' => (int) ($line['spare_quantity'] ?? 0) > 0,
-                'returns' => (int) ($line['total_quantity'] ?? 0) > 0 || !empty($line['action']),
-                default => (int) ($line['total_quantity'] ?? 0) > 0,
+                'returns' => $hasTotal || $hasAction || $hasNote || $hasDates,
+                default => $hasTotal || $hasAction || $hasNote || $hasDates,
             };
             if ($include) {
                 $visibleItems[] = $item;
@@ -776,7 +780,8 @@ $summaryPages = !empty($revision['is_initial']) ? [] : export_summary_pages($sum
 $equipmentPages = export_equipment_pages($equipmentRows, $layout);
 $notes = export_notes_list($layout);
 $shopRoute = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'dash/sound' : 'dash/lx';
-$editorUrl = export_url($shopRoute . '?show_id=' . $showId . '&tab=paperwork&revision_id=' . (int) $revision['id']);
+$editorUrl = export_url($shopRoute . '?show=' . $showId . '&tab=exports&export_revision=' . (int) $revision['id']);
+$embedMode = ((string) ($_GET['embed'] ?? '')) === '1';
 $renderSummaryPage = empty($revision['is_initial']);
 $pageNumbers = ['cover' => 1, 'details' => 2, 'summary' => [], 'equipment' => []];
 $nextPageNumber = 3;
@@ -1279,10 +1284,12 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
   </style>
 </head>
 <body>
+  <?php if (!$embedMode): ?>
   <div class="toolbar">
     <a href="<?= h($editorUrl) ?>">Back</a>
     <button type="button" id="downloadPdfButton">Download PDF</button>
   </div>
+  <?php endif; ?>
   <div class="document">
     <section class="page cover-page">
       <div class="page-content">
@@ -1584,6 +1591,7 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   <script>
     (function () {
+      if (<?= $embedMode ? 'true' : 'false' ?>) return;
       const button = document.getElementById('downloadPdfButton');
       if (!button) return;
       button.addEventListener('click', function () {

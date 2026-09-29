@@ -114,6 +114,22 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   border-top: 1px solid rgba(59, 130, 246, .18);
 }
 
+.shop-line-row.shop-action-add td {
+  background: #D9EADF !important;
+}
+
+.shop-line-row.shop-action-return td {
+  background: #F8D9D7 !important;
+}
+
+.shop-line-row.shop-action-exchange td {
+  background: #F8EDC9 !important;
+}
+
+.shop-line-row.shop-action-note td {
+  background: #DCEBFA !important;
+}
+
 .paperwork-preview-wrap {
   display: flex;
   flex-direction: column;

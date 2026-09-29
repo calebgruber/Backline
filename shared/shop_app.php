@@ -50,6 +50,40 @@ if (!function_exists('shop_has_inventory_subcategory_column')) {
     }
 }
 
+if (!function_exists('shop_store_show_upload')) {
+    function shop_store_show_upload(array $file, int $showId, string $baseName): ?string
+    {
+        $tmpPath = (string) ($file['tmp_name'] ?? '');
+        if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+            return null;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? (string) finfo_file($finfo, $tmpPath) : '';
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        $allowed = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        if (!isset($allowed[$mime])) {
+            return null;
+        }
+
+        $dir = __DIR__ . '/../uploads/shows/' . $showId;
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return null;
+        }
+        foreach (glob($dir . '/' . $baseName . '.*') ?: [] as $oldFile) {
+            @unlink($oldFile);
+        }
+
+        $target = $dir . '/' . $baseName . '.' . $allowed[$mime];
+        if (!move_uploaded_file($tmpPath, $target)) {
+            return null;
+        }
+        return '/uploads/shows/' . $showId . '/' . $baseName . '.' . $allowed[$mime];
+    }
+}
+
 if (!function_exists('render_shop_app_page')) {
     function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
@@ -57,12 +91,12 @@ if (!function_exists('render_shop_app_page')) {
         $isAdmin = user_has_permission($user, 'admin.access');
         $showListStmt = $isAdmin
             ? (function () use ($shopType) {
-                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
+                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address, show_image_path FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
                 $stmt->execute([$shopType]);
                 return $stmt;
             })()
             : (function () use ($user, $shopType) {
-                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
+                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address, show_image_path FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
                 $stmt->execute([(int) $user['id'], $shopType]);
                 return $stmt;
             })();
@@ -84,7 +118,7 @@ if (!function_exists('render_shop_app_page')) {
         }
 
         $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'] . ' AND COALESCE(s.show_scope, "both") IN ("both", ' . db()->quote($shopType) . ')';
-        $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
+        $allowedTabs = ['info', 'initial', 'revisions', 'paperwork', 'exports'];
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         $hasReturnDateColumn = shop_has_order_line_return_date_column();
         $hasSubcategoryColumn = shop_has_inventory_subcategory_column();
@@ -308,6 +342,15 @@ if (!function_exists('render_shop_app_page')) {
                         $updates[$settingKey] = trim((string) ($_POST[$inputName] ?? ''));
                     }
                 }
+                $uploadedFooterLogo = shop_store_show_upload($_FILES['cover_footer_logo_file'] ?? [], $selectedShowId, 'paperwork-footer-logo');
+                if ($uploadedFooterLogo !== null && isset($allowedKeys['layout.cover_footer_logo_url'])) {
+                    $updates['layout.cover_footer_logo_url'] = $uploadedFooterLogo;
+                }
+                $uploadedShowImage = shop_store_show_upload($_FILES['show_photo_file'] ?? [], $selectedShowId, 'show-photo');
+                if ($uploadedShowImage !== null) {
+                    $showImageStmt = db()->prepare('UPDATE shows SET show_image_path = ?, updated_at = NOW() WHERE id = ?');
+                    $showImageStmt->execute([$uploadedShowImage, $selectedShowId]);
+                }
                 $upsert = db()->prepare('INSERT INTO show_settings (show_id, key_name, value_json, created_at, updated_at)
                     VALUES (?, ?, ?, NOW(), NOW())
                     ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
@@ -332,7 +375,7 @@ if (!function_exists('render_shop_app_page')) {
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
                 $latestRevisionId = (int) ($latestRevision['id'] ?? 0);
-                redirect($appPath . '?show=' . $selectedShowId . '&tab=paperwork&revision=' . $latestRevisionId);
+                redirect($appPath . '?show=' . $selectedShowId . '&tab=exports&export_revision=' . $latestRevisionId);
             }
             if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
                 flash_set('info', 'Label printing is not wired yet.');
@@ -344,6 +387,7 @@ if (!function_exists('render_shop_app_page')) {
         $order = null;
         $revisions = [];
         $selectedRevisionId = (int) ($_GET['revision'] ?? 0);
+        $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         $linesByCategory = [];
         $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
             ? require __DIR__ . '/paperwork_export_settings_reference.php'
@@ -371,6 +415,13 @@ if (!function_exists('render_shop_app_page')) {
                 unset($revisionRow);
                 if ($selectedRevisionId <= 0 && !empty($revisions)) {
                     $selectedRevisionId = (int) $revisions[0]['id'];
+                }
+                if ($selectedExportRevisionId <= 0 && !empty($revisions)) {
+                    $selectedExportRevisionId = (int) $revisions[0]['id'];
+                }
+                $revisionIds = array_map(static fn ($r): int => (int) ($r['id'] ?? 0), $revisions);
+                if ($selectedExportRevisionId > 0 && !in_array($selectedExportRevisionId, $revisionIds, true)) {
+                    $selectedExportRevisionId = (int) $revisions[0]['id'];
                 }
                 if ($currentTab === 'initial' && !empty($revisions)) {
                     $initialRevision = null;
@@ -454,7 +505,7 @@ if (!function_exists('render_shop_app_page')) {
             $paperworkLayout = array_replace($paperworkLayout, $paperworkOverrides);
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -501,7 +552,7 @@ if (!function_exists('render_shop_app_page')) {
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
                                 <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
-                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1">Download Latest Paperwork PDF</a>
+                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports">Exports</a>
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
                                         <?= csrf_input() ?>
@@ -515,7 +566,7 @@ if (!function_exists('render_shop_app_page')) {
                         </div>
                     </div>
                     <ul class="nav nav-tabs mb-3">
-                        <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
+                        <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings', 'exports' => 'Exports'] as $tabKey => $tabLabel): ?>
                             <li class="nav-item"><a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a></li>
                         <?php endforeach; ?>
                     </ul>
@@ -599,17 +650,12 @@ if (!function_exists('render_shop_app_page')) {
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
                     <?php
                     $layout = $paperworkLayout;
-                    $isInitialRevision = $currentRevisionLabel === '1.1';
-                    $backTab = $isInitialRevision ? 'initial' : 'revisions';
                     $checkboxInputs = $paperworkSettings['show_checkbox_inputs'] ?? [];
-                    $paperworkUrl = '/shared/paperwork_export_template_reference.php?show_id=' . (int) $selectedShowId
-                        . '&revision_id=' . (int) $selectedRevisionId
-                        . '&type=order&shop=' . rawurlencode($shopType);
                     ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title mb-0">Paperwork Settings (Per Show)</h3></div>
                         <div class="card-body">
-                            <form method="post" class="row g-3">
+                            <form method="post" enctype="multipart/form-data" class="row g-3">
                                 <?= csrf_input() ?>
                                 <input type="hidden" name="action" value="save_paperwork_options">
                                 <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
@@ -640,18 +686,85 @@ if (!function_exists('render_shop_app_page')) {
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
+                                <div class="col-md-6">
+                                    <label class="form-label">Personal Cover Footer Logo (Upload)</label>
+                                    <input class="form-control" type="file" name="cover_footer_logo_file" accept="image/png,image/jpeg,image/webp,image/gif">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Show Photo (Upload)</label>
+                                    <input class="form-control" type="file" name="show_photo_file" accept="image/png,image/jpeg,image/webp,image/gif">
+                                </div>
                                 <div class="col-12 d-flex justify-content-between">
                                     <button class="btn btn-primary" type="submit">Save Paperwork Options</button>
-                                    <a class="btn btn-outline-primary" href="<?= e($paperworkUrl) ?>" target="_blank" rel="noopener">Open Download View</a>
+                                    <a class="btn btn-outline-primary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports&export_revision=<?= (int) $selectedExportRevisionId ?>">Go to Exports</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                <?php elseif ($selectedShow && $currentTab === 'exports'): ?>
+                    <?php
+                    $selectedExport = null;
+                    foreach ($revisions as $rev) {
+                        if ((int) $rev['id'] === (int) $selectedExportRevisionId) {
+                            $selectedExport = $rev;
+                            break;
+                        }
+                    }
+                    if ($selectedExport === null && !empty($revisions)) {
+                        $selectedExport = $revisions[0];
+                    }
+                    $exportRevisionId = (int) ($selectedExport['id'] ?? 0);
+                    $paperworkUrl = '/shared/paperwork_export_template_reference.php?show_id=' . (int) $selectedShowId
+                        . '&revision_id=' . $exportRevisionId
+                        . '&type=order&shop=' . rawurlencode($shopType)
+                        . '&embed=1';
+                    ?>
+                    <?php if (empty($revisions)): ?>
+                        <div class="card"><div class="card-body text-secondary">Create an initial order first, then exports will be available.</div></div>
+                    <?php else: ?>
+                    <div class="card mb-3">
+                        <div class="card-header"><h3 class="card-title mb-0">Exports</h3></div>
+                        <div class="card-body">
+                            <form method="get" class="row g-3 align-items-end">
+                                <input type="hidden" name="show" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="tab" value="exports">
+                                <div class="col-md-8">
+                                    <label class="form-label">Export Revision</label>
+                                    <select class="form-select" name="export_revision" onchange="this.form.submit()">
+                                        <?php foreach ($revisions as $rev): ?>
+                                            <?php
+                                            $label = (int) ($rev['revision_number'] ?? 0) === 1
+                                                ? 'Initial Order (' . (string) ($rev['revision_label'] ?? '1.1') . ')'
+                                                : 'Revision ' . (string) ($rev['revision_label'] ?? '');
+                                            ?>
+                                            <option value="<?= (int) $rev['id'] ?>" <?= (int) $rev['id'] === $exportRevisionId ? 'selected' : '' ?>><?= e($label) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 d-flex gap-2">
+                                    <button type="button" class="btn btn-primary w-100" id="print-export-button">Print Export</button>
+                                    <a class="btn btn-outline-primary w-100" target="_blank" rel="noopener" href="<?= e(str_replace('&embed=1', '', $paperworkUrl)) ?>">Open Full Page</a>
                                 </div>
                             </form>
                         </div>
                     </div>
                     <div class="card">
                         <div class="card-body p-0">
-                            <iframe src="<?= e($paperworkUrl) ?>" title="Paperwork export" style="display:block;width:100%;min-height:900px;border:0;"></iframe>
+                            <iframe id="export-preview-frame" src="<?= e($paperworkUrl) ?>" title="Paperwork export preview" style="display:block;width:100%;min-height:900px;border:0;"></iframe>
                         </div>
                     </div>
+                    <script>
+                        (() => {
+                            const printButton = document.getElementById('print-export-button');
+                            const frame = document.getElementById('export-preview-frame');
+                            if (!printButton || !frame) return;
+                            printButton.addEventListener('click', () => {
+                                frame.contentWindow?.focus();
+                                frame.contentWindow?.print();
+                            });
+                        })();
+                    </script>
+                    <?php endif; ?>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title">Revisions</h3></div>
@@ -735,8 +848,12 @@ if (!function_exists('render_shop_app_page')) {
                                                             (string) ($line['sku'] ?? ''),
                                                             (string) ($line['line_note'] ?? ''),
                                                         ])));
+                                                        $lineActionCode = (string) ($line['action_code'] ?? 'blank');
+                                                        if ($lineActionCode === 'notes') {
+                                                            $lineActionCode = 'note';
+                                                        }
                                                         ?>
-                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -746,7 +863,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
                                                             <td><span class="badge bg-azure-lt js-row-total">0</span></td>
                                                             <td>
-                                                                <select class="form-select js-live-field" name="action_code[]">
+                                                                <select class="form-select js-live-field js-action-field" name="action_code[]">
                                                                     <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
                                                                         <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
                                                                     <?php endforeach; ?>
@@ -854,8 +971,12 @@ if (!function_exists('render_shop_app_page')) {
                                                             (string) ($line['sku'] ?? ''),
                                                             (string) ($line['line_note'] ?? ''),
                                                         ])));
+                                                        $lineActionCode = (string) ($line['action_code'] ?? 'blank');
+                                                        if ($lineActionCode === 'notes') {
+                                                            $lineActionCode = 'note';
+                                                        }
                                                         ?>
-                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row shop-action-<?= e($lineActionCode) ?>" data-line-id="<?= (int) $line['id'] ?>" data-action="<?= e($lineActionCode) ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -865,7 +986,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
                                                             <td><span class="badge bg-azure-lt js-row-total">0</span></td>
                                                             <td>
-                                                                <select class="form-select js-live-field" name="action_code[]">
+                                                                <select class="form-select js-live-field js-action-field" name="action_code[]">
                                                                     <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
                                                                         <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
                                                                     <?php endforeach; ?>
@@ -924,6 +1045,15 @@ if (!function_exists('render_shop_app_page')) {
                             if (grandEl) {
                                 grandEl.textContent = String(grandTotal);
                             }
+                        };
+
+                        const applyActionRowClass = (row) => {
+                            const select = row.querySelector('select[name="action_code[]"]');
+                            const raw = String(select?.value || 'blank').toLowerCase();
+                            const normalized = raw === 'notes' ? 'note' : raw;
+                            row.classList.remove('shop-action-blank', 'shop-action-add', 'shop-action-return', 'shop-action-exchange', 'shop-action-note');
+                            row.classList.add(`shop-action-${normalized}`);
+                            row.setAttribute('data-action', normalized);
                         };
 
                         const applyFilters = (editor) => {
@@ -1062,9 +1192,11 @@ if (!function_exists('render_shop_app_page')) {
                             categoryInput?.addEventListener('change', () => applyFilters(editor));
 
                             editor.querySelectorAll('.shop-line-row').forEach((row) => {
+                                applyActionRowClass(row);
                                 row.querySelectorAll('.js-live-field').forEach((field) => {
                                     const handler = () => {
                                         updateEditorTotals(editor);
+                                        applyActionRowClass(row);
                                         const lineId = row.getAttribute('data-line-id') || '';
                                         if (saveTimers.has(lineId)) {
                                             window.clearTimeout(saveTimers.get(lineId));
