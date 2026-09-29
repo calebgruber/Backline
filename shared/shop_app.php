@@ -9,6 +9,25 @@ if (!function_exists('shop_revision_label')) {
     }
 }
 
+if (!function_exists('shop_has_order_line_return_date_column')) {
+    function shop_has_order_line_return_date_column(): bool
+    {
+        static $hasColumn = null;
+        if ($hasColumn !== null) {
+            return $hasColumn;
+        }
+
+        try {
+            $stmt = db()->query("SHOW COLUMNS FROM order_lines LIKE 'specific_return_date'");
+            $hasColumn = (bool) $stmt->fetch();
+        } catch (Throwable) {
+            $hasColumn = false;
+        }
+
+        return $hasColumn;
+    }
+}
+
 if (!function_exists('render_shop_app_page')) {
     function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
@@ -45,6 +64,7 @@ if (!function_exists('render_shop_app_page')) {
         $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'] . ' AND COALESCE(s.show_scope, "both") IN ("both", ' . db()->quote($shopType) . ')';
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
         $currentTab = (string) ($_GET['tab'] ?? 'info');
+        $hasReturnDateColumn = shop_has_order_line_return_date_column();
         if (!in_array($currentTab, $allowedTabs, true)) {
             $currentTab = 'info';
         }
@@ -120,9 +140,15 @@ if (!function_exists('render_shop_app_page')) {
                         $newRevisionId = (int) db()->lastInsertId();
 
                         if ($latest) {
-                            $copyStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
-                                SELECT ?, inventory_item_id, qty, spares, line_note, NULL, NULL, action_code, sort_order, NOW(), NOW()
-                                FROM order_lines WHERE revision_id = ?');
+                            if ($hasReturnDateColumn) {
+                                $copyStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
+                                    SELECT ?, inventory_item_id, qty, spares, line_note, NULL, NULL, action_code, sort_order, NOW(), NOW()
+                                    FROM order_lines WHERE revision_id = ?');
+                            } else {
+                                $copyStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, created_at, updated_at)
+                                    SELECT ?, inventory_item_id, qty, spares, line_note, NULL, action_code, sort_order, NOW(), NOW()
+                                    FROM order_lines WHERE revision_id = ?');
+                            }
                             $copyStmt->execute([$newRevisionId, (int) $latest['id']]);
                         }
                         db()->commit();
@@ -149,7 +175,11 @@ if (!function_exists('render_shop_app_page')) {
                     $pullDates = $_POST['specific_pull_date'] ?? [];
                     $returnDates = $_POST['specific_return_date'] ?? [];
                     $actions = $_POST['action_code'] ?? [];
-                    $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                    if ($hasReturnDateColumn) {
+                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                    } else {
+                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                    }
                     foreach ($lineIds as $idx => $lineId) {
                         $actionCode = (string) ($actions[$idx] ?? 'blank');
                         if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
@@ -157,16 +187,19 @@ if (!function_exists('render_shop_app_page')) {
                         }
                         $pullDate = trim((string) ($pullDates[$idx] ?? ''));
                         $returnDate = trim((string) ($returnDates[$idx] ?? ''));
-                        $upd->execute([
+                        $args = [
                             (int) ($qty[$idx] ?? 0),
                             (int) ($spares[$idx] ?? 0),
                             trim((string) ($notes[$idx] ?? '')),
                             $pullDate === '' ? null : $pullDate,
-                            $returnDate === '' ? null : $returnDate,
-                            $actionCode,
-                            (int) $lineId,
-                            $revisionId,
-                        ]);
+                        ];
+                        if ($hasReturnDateColumn) {
+                            $args[] = $returnDate === '' ? null : $returnDate;
+                        }
+                        $args[] = $actionCode;
+                        $args[] = (int) $lineId;
+                        $args[] = $revisionId;
+                        $upd->execute($args);
                     }
                     flash_set('success', 'Revision lines saved.');
                 }
@@ -185,24 +218,37 @@ if (!function_exists('render_shop_app_page')) {
                     }
                     $pullDate = trim((string) post('specific_pull_date', ''));
                     $returnDate = trim((string) post('specific_return_date', ''));
-                    $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
-                    $upd->execute([
-                        (int) post('qty', 0),
-                        (int) post('spares', 0),
-                        trim((string) post('line_note', '')),
-                        $pullDate === '' ? null : $pullDate,
-                        $returnDate === '' ? null : $returnDate,
-                        $actionCode,
-                        $lineId,
-                        $revisionId,
-                    ]);
+                    if ($hasReturnDateColumn) {
+                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                        $upd->execute([
+                            (int) post('qty', 0),
+                            (int) post('spares', 0),
+                            trim((string) post('line_note', '')),
+                            $pullDate === '' ? null : $pullDate,
+                            $returnDate === '' ? null : $returnDate,
+                            $actionCode,
+                            $lineId,
+                            $revisionId,
+                        ]);
+                    } else {
+                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                        $upd->execute([
+                            (int) post('qty', 0),
+                            (int) post('spares', 0),
+                            trim((string) post('line_note', '')),
+                            $pullDate === '' ? null : $pullDate,
+                            $actionCode,
+                            $lineId,
+                            $revisionId,
+                        ]);
+                    }
                     header('Content-Type: application/json');
-                    echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+                    echo json_encode(['ok' => true]);
                     exit;
                 }
                 http_response_code(400);
                 header('Content-Type: application/json');
-                echo json_encode(['ok' => false], JSON_THROW_ON_ERROR);
+                echo json_encode(['ok' => false]);
                 exit;
             }
 
@@ -224,50 +270,51 @@ if (!function_exists('render_shop_app_page')) {
                 }
                 $latestRevision['revision_label'] = shop_revision_label((int) ($latestRevision['revision_number'] ?? 1));
 
-                $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.specific_return_date, ol.action_code
-                    FROM order_lines ol
-                    JOIN inventory_items ii ON ii.id = ol.inventory_item_id
-                    LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
-                    WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                    ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                if ($hasReturnDateColumn) {
+                    $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.specific_return_date, ol.action_code
+                        FROM order_lines ol
+                        JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+                        LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
+                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                } else {
+                    $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, NULL AS specific_return_date, ol.action_code
+                        FROM order_lines ol
+                        JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+                        LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
+                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                }
                 $lineStmt->execute([(int) $latestRevision['id']]);
                 $exportLines = $lineStmt->fetchAll();
 
                 $showName = trim((string) ($selectedShow['show_name'] ?? ('show-' . $selectedShowId)));
                 $safeShowName = preg_replace('/[^A-Za-z0-9._-]+/', '_', $showName) ?: ('show-' . $selectedShowId);
-                $filename = $safeShowName . '-' . strtoupper($shopType) . '-shop-order-' . strtolower((string) ($latestRevision['revision_label'] ?? 'rev')) . '.csv';
+                $filename = $safeShowName . '-' . strtoupper($shopType) . '-shop-order-' . strtolower((string) ($latestRevision['revision_label'] ?? 'rev')) . '.html';
+                $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
+                    ? require __DIR__ . '/paperwork_export_settings_reference.php'
+                    : ['current_export_settings' => []];
+                $layout = $paperworkSettings['current_export_settings'] ?? [];
+                $headerText = (string) ($layout['layout.header_text'] ?? 'Production Electrician Shop Order');
+                $orgText = (string) ($layout['layout.organization_text'] ?? '');
+                $footerText = (string) ($layout['layout.footer_text'] ?? 'Prepared in Backline');
+                $defaultNotes = preg_split('/\r\n|\r|\n/', (string) ($layout['layout.export_notes'] ?? '')) ?: [];
+                $defaultNotes = array_values(array_filter(array_map(static fn ($n): string => trim((string) $n), $defaultNotes), static fn ($n): bool => $n !== ''));
 
-                header('Content-Type: text/csv; charset=UTF-8');
+                header('Content-Type: text/html; charset=UTF-8');
                 header('Content-Disposition: attachment; filename="' . $filename . '"');
                 header('Pragma: no-cache');
                 header('Expires: 0');
 
-                $out = fopen('php://output', 'wb');
-                if ($out === false) {
-                    exit;
-                }
-                fputcsv($out, ['Show', $showName]);
-                fputcsv($out, ['Shop', strtoupper($shopType)]);
-                fputcsv($out, ['Revision', (string) ($latestRevision['revision_label'] ?? '')]);
-                fputcsv($out, ['Revised At', (string) ($latestRevision['revised_at'] ?? '')]);
-                fputcsv($out, []);
-                $headers = ['Category', 'Item', 'Qty', 'Spares', 'Unit', 'Action', 'Note'];
-                if ($shopType === 'snd') {
-                    array_splice($headers, 2, 0, ['SKU']);
-                }
-                fputcsv($out, $headers);
+                echo '<!doctype html><html><head><meta charset="utf-8"><title>' . e($showName) . ' ' . e((string) $latestRevision['revision_label']) . '</title>';
+                echo '<style>body{font-family:Arial,sans-serif;color:#111;padding:20px}h1,h2,h3{margin:0}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.meta{color:#555;font-size:12px}.rev{margin-top:4px;font-size:18px;font-weight:700}.cat{margin-top:14px;background:#E5E7EB;padding:8px 10px;font-weight:700}.tbl{width:100%;border-collapse:collapse}.tbl th,.tbl td{border:1px solid #d1d5db;padding:6px 8px;font-size:12px;vertical-align:top}.tbl th{background:#F3F4F6;text-align:left}.notes{margin-top:18px}.notes li{margin:4px 0}.footer{margin-top:22px;font-size:11px;color:#666}</style>';
+                echo '</head><body>';
+                echo '<div class="top"><div><h1>' . e($headerText) . '</h1><div class="rev">' . e($showName) . ' · Revision ' . e((string) $latestRevision['revision_label']) . '</div><div class="meta">Shop: ' . e(strtoupper($shopType)) . ' · Revised: ' . e((string) ($latestRevision['revised_at'] ?? '')) . '</div></div><div class="meta">' . e($orgText) . '</div></div>';
+
+                $currentCategory = null;
+                echo '<table class="tbl"><thead><tr><th style="width:20%">Category</th><th>Item</th>' . ($shopType === 'snd' ? '<th style="width:12%">SKU</th>' : '') . '<th style="width:7%">Used</th><th style="width:7%">Spare</th><th style="width:7%">Total</th><th style="width:8%">Unit</th><th style="width:9%">Action</th><th style="width:30%">Notes</th></tr></thead><tbody>';
                 foreach ($exportLines as $line) {
-                    $row = [
-                        (string) ($line['category_name'] ?: 'Uncategorized'),
-                        (string) ($line['item_name'] ?? ''),
-                    ];
-                    if ($shopType === 'snd') {
-                        $row[] = (string) ($line['sku'] ?? '');
-                    }
-                    $row[] = (int) ($line['qty'] ?? 0);
-                    $row[] = (int) ($line['spares'] ?? 0);
-                    $row[] = (string) ($line['unit'] ?? '');
-                    $row[] = (string) ($line['action_code'] ?? 'blank');
+                    $category = (string) ($line['category_name'] ?: 'Uncategorized');
                     $noteParts = [];
                     $lineNote = trim((string) ($line['line_note'] ?? ''));
                     if ($lineNote !== '') {
@@ -281,10 +328,29 @@ if (!function_exists('render_shop_app_page')) {
                     if ($returnDate !== '') {
                         $noteParts[] = 'Return: ' . $returnDate;
                     }
-                    $row[] = implode(' | ', $noteParts);
-                    fputcsv($out, $row);
+                    if ($currentCategory !== $category) {
+                        $currentCategory = $category;
+                        echo '<tr><td colspan="' . ($shopType === 'snd' ? '9' : '8') . '" class="cat">' . e($category) . '</td></tr>';
+                    }
+                    $qty = (int) ($line['qty'] ?? 0);
+                    $spares = (int) ($line['spares'] ?? 0);
+                    echo '<tr><td>' . e($category) . '</td><td>' . e((string) ($line['item_name'] ?? '')) . '</td>';
+                    if ($shopType === 'snd') {
+                        echo '<td>' . e((string) ($line['sku'] ?? '')) . '</td>';
+                    }
+                    echo '<td>' . $qty . '</td><td>' . $spares . '</td><td>' . ($qty + $spares) . '</td><td>' . e((string) ($line['unit'] ?? '')) . '</td><td>' . e((string) ($line['action_code'] ?? 'blank')) . '</td><td>' . e(implode(' | ', $noteParts)) . '</td></tr>';
                 }
-                fclose($out);
+                echo '</tbody></table>';
+
+                if ($defaultNotes) {
+                    echo '<div class="notes"><h3>Important Notes</h3><ul>';
+                    foreach ($defaultNotes as $note) {
+                        echo '<li>' . e($note) . '</li>';
+                    }
+                    echo '</ul></div>';
+                }
+                echo '<div class="footer">' . e($footerText) . '</div>';
+                echo '</body></html>';
                 exit;
             }
             if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
@@ -329,21 +395,40 @@ if (!function_exists('render_shop_app_page')) {
                 }
 
                 if ($selectedRevisionId > 0) {
-                    $ensureStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
-                        SELECT ?, ii.id, 0, 0, "", NULL, NULL, "blank", ii.sort_order, NOW(), NOW()
-                        FROM inventory_items ii
-                        WHERE ii.shop_type = ? AND ii.is_spacer = 0
-                        AND NOT EXISTS (
-                            SELECT 1 FROM order_lines ol WHERE ol.revision_id = ? AND ol.inventory_item_id = ii.id
-                        )');
+                    if ($hasReturnDateColumn) {
+                        $ensureStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
+                            SELECT ?, ii.id, 0, 0, "", NULL, NULL, "blank", ii.sort_order, NOW(), NOW()
+                            FROM inventory_items ii
+                            WHERE ii.shop_type = ? AND ii.is_spacer = 0
+                            AND NOT EXISTS (
+                                SELECT 1 FROM order_lines ol WHERE ol.revision_id = ? AND ol.inventory_item_id = ii.id
+                            )');
+                    } else {
+                        $ensureStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, created_at, updated_at)
+                            SELECT ?, ii.id, 0, 0, "", NULL, "blank", ii.sort_order, NOW(), NOW()
+                            FROM inventory_items ii
+                            WHERE ii.shop_type = ? AND ii.is_spacer = 0
+                            AND NOT EXISTS (
+                                SELECT 1 FROM order_lines ol WHERE ol.revision_id = ? AND ol.inventory_item_id = ii.id
+                            )');
+                    }
                     $ensureStmt->execute([$selectedRevisionId, $shopType, $selectedRevisionId]);
 
-                    $lineStmt = db()->prepare('SELECT ol.*, ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
-                        FROM order_lines ol
-                        JOIN inventory_items ii ON ii.id = ol.inventory_item_id
-                        LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
-                        WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                        ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                    if ($hasReturnDateColumn) {
+                        $lineStmt = db()->prepare('SELECT ol.*, ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                            FROM order_lines ol
+                            JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+                            LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+                            WHERE ol.revision_id = ? AND ii.is_spacer = 0
+                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                    } else {
+                        $lineStmt = db()->prepare('SELECT ol.*, NULL AS specific_return_date, ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                            FROM order_lines ol
+                            JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+                            LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+                            WHERE ol.revision_id = ? AND ii.is_spacer = 0
+                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                    }
                     $lineStmt->execute([$selectedRevisionId]);
                     $lines = $lineStmt->fetchAll();
                     foreach ($lines as $line) {
@@ -384,12 +469,28 @@ if (!function_exists('render_shop_app_page')) {
                     <?php endif; ?>
                 </div>
             <?php else: ?>
-                <div class="card mb-3">
-                    <div class="card-header d-flex align-items-center justify-content-between gap-2">
-                        <h3 class="card-title mb-0"><?= $selectedShow ? e((string) $selectedShow['show_name']) : 'Select Show' ?></h3>
-                        <?php if ($selectedShow): ?>
-                            <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
+                <?php
+                $currentRevisionLabel = '—';
+                if ($order && $selectedRevisionId > 0) {
+                    foreach ($revisions as $revisionCandidate) {
+                        if ((int) ($revisionCandidate['id'] ?? 0) === (int) $selectedRevisionId) {
+                            $currentRevisionLabel = (string) ($revisionCandidate['revision_label'] ?? '—');
+                            break;
+                        }
+                    }
+                }
+                ?>
+                <?php if ($selectedShow): ?>
+                    <div class="mb-3 p-3 p-md-4 border rounded-3 bg-body-tertiary">
+                        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                            <div>
+                                <a class="btn btn-outline-danger" href="/dash/home">Exit Show</a>
+                            </div>
+                            <div class="text-center flex-fill">
+                                <div class="h1 mb-1"><?= e((string) $selectedShow['show_name']) ?></div>
+                                <div class="h3 mb-0 text-secondary">Revision <?= e($currentRevisionLabel) ?></div>
+                            </div>
+                            <div class="d-flex flex-wrap justify-content-md-end gap-2">
                                 <form method="post" class="d-inline-block">
                                     <?= csrf_input() ?>
                                     <input type="hidden" name="action" value="export_latest">
@@ -407,25 +508,21 @@ if (!function_exists('render_shop_app_page')) {
                                     </form>
                                 <?php endif; ?>
                             </div>
-                        <?php endif; ?>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <?php if (!$showFirstNav): ?>
-                            <form method="get" class="row g-2 align-items-end">
-                                <div class="col-md-12">
-                                    <label class="form-label">Show</label>
-                                    <select class="form-select" name="show" onchange="this.form.submit()">
-                                        <option value="">Select show</option>
-                                        <?php foreach ($shows as $show): ?>
-                                            <option value="<?= (int) $show['id'] ?>" <?= ((int) $show['id'] === (int) $selectedShowId) ? 'selected' : '' ?>><?= e((string) $show['show_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </form>
-                        <?php endif; ?>
-                        <?php if ($selectedShow): ?><p class="text-secondary mb-0">Use the top navigation for this show’s sections.</p><?php endif; ?>
-                    </div>
-                </div>
+                <?php elseif (!$showFirstNav): ?>
+                    <form method="get" class="row g-2 align-items-end mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Show</label>
+                            <select class="form-select" name="show" onchange="this.form.submit()">
+                                <option value="">Select show</option>
+                                <?php foreach ($shows as $show): ?>
+                                    <option value="<?= (int) $show['id'] ?>" <?= ((int) $show['id'] === (int) $selectedShowId) ? 'selected' : '' ?>><?= e((string) $show['show_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </form>
+                <?php endif; ?>
 
                 <?php if ($selectedShow && $currentTab === 'info'): ?>
                     <div class="card">
@@ -823,14 +920,20 @@ if (!function_exists('render_shop_app_page')) {
 
                             fetch(window.location.pathname + window.location.search, {
                                 method: 'POST',
+                                credentials: 'same-origin',
+                                redirect: 'error',
                                 headers: {
                                     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
                                     'X-Requested-With': 'XMLHttpRequest',
                                 },
                                 body: params.toString(),
-                            }).then((response) => {
+                            }).then(async (response) => {
                                 if (!response.ok) {
                                     throw new Error('save failed');
+                                }
+                                const payload = await response.json();
+                                if (!payload || payload.ok !== true) {
+                                    throw new Error('save rejected');
                                 }
                                 if (saveStatus) {
                                     saveStatus.textContent = 'Saved';
