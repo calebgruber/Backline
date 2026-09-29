@@ -5,14 +5,7 @@ declare(strict_types=1);
 if (!function_exists('shop_revision_label')) {
     function shop_revision_label(int $number): string
     {
-        $n = max(1, $number);
-        $label = '';
-        while ($n > 0) {
-            $n--;
-            $label = chr(65 + ($n % 26)) . $label;
-            $n = intdiv($n, 26);
-        }
-        return 'Rev ' . $label;
+        return '1.' . max(1, $number);
     }
 }
 
@@ -222,13 +215,14 @@ if (!function_exists('render_shop_app_page')) {
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
 
-                $revisionStmt = db()->prepare('SELECT id, revision_label, revised_at FROM order_revisions WHERE order_id = ? ORDER BY revision_number DESC LIMIT 1');
+                $revisionStmt = db()->prepare('SELECT id, revision_number, revision_label, revised_at FROM order_revisions WHERE order_id = ? ORDER BY revision_number DESC LIMIT 1');
                 $revisionStmt->execute([$orderId]);
                 $latestRevision = $revisionStmt->fetch();
                 if (!$latestRevision) {
                     flash_set('warning', 'No revisions exist to export yet.');
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
+                $latestRevision['revision_label'] = shop_revision_label((int) ($latestRevision['revision_number'] ?? 1));
 
                 $lineStmt = db()->prepare('SELECT ic.name AS category_name, ii.name AS item_name, ii.sku, ii.unit, ol.qty, ol.spares, ol.line_note, ol.specific_pull_date, ol.specific_return_date, ol.action_code
                     FROM order_lines ol
@@ -314,6 +308,10 @@ if (!function_exists('render_shop_app_page')) {
                 $revStmt = db()->prepare('SELECT * FROM order_revisions WHERE order_id = ? ORDER BY revision_number DESC');
                 $revStmt->execute([(int) $order['id']]);
                 $revisions = $revStmt->fetchAll();
+                foreach ($revisions as &$revisionRow) {
+                    $revisionRow['revision_label'] = shop_revision_label((int) ($revisionRow['revision_number'] ?? 1));
+                }
+                unset($revisionRow);
                 if ($selectedRevisionId <= 0 && !empty($revisions)) {
                     $selectedRevisionId = (int) $revisions[0]['id'];
                 }
