@@ -148,14 +148,11 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
                 <?php foreach ($showRows as $show): ?>
                     <?php $scope = strtolower((string) ($show['show_scope'] ?? 'both')); ?>
                     <div class="col-md-6 col-xl-4">
-                        <div class="card h-100">
+                        <div class="card h-100 dashboard-show-card dashboard-show-card-<?= e($scope) ?>">
                             <div class="card-body d-flex flex-column">
-                                <h3 class="card-title mb-1"><?= e((string) $show['show_name']) ?></h3>
+                                <h3 class="card-title mb-1"><span class="dashboard-show-pill"><?= e((string) $show['show_name']) ?></span></h3>
                                 <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
-                                <div class="small mb-3 text-secondary">
-                                    Scope:
-                                    <?= e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'Sound only' : 'Both')) ?>
-                                </div>
+                                <div class="small mb-3 text-secondary">Scope: <?= e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'Sound only' : 'Both')) ?></div>
                                 <div class="mt-auto d-grid gap-2">
                                     <?php if ($canLx && in_array($scope, ['lx', 'both'], true)): ?>
                                         <a class="btn btn-primary btn-lg w-100" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
