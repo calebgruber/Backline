@@ -39,6 +39,28 @@ if (!function_exists('export_url')) {
         if (function_exists('url_for')) {
             return (string) url_for($path);
         }
+
+        if (!function_exists('sanitize_local_asset_path')) {
+            function sanitize_local_asset_path(string $path): string
+            {
+                $path = trim($path);
+                if ($path === '') {
+                    return '';
+                }
+                if (preg_match('#^https?://#i', $path)) {
+                    return '';
+                }
+                $path = str_replace('\\', '/', $path);
+                $path = preg_replace('#/+#', '/', $path) ?? '';
+                if (str_contains($path, '..')) {
+                    return '';
+                }
+                if (!str_starts_with($path, '/')) {
+                    $path = '/' . ltrim($path, '/');
+                }
+                return $path;
+            }
+        }
         if ($path === '') {
             return '/';
         }
