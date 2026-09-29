@@ -33,6 +33,22 @@ if (!function_exists('h')) {
     }
 }
 
+if (!function_exists('export_url')) {
+    function export_url(string $path): string
+    {
+        if (function_exists('url_for')) {
+            return (string) url_for($path);
+        }
+        if ($path === '') {
+            return '/';
+        }
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+        return str_starts_with($path, '/') ? $path : '/' . ltrim($path, '/');
+    }
+}
+
 if (!function_exists('concentration_label')) {
     function concentration_label(string $concentration): string
     {
@@ -738,7 +754,7 @@ $summaryPages = !empty($revision['is_initial']) ? [] : export_summary_pages($sum
 $equipmentPages = export_equipment_pages($equipmentRows, $layout);
 $notes = export_notes_list($layout);
 $shopRoute = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'dash/sound' : 'dash/lx';
-$editorUrl = url_for($shopRoute . '?show_id=' . $showId . '&tab=paperwork&revision_id=' . (int) $revision['id']);
+$editorUrl = export_url($shopRoute . '?show_id=' . $showId . '&tab=paperwork&revision_id=' . (int) $revision['id']);
 $renderSummaryPage = empty($revision['is_initial']);
 $pageNumbers = ['cover' => 1, 'details' => 2, 'summary' => [], 'equipment' => []];
 $nextPageNumber = 3;
@@ -768,7 +784,7 @@ if (!preg_match('/^#[0-9A-F]{6}$/', $equipmentCategoryFill)) {
 $coverTitleRevisionSpacing = max(0.0, (float) ($layout['layout.cover_title_revision_spacing'] ?? 0.52));
 $coverNotesSpacing = max(0.0, (float) ($layout['layout.cover_notes_spacing'] ?? 0.9));
 $coverFooterLogoPath = sanitize_local_asset_path((string) ($layout['layout.cover_footer_logo_url'] ?? ''));
-$coverFooterLogoUrl = $coverFooterLogoPath ? url_for($coverFooterLogoPath) : '';
+$coverFooterLogoUrl = $coverFooterLogoPath ? export_url($coverFooterLogoPath) : '';
 $coverPreparedByName = trim((string) ($layout['layout.cover_prepared_by_name'] ?? ''));
 if ($coverPreparedByName === '') {
     $coverPreparedByName = (string) (current_user()['display_name'] ?? '');
@@ -783,7 +799,7 @@ $coverTitle = $type === 'order'
     ? (string) ($labels['order_title'] ?? strtoupper(concentration_label($show['concentration'] ?? 'lighting') . ' Shop Order'))
     : strtoupper($labels['title']);
 $showImagePath = trim((string) ($show['show_image_url'] ?? ''));
-$showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') === '1' ? url_for($showImagePath) : '';
+$showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') === '1' ? export_url($showImagePath) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
