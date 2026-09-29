@@ -25,6 +25,11 @@ function inventory_has_subcategory_column(): bool
     try {
         $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
         $hasColumn = (bool) $stmt->fetch();
+        if (!$hasColumn) {
+            db()->exec('ALTER TABLE inventory_items ADD COLUMN subcategory_name VARCHAR(190) NULL AFTER category_id');
+            $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
+            $hasColumn = (bool) $stmt->fetch();
+        }
     } catch (Throwable) {
         $hasColumn = false;
     }

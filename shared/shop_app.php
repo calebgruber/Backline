@@ -38,6 +38,11 @@ if (!function_exists('shop_has_inventory_subcategory_column')) {
         try {
             $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
             $hasColumn = (bool) $stmt->fetch();
+            if (!$hasColumn) {
+                db()->exec('ALTER TABLE inventory_items ADD COLUMN subcategory_name VARCHAR(190) NULL AFTER category_id');
+                $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
+                $hasColumn = (bool) $stmt->fetch();
+            }
         } catch (Throwable) {
             $hasColumn = false;
         }
@@ -281,6 +286,35 @@ if (!function_exists('render_shop_app_page')) {
                 exit;
             }
 
+            if ($action === 'save_paperwork_options' && $selectedShowId > 0) {
+                $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
+                    ? require __DIR__ . '/paperwork_export_settings_reference.php'
+                    : ['show_override_keys' => [], 'show_checkbox_inputs' => []];
+                $allowedKeys = array_flip($paperworkSettings['show_override_keys'] ?? []);
+                $checkboxInputs = $paperworkSettings['show_checkbox_inputs'] ?? [];
+                $updates = [];
+                foreach (($paperworkSettings['configurable_options'] ?? []) as $option) {
+                    if (empty($option['show_override']) || empty($option['setting_key']) || empty($option['input_name'])) {
+                        continue;
+                    }
+                    $settingKey = (string) $option['setting_key'];
+                    if (!isset($allowedKeys[$settingKey])) {
+                        continue;
+                    }
+                    $inputName = (string) $option['input_name'];
+                    if (in_array($inputName, $checkboxInputs, true)) {
+                        $updates[$settingKey] = isset($_POST[$inputName]) ? '1' : '0';
+                    } else {
+                        $updates[$settingKey] = trim((string) ($_POST[$inputName] ?? ''));
+                    }
+                }
+                $upsert = db()->prepare('INSERT INTO show_settings (show_id, key_name, value_json, created_at, updated_at)
+                    VALUES (?, ?, ?, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
+                $upsert->execute([$selectedShowId, 'paperwork.layout_overrides', json_encode($updates)]);
+                flash_set('success', 'Paperwork options saved.');
+            }
+
             if ($action === 'export_latest' && $selectedShowId > 0) {
                 $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $orderStmt->execute([$selectedShowId, $shopType]);
@@ -311,6 +345,11 @@ if (!function_exists('render_shop_app_page')) {
         $revisions = [];
         $selectedRevisionId = (int) ($_GET['revision'] ?? 0);
         $linesByCategory = [];
+        $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
+            ? require __DIR__ . '/paperwork_export_settings_reference.php'
+            : ['current_export_settings' => [], 'show_override_keys' => [], 'show_checkbox_inputs' => [], 'configurable_options' => []];
+        $paperworkLayout = $paperworkSettings['current_export_settings'] ?? [];
+        $paperworkOverrides = [];
 
         if ($selectedShowId > 0) {
             $orderStmt = db()->prepare('SELECT o.* FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
@@ -392,8 +431,25 @@ if (!function_exists('render_shop_app_page')) {
                 }
             }
         }
+        if ($selectedShowId > 0) {
+            $showSettingStmt = db()->prepare('SELECT value_json FROM show_settings WHERE show_id = ? AND key_name = ? LIMIT 1');
+            $showSettingStmt->execute([$selectedShowId, 'paperwork.layout_overrides']);
+            $showSettingRaw = $showSettingStmt->fetchColumn();
+            if (is_string($showSettingRaw) && $showSettingRaw !== '') {
+                $decoded = json_decode($showSettingRaw, true);
+                if (is_array($decoded)) {
+                    $allowedKeys = array_flip($paperworkSettings['show_override_keys'] ?? []);
+                    foreach ($decoded as $key => $value) {
+                        if (isset($allowedKeys[(string) $key])) {
+                            $paperworkOverrides[(string) $key] = is_scalar($value) ? (string) $value : '';
+                        }
+                    }
+                }
+            }
+            $paperworkLayout = array_replace($paperworkLayout, $paperworkOverrides);
+        }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -440,7 +496,7 @@ if (!function_exists('render_shop_app_page')) {
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
                                 <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
-                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1">Export Latest Paperwork</a>
+                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1">Download Latest Paperwork PDF</a>
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
                                         <?= csrf_input() ?>
@@ -538,10 +594,7 @@ if (!function_exists('render_shop_app_page')) {
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
                     <?php
                     $previewMode = (string) ($_GET['preview'] ?? '') === '1';
-                    $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
-                        ? require __DIR__ . '/paperwork_export_settings_reference.php'
-                        : ['current_export_settings' => []];
-                    $layout = $paperworkSettings['current_export_settings'] ?? [];
+                    $layout = $paperworkLayout;
                     $headerText = (string) ($layout['layout.header_text'] ?? 'Production Electrician Shop Order');
                     $organizationText = (string) ($layout['layout.organization_text'] ?? '');
                     $footerText = (string) ($layout['layout.footer_text'] ?? 'Prepared in Backline');
@@ -549,16 +602,55 @@ if (!function_exists('render_shop_app_page')) {
                     $defaultNotes = array_values(array_filter(array_map(static fn ($n): string => trim((string) $n), $defaultNotes), static fn ($n): bool => $n !== ''));
                     $isInitialRevision = $currentRevisionLabel === '1.1';
                     $backTab = $isInitialRevision ? 'initial' : 'revisions';
+                    $checkboxInputs = $paperworkSettings['show_checkbox_inputs'] ?? [];
                     ?>
                     <?php if (!$previewMode): ?>
-                        <div class="card"><div class="card-body text-secondary">
-                            <p class="mb-0">Use “Export Latest Paperwork” to open print preview.</p>
-                        </div></div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title mb-0">Paperwork Settings (Per Show)</h3></div>
+                            <div class="card-body">
+                                <form method="post" class="row g-3">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="save_paperwork_options">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="current_tab" value="paperwork">
+                                    <?php foreach (($paperworkSettings['configurable_options'] ?? []) as $option): ?>
+                                        <?php if (empty($option['show_override'])) continue; ?>
+                                        <?php
+                                        $settingKey = (string) ($option['setting_key'] ?? '');
+                                        $inputName = (string) ($option['input_name'] ?? '');
+                                        $label = (string) ($option['label'] ?? $inputName);
+                                        $type = (string) ($option['type'] ?? 'text');
+                                        $value = (string) ($layout[$settingKey] ?? ($option['default_value'] ?? ''));
+                                        ?>
+                                        <div class="col-md-6">
+                                            <label class="form-label"><?= e($label) ?></label>
+                                            <?php if ($type === 'textarea'): ?>
+                                                <textarea class="form-control" name="<?= e($inputName) ?>" rows="4"><?= e($value) ?></textarea>
+                                            <?php elseif (in_array($inputName, $checkboxInputs, true) || $type === 'checkbox'): ?>
+                                                <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="<?= e($inputName) ?>" value="1" <?= $value === '1' ? 'checked' : '' ?>><span class="form-check-label">Enabled</span></label>
+                                            <?php elseif ($type === 'color'): ?>
+                                                <input class="form-control form-control-color" type="color" name="<?= e($inputName) ?>" value="<?= e($value !== '' ? $value : '#000000') ?>">
+                                            <?php elseif ($type === 'integer'): ?>
+                                                <input class="form-control" type="number" step="1" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                            <?php elseif ($type === 'decimal'): ?>
+                                                <input class="form-control" type="number" step="0.01" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                            <?php else: ?>
+                                                <input class="form-control" type="text" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <div class="col-12 d-flex justify-content-between">
+                                        <button class="btn btn-primary" type="submit">Save Paperwork Options</button>
+                                        <a class="btn btn-outline-primary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1<?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Open Paperwork Preview</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     <?php else: ?>
                         <div class="card mb-3 paperwork-preview-actions">
                             <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
                                 <a class="btn btn-outline-secondary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($backTab) ?><?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Back to Show</a>
-                                <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
+                                <button type="button" class="btn btn-primary" id="download-paperwork-pdf">Download PDF</button>
                             </div>
                         </div>
                         <?php
@@ -654,6 +746,28 @@ if (!function_exists('render_shop_app_page')) {
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F4QdMdbC+aD9Y9ycYzaO+VxDRKCVh0b07XHtcwPa5RWPLXnw0lPwQBGzb62LF8A3+yQUwpsOSJyYjg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                        <script>
+                          (() => {
+                            const button = document.getElementById('download-paperwork-pdf');
+                            if (!button || !window.html2pdf) return;
+                            button.addEventListener('click', () => {
+                              const preview = document.querySelector('.paperwork-preview-wrap');
+                              if (!preview) return;
+                              const filename = `<?= e(preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) ($selectedShow['show_name'] ?? 'show')) ?: 'show') ?>-<?= e(strtoupper($shopType)) ?>-rev-<?= e($currentRevisionLabel) ?>.pdf`;
+                              window.html2pdf()
+                                .set({
+                                  margin: [0, 0, 0, 0],
+                                  filename,
+                                  html2canvas: { scale: 2 },
+                                  jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+                                  pagebreak: { mode: ['css', 'legacy'] }
+                                })
+                                .from(preview)
+                                .save();
+                            });
+                          })();
+                        </script>
                     <?php endif; ?>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
@@ -728,7 +842,7 @@ if (!function_exists('render_shop_app_page')) {
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($subGroups as $subcategory => $lines): ?>
-                                                    <tr class="shop-subcategory-row"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
                                                     <?php foreach ($lines as $line): ?>
                                                         <?php
                                                         $searchBlob = strtolower(trim(implode(' ', [
@@ -739,7 +853,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             (string) ($line['line_note'] ?? ''),
                                                         ])));
                                                         ?>
-                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -847,7 +961,7 @@ if (!function_exists('render_shop_app_page')) {
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($subGroups as $subcategory => $lines): ?>
-                                                    <tr class="shop-subcategory-row"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
                                                     <?php foreach ($lines as $line): ?>
                                                         <?php
                                                         $searchBlob = strtolower(trim(implode(' ', [
@@ -858,7 +972,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             (string) ($line['line_note'] ?? ''),
                                                         ])));
                                                         ?>
-                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
+                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-subcategory="<?= e(strtolower($subcategory)) ?>" data-search="<?= e($searchBlob) ?>">
                                                             <td><?= e($category) ?></td>
                                                             <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
                                                             <td>
@@ -947,6 +1061,16 @@ if (!function_exists('render_shop_app_page')) {
                                     if (shouldShow) {
                                         visibleRows++;
                                     }
+                                });
+                                group.querySelectorAll('.shop-subcategory-row').forEach((subRow) => {
+                                    const subKey = (subRow.getAttribute('data-subcategory') || '').toLowerCase();
+                                    let hasVisibleLine = false;
+                                    group.querySelectorAll('.shop-line-row[data-subcategory]').forEach((lineRow) => {
+                                        if ((lineRow.getAttribute('data-subcategory') || '').toLowerCase() === subKey && lineRow.style.display !== 'none') {
+                                            hasVisibleLine = true;
+                                        }
+                                    });
+                                    subRow.style.display = hasVisibleLine ? '' : 'none';
                                 });
 
                                 if (!header) {
