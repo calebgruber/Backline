@@ -838,6 +838,15 @@ $coverTitleRevisionSpacing = max(0.0, (float) ($layout['layout.cover_title_revis
 $coverNotesSpacing = max(0.0, (float) ($layout['layout.cover_notes_spacing'] ?? 0.9));
 $coverFooterLogoPath = sanitize_local_asset_path((string) ($layout['layout.cover_footer_logo_url'] ?? ''));
 $coverFooterLogoUrl = $coverFooterLogoPath ? export_url($coverFooterLogoPath) : '';
+$includeBrandingLogo = (string) app_setting('paperwork.include_branding_logo', '1') === '1';
+$brandingLogoUrl = '';
+if ($includeBrandingLogo && function_exists('first_existing_brand_asset')) {
+    $brandingDir = __DIR__ . '/../uploads/branding';
+    $brandingFile = first_existing_brand_asset($brandingDir, ['logo-dark.*', 'logo-light.*', 'logo.*']);
+    if ($brandingFile) {
+        $brandingLogoUrl = export_url('/uploads/branding/' . basename($brandingFile));
+    }
+}
 $coverPreparedByName = trim((string) ($layout['layout.cover_prepared_by_name'] ?? ''));
 if ($coverPreparedByName === '') {
     $coverPreparedByName = (string) (($user['display_name'] ?? $user['email'] ?? ''));
@@ -853,6 +862,8 @@ $coverTitle = $type === 'order'
     : strtoupper($labels['title']);
 $showImagePath = trim((string) ($show['show_image_url'] ?? ''));
 $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') === '1' ? export_url($showImagePath) : '';
+$crewPrimaryLabel = show_concentration($show) === 'sound' ? 'Sound Designer' : 'Electrician';
+$crewAssistantLabel = show_concentration($show) === 'sound' ? 'Assistant Sound Designer' : 'Assistant Electrician';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1293,6 +1304,17 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
       margin: 0 auto;
       object-fit: contain;
     }
+    .cover-footer-logos {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.2in;
+      width: 100%;
+    }
+    .cover-footer-logos .cover-footer-logo img {
+      max-width: 2.2in;
+      max-height: 0.8in;
+    }
     .cover-footer-prepared-by {
       font-weight: 600;
       text-align: center;
@@ -1336,8 +1358,15 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
       </div>
 
       <div class="footer cover-footer">
-        <?php if ($coverFooterLogoUrl !== ''): ?>
+        <?php if ($coverFooterLogoUrl !== '' && $brandingLogoUrl !== ''): ?>
+        <div class="cover-footer-logos">
+          <div class="cover-footer-logo"><img src="<?= h($coverFooterLogoUrl) ?>" alt="Cover footer logo"></div>
+          <div class="cover-footer-logo"><img src="<?= h($brandingLogoUrl) ?>" alt="Backline branding logo"></div>
+        </div>
+        <?php elseif ($coverFooterLogoUrl !== ''): ?>
         <div class="cover-footer-logo"><img src="<?= h($coverFooterLogoUrl) ?>" alt="Cover footer logo"></div>
+        <?php elseif ($brandingLogoUrl !== ''): ?>
+        <div class="cover-footer-logo"><img src="<?= h($brandingLogoUrl) ?>" alt="Backline branding logo"></div>
         <?php endif; ?>
         <?php if ($coverPreparedByName !== ''): ?><div class="cover-footer-prepared-by">Prepared by: <?= h($coverPreparedByName) ?></div><?php endif; ?>
         <?php if ($coverPreparedByName === '' && $globalFooterText !== ''): ?><span><?= h($globalFooterText) ?></span><?php endif; ?>
@@ -1364,14 +1393,14 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
           <p class="cover-panel-title">Creative Team</p>
           <div class="cover-list">
             <div class="cover-entry">
-              <div class="cover-entry-label">Designer · <?= h(export_value((string) ($show['ld_name'] ?? ''))) ?></div>
+              <div class="cover-entry-label"><?= h($crewPrimaryLabel) ?> · <?= h(export_value((string) ($show['ld_name'] ?? ''))) ?></div>
               <div class="cover-entry-meta">
                 <div><?= h(export_value((string) ($show['ld_email'] ?? ''))) ?></div>
                 <div><?= h(export_value((string) ($show['ld_phone'] ?? ''))) ?></div>
               </div>
             </div>
             <div class="cover-entry">
-              <div class="cover-entry-label">Assistant Designer · <?= h(export_value((string) ($show['assistant_ld_name'] ?? ''))) ?></div>
+              <div class="cover-entry-label"><?= h($crewAssistantLabel) ?> · <?= h(export_value((string) ($show['assistant_ld_name'] ?? ''))) ?></div>
               <div class="cover-entry-meta">
                 <div><?= h(export_value((string) ($show['assistant_ld_email'] ?? ''))) ?></div>
                 <div><?= h(export_value((string) ($show['assistant_ld_phone'] ?? ''))) ?></div>

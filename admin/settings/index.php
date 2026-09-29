@@ -138,6 +138,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES ("paperwork.global_layout_overrides", ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
         $stmt->execute([json_encode($updates)]);
+        $brandingLogoSetting = isset($_POST['paperwork_include_branding_logo']) ? '1' : '0';
+        $stmtBranding = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES ("paperwork.include_branding_logo", ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
+        $stmtBranding->execute([json_encode($brandingLogoSetting)]);
         app_setting_clear_cache();
         flash_set('success', 'Global paperwork settings saved.');
     }
@@ -152,6 +155,7 @@ $loginCardColor = '';
 $loginCardIcon = '';
 $paperworkGlobalOverrides = [];
 $paperworkLayout = $paperworkSettingsRef['current_export_settings'] ?? [];
+$paperworkIncludeBrandingLogo = (string) app_setting('paperwork.include_branding_logo', '1') === '1';
 $settings = db()->query('SELECT key_name, value_json FROM app_settings WHERE key_name IN ("branding.app_name", "branding.made_in", "branding.login_card_color", "branding.login_card_icon")')->fetchAll();
 foreach ($settings as $row) {
     if ($row['key_name'] === 'branding.app_name') $appName = (string) json_decode((string) $row['value_json'], true);
@@ -165,7 +169,7 @@ if (is_array($paperworkGlobalOverrides)) {
     $paperworkLayout = array_replace($paperworkLayout, $paperworkGlobalOverrides);
 }
 
-render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon, $paperworkSettingsRef, $paperworkLayout): void {
+render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon, $paperworkSettingsRef, $paperworkLayout, $paperworkIncludeBrandingLogo): void {
     ?>
     <div class="row row-cards">
         <div class="col-lg-6">
@@ -231,6 +235,12 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                                     <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
+                            <div class="col-12">
+                                <label class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="paperwork_include_branding_logo" value="1" <?= $paperworkIncludeBrandingLogo ? 'checked' : '' ?>>
+                                    <span class="form-check-label">Include Made in Backline branding logo on cover footer (when show logo exists)</span>
+                                </label>
+                            </div>
                             <div class="col-12">
                                 <button class="btn btn-primary" type="submit">Save Global Paperwork Settings</button>
                             </div>

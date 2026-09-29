@@ -76,6 +76,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('success', 'Category updated.');
     }
 
+    if ($action === 'save_category_live') {
+        $stmt = db()->prepare('UPDATE inventory_categories SET name = ?, sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
+        $stmt->execute([post('name'), (int) post('sort_order', '0'), (int) post('id'), $shop]);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     if ($action === 'delete') {
         $stmt = db()->prepare('DELETE FROM inventory_categories WHERE id = ? AND shop_type = ?');
         $stmt->execute([(int) post('id'), $shop]);
@@ -123,6 +131,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = db()->prepare('UPDATE inventory_subcategories SET category_id = ?, name = ?, sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
         $stmt->execute([$categoryId, post('name'), (int) post('sort_order', '0'), (int) post('id'), $shop]);
         flash_set('success', 'Subcategory updated.');
+    }
+
+    if ($hasSubcategoryTable && $action === 'save_subcategory_live') {
+        $categoryId = (int) post('category_id', '0');
+        $categoryId = $categoryId > 0 ? $categoryId : null;
+        $stmt = db()->prepare('UPDATE inventory_subcategories SET category_id = ?, name = ?, sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
+        $stmt->execute([$categoryId, post('name'), (int) post('sort_order', '0'), (int) post('id'), $shop]);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
     }
 
     if ($hasSubcategoryTable && $action === 'delete_subcategory') {
@@ -238,6 +256,9 @@ render_page('Categories', function () use ($categoriesByShop, $subcategoriesBySh
                                                 <button class="btn btn-icon btn-sm btn-outline-danger" title="Delete"><i class="ti ti-trash"></i></button>
                                             </form>
                                         </div>
+                                        <div class="card-body border-top py-2">
+                                            <div class="small text-secondary js-category-save-status" data-shop="<?= e($shopKey) ?>">All category changes auto-save as you edit.</div>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -314,6 +335,9 @@ render_page('Categories', function () use ($categoriesByShop, $subcategoriesBySh
                                     </div>
                                 </div>
                             <?php endforeach; ?>
+                        </div>
+                        <div class="card-body border-top py-2">
+                            <div class="small text-secondary js-subcategory-save-status" data-shop="<?= e($shopKey) ?>">All subcategory changes auto-save as you edit.</div>
                         </div>
                     </div>
                 </div>
@@ -394,6 +418,95 @@ render_page('Categories', function () use ($categoriesByShop, $subcategoriesBySh
           }
         });
       });
+
+      (() => {
+        const saveTimers = new Map();
+        const setStatus = (selector, shop, text) => {
+          const el = document.querySelector(`${selector}[data-shop="${shop}"]`);
+          if (el) el.textContent = text;
+        };
+
+        document.querySelectorAll('.category-manager-list [data-category-id]').forEach((row) => {
+          const shop = row.closest('.category-manager-list')?.getAttribute('data-shop') || '';
+          const id = row.getAttribute('data-category-id') || '';
+          const nameInput = row.querySelector('input[name="name"]');
+          const sortInput = row.querySelector('input[name="sort_order"]');
+          if (!nameInput || !sortInput || !shop || !id) return;
+          const triggerSave = () => {
+            const key = `cat:${shop}:${id}`;
+            if (saveTimers.has(key)) window.clearTimeout(saveTimers.get(key));
+            saveTimers.set(key, window.setTimeout(async () => {
+              setStatus('.js-category-save-status', shop, 'Saving…');
+              const body = new URLSearchParams();
+              body.set('_csrf', '<?= e(csrf_token()) ?>');
+              body.set('action', 'save_category_live');
+              body.set('shop_type', shop);
+              body.set('id', id);
+              body.set('name', nameInput.value || '');
+              body.set('sort_order', sortInput.value || '0');
+              try {
+                const response = await fetch('/admin/categories', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                  body: body.toString(),
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload?.ok) throw new Error('save failed');
+                setStatus('.js-category-save-status', shop, 'Saved');
+              } catch {
+                setStatus('.js-category-save-status', shop, 'Autosave failed. Use update button.');
+              }
+            }, 300));
+          };
+          nameInput.addEventListener('input', triggerSave);
+          nameInput.addEventListener('change', triggerSave);
+          sortInput.addEventListener('input', triggerSave);
+          sortInput.addEventListener('change', triggerSave);
+        });
+
+        document.querySelectorAll('.subcategory-manager-list [data-subcategory-id]').forEach((row) => {
+          const shop = row.closest('.subcategory-manager-list')?.getAttribute('data-shop') || '';
+          const id = row.getAttribute('data-subcategory-id') || '';
+          const nameInput = row.querySelector('input[name="name"]');
+          const sortInput = row.querySelector('input[name="sort_order"]');
+          const catSelect = row.querySelector('select[name="category_id"]');
+          if (!nameInput || !sortInput || !catSelect || !shop || !id) return;
+          const triggerSave = () => {
+            const key = `sub:${shop}:${id}`;
+            if (saveTimers.has(key)) window.clearTimeout(saveTimers.get(key));
+            saveTimers.set(key, window.setTimeout(async () => {
+              setStatus('.js-subcategory-save-status', shop, 'Saving…');
+              const body = new URLSearchParams();
+              body.set('_csrf', '<?= e(csrf_token()) ?>');
+              body.set('action', 'save_subcategory_live');
+              body.set('shop_type', shop);
+              body.set('id', id);
+              body.set('name', nameInput.value || '');
+              body.set('sort_order', sortInput.value || '0');
+              body.set('category_id', catSelect.value || '0');
+              try {
+                const response = await fetch('/admin/categories', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                  body: body.toString(),
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload?.ok) throw new Error('save failed');
+                setStatus('.js-subcategory-save-status', shop, 'Saved');
+              } catch {
+                setStatus('.js-subcategory-save-status', shop, 'Autosave failed. Use update button.');
+              }
+            }, 300));
+          };
+          nameInput.addEventListener('input', triggerSave);
+          nameInput.addEventListener('change', triggerSave);
+          sortInput.addEventListener('input', triggerSave);
+          sortInput.addEventListener('change', triggerSave);
+          catSelect.addEventListener('change', triggerSave);
+        });
+      })();
     </script>
     <?php
 }, $user);

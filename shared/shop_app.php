@@ -573,7 +573,7 @@ if (!function_exists('render_shop_app_page')) {
                     <div class="shop-workspace-banner mb-3">
                         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
                             <div class="text-center flex-fill">
-                                <div class="h1 mb-1"><?= e((string) $selectedShow['show_name']) ?></div>
+                                <div class="h1 mb-1"><?= e((string) $selectedShow['show_name']) ?> - <?= e(strtoupper($shopType)) ?></div>
                                 <div class="h3 mb-0 text-secondary">Revision <?= e($currentRevisionLabel) ?></div>
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
@@ -1179,6 +1179,11 @@ if (!function_exists('render_shop_app_page')) {
                         editors.forEach((editor) => {
                             updateEditorTotals(editor);
                             applyFilters(editor);
+                            const searchBar = editor.querySelector('.js-line-search');
+                            if (searchBar instanceof HTMLInputElement && searchBar.offsetParent !== null && document.activeElement === document.body) {
+                                searchBar.focus();
+                                searchBar.select();
+                            }
                             editor.querySelectorAll('.shop-category-header .js-toggle-category').forEach((btn) => {
                                 btn.addEventListener('click', () => {
                                     const header = btn.closest('.shop-category-header');

@@ -89,6 +89,65 @@ function parse_import_rows(string $shop, string $text): array
     return $rows;
 }
 
+function inventory_update_item_record(string $shop, bool $hasSubcategoryColumn): void
+{
+    if ($shop === 'snd') {
+        $sql = $hasSubcategoryColumn
+            ? 'UPDATE inventory_items
+            SET category_id = ?, subcategory_name = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+            WHERE id = ? AND shop_type = ?'
+            : 'UPDATE inventory_items
+            SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+            WHERE id = ? AND shop_type = ?';
+        $stmt = db()->prepare($sql);
+        $params = [
+            (int) post('category_id', '0') ?: null,
+        ];
+        if ($hasSubcategoryColumn) {
+            $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
+        }
+        $params = array_merge($params, [
+            post('name'),
+            post('sku') ?: null,
+            (int) post('shop_quantity', '0'),
+            post('unit', 'ea'),
+            post('description'),
+            isset($_POST['is_spacer']) ? 1 : 0,
+            (int) post('sort_order', '0'),
+            (int) post('id'),
+            $shop,
+        ]);
+        $stmt->execute($params);
+        return;
+    }
+
+    $sql = $hasSubcategoryColumn
+        ? 'UPDATE inventory_items
+        SET category_id = ?, subcategory_name = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+        WHERE id = ? AND shop_type = ?'
+        : 'UPDATE inventory_items
+        SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+        WHERE id = ? AND shop_type = ?';
+    $stmt = db()->prepare($sql);
+    $params = [
+        (int) post('category_id', '0') ?: null,
+    ];
+    if ($hasSubcategoryColumn) {
+        $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
+    }
+    $params = array_merge($params, [
+        post('name'),
+        (int) post('shop_quantity', '0'),
+        post('unit', 'ea'),
+        post('description'),
+        isset($_POST['is_spacer']) ? 1 : 0,
+        (int) post('sort_order', '0'),
+        (int) post('id'),
+        $shop,
+    ]);
+    $stmt->execute($params);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
@@ -138,61 +197,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_item') {
-        if ($shop === 'snd') {
-            $sql = $hasSubcategoryColumn
-                ? 'UPDATE inventory_items
-                SET category_id = ?, subcategory_name = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?'
-                : 'UPDATE inventory_items
-                SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?';
-            $stmt = db()->prepare($sql);
-            $params = [
-                (int) post('category_id', '0') ?: null,
-            ];
-            if ($hasSubcategoryColumn) {
-                $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
-            }
-            $params = array_merge($params, [
-                post('name'),
-                post('sku') ?: null,
-                (int) post('shop_quantity', '0'),
-                post('unit', 'ea'),
-                post('description'),
-                isset($_POST['is_spacer']) ? 1 : 0,
-                (int) post('sort_order', '0'),
-                (int) post('id'),
-                $shop,
-            ]);
-            $stmt->execute($params);
-        } else {
-            $sql = $hasSubcategoryColumn
-                ? 'UPDATE inventory_items
-                SET category_id = ?, subcategory_name = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?'
-                : 'UPDATE inventory_items
-                SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?';
-            $stmt = db()->prepare($sql);
-            $params = [
-                (int) post('category_id', '0') ?: null,
-            ];
-            if ($hasSubcategoryColumn) {
-                $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
-            }
-            $params = array_merge($params, [
-                post('name'),
-                (int) post('shop_quantity', '0'),
-                post('unit', 'ea'),
-                post('description'),
-                isset($_POST['is_spacer']) ? 1 : 0,
-                (int) post('sort_order', '0'),
-                (int) post('id'),
-                $shop,
-            ]);
-            $stmt->execute($params);
-        }
+        inventory_update_item_record($shop, $hasSubcategoryColumn);
         flash_set('success', 'Item updated.');
+    }
+
+    if ($action === 'save_item_live') {
+        inventory_update_item_record($shop, $hasSubcategoryColumn);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
     }
 
     if ($action === 'delete_item') {
@@ -372,6 +385,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                     </select>
                                 </div>
                             </div>
+                            <div class="small text-secondary mt-2 js-inventory-save-status" data-shop="<?= e($shopKey) ?>">All changes auto-save as you edit.</div>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
@@ -540,6 +554,67 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
           }
         });
       });
+
+      (() => {
+        const saveTimers = new Map();
+        const setStatus = (shop, text) => {
+          const status = document.querySelector('.js-inventory-save-status[data-shop="' + shop + '"]');
+          if (status) status.textContent = text;
+        };
+        document.querySelectorAll('.category-item-group tr[data-item-id]').forEach((row) => {
+          const form = row.querySelector('form[id^="item-update-"]');
+          if (!form) return;
+          const shop = (form.querySelector('input[name="shop_type"]')?.value || '').trim();
+          const itemId = (form.querySelector('input[name="id"]')?.value || '').trim();
+          const fields = row.querySelectorAll('input[name], select[name], textarea[name]');
+          const queueSave = () => {
+            const timerKey = shop + ':' + itemId;
+            if (saveTimers.has(timerKey)) {
+              window.clearTimeout(saveTimers.get(timerKey));
+            }
+            saveTimers.set(timerKey, window.setTimeout(async () => {
+              setStatus(shop, 'Saving…');
+              const body = new URLSearchParams();
+              body.set('_csrf', form.querySelector('input[name="_csrf"]')?.value || '');
+              body.set('action', 'save_item_live');
+              body.set('shop_type', shop);
+              body.set('id', itemId);
+              body.set('category_id', (row.querySelector('select[name="category_id"]')?.value || '0'));
+              body.set('subcategory_name', (row.querySelector('input[name="subcategory_name"]')?.value || ''));
+              body.set('name', (row.querySelector('input[name="name"]')?.value || ''));
+              body.set('sku', (row.querySelector('input[name="sku"]')?.value || ''));
+              body.set('shop_quantity', (row.querySelector('input[name="shop_quantity"]')?.value || '0'));
+              body.set('unit', (row.querySelector('input[name="unit"]')?.value || 'ea'));
+              body.set('description', (row.querySelector('input[name="description"]')?.value || ''));
+              body.set('sort_order', (row.querySelector('input[name="sort_order"]')?.value || '0'));
+              if (row.querySelector('input[name="is_spacer"]')?.checked) {
+                body.set('is_spacer', '1');
+              }
+              try {
+                const response = await fetch('/admin/inventory', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                  },
+                  body: body.toString()
+                });
+                if (!response.ok) throw new Error('save failed');
+                const payload = await response.json();
+                if (!payload || payload.ok !== true) throw new Error('save rejected');
+                setStatus(shop, 'Saved');
+              } catch {
+                setStatus(shop, 'Autosave failed. Use update button.');
+              }
+            }, 300));
+          };
+          fields.forEach((field) => {
+            field.addEventListener('input', queueSave);
+            field.addEventListener('change', queueSave);
+          });
+        });
+      })();
     </script>
     <?php
 }, $user);
