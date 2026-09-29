@@ -388,6 +388,9 @@ function export_notes_list(array $layout): array
 
 function export_row_action_class(array $revision, array $item, array $line): string
 {
+    if (!empty($revision['is_initial'])) {
+        return '';
+    }
     $action = strtolower((string) ($line['action'] ?? ''));
     if ($action === 'notes') {
         $action = 'note';

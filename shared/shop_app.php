@@ -970,7 +970,7 @@ if (!function_exists('render_shop_app_page')) {
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
-                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
+                                            <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
                                             <?php foreach ($linesByCategory as $category => $subGroups): ?>
                                                 <?php $lineCount = 0; foreach ($subGroups as $subLinesForCount) { $lineCount += count($subLinesForCount); } ?>
                                                 <?php $categoryKey = 'init-cat-' . substr(md5($category), 0, 12); ?>
@@ -987,7 +987,7 @@ if (!function_exists('render_shop_app_page')) {
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
                                                 <?php foreach ($subGroups as $subcategory => $lines): ?>
-                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <tr class="shop-subcategory-row" data-subcategory="<?= e(strtolower($subcategory)) ?>"><td colspan="7"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
                                                     <?php foreach ($lines as $line): ?>
                                                         <?php
                                                         $searchBlob = strtolower(trim(implode(' ', [
@@ -1011,13 +1011,7 @@ if (!function_exists('render_shop_app_page')) {
                                                             </td>
                                                             <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
                                                             <td><span class="badge bg-azure-lt js-row-total">0</span></td>
-                                                            <td>
-                                                                <select class="form-select js-live-field js-action-field" name="action_code[]">
-                                                                    <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
-                                                                        <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
-                                                                    <?php endforeach; ?>
-                                                                </select>
-                                                            </td>
+                                                            <input type="hidden" name="action_code[]" value="blank">
                                                             <td>
                                                                 <details>
                                                                     <summary class="text-primary">Pull/Return</summary>
