@@ -16,6 +16,43 @@ if (!function_exists('app_config')) {
 
 $user = require_permission('categories.manage');
 
+function categories_has_subcategory_table(): bool
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+    try {
+        $stmt = db()->query("SHOW TABLES LIKE 'inventory_subcategories'");
+        $exists = (bool) $stmt?->fetchColumn();
+        if (!$exists) {
+            db()->exec(
+                'CREATE TABLE IF NOT EXISTS inventory_subcategories (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    shop_type ENUM("lx","snd") NOT NULL,
+                    category_id INT NULL,
+                    name VARCHAR(190) NOT NULL,
+                    sort_order INT NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_inventory_subcategories_shop_sort (shop_type, sort_order, name),
+                    INDEX idx_inventory_subcategories_category (category_id),
+                    CONSTRAINT fk_inventory_subcategories_category
+                        FOREIGN KEY (category_id) REFERENCES inventory_categories(id)
+                        ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            );
+            $stmt = db()->query("SHOW TABLES LIKE 'inventory_subcategories'");
+            $exists = (bool) $stmt?->fetchColumn();
+        }
+    } catch (Throwable) {
+        $exists = false;
+    }
+    return $exists;
+}
+
+$hasSubcategoryTable = categories_has_subcategory_table();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
@@ -66,6 +103,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($hasSubcategoryTable && $action === 'create_subcategory') {
+        $requestedSortOrder = (int) post('sort_order', '0');
+        if ($requestedSortOrder <= 0) {
+            $nextSortStmt = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_subcategories WHERE shop_type = ?');
+            $nextSortStmt->execute([$shop]);
+            $requestedSortOrder = (int) $nextSortStmt->fetchColumn();
+        }
+        $categoryId = (int) post('category_id', '0');
+        $categoryId = $categoryId > 0 ? $categoryId : null;
+        $stmt = db()->prepare('INSERT INTO inventory_subcategories (shop_type, category_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())');
+        $stmt->execute([$shop, $categoryId, post('name'), $requestedSortOrder]);
+        flash_set('success', strtoupper($shop) . ' subcategory created.');
+    }
+
+    if ($hasSubcategoryTable && $action === 'update_subcategory') {
+        $categoryId = (int) post('category_id', '0');
+        $categoryId = $categoryId > 0 ? $categoryId : null;
+        $stmt = db()->prepare('UPDATE inventory_subcategories SET category_id = ?, name = ?, sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
+        $stmt->execute([$categoryId, post('name'), (int) post('sort_order', '0'), (int) post('id'), $shop]);
+        flash_set('success', 'Subcategory updated.');
+    }
+
+    if ($hasSubcategoryTable && $action === 'delete_subcategory') {
+        $stmt = db()->prepare('DELETE FROM inventory_subcategories WHERE id = ? AND shop_type = ?');
+        $stmt->execute([(int) post('id'), $shop]);
+        flash_set('warning', 'Subcategory deleted.');
+    }
+
+    if ($hasSubcategoryTable && $action === 'clear_shop_subcategories') {
+        $stmt = db()->prepare('DELETE FROM inventory_subcategories WHERE shop_type = ?');
+        $stmt->execute([$shop]);
+        flash_set('warning', strtoupper($shop) . ' subcategories cleared.');
+    }
+
+    if ($hasSubcategoryTable && $action === 'reorder_subcategories') {
+        $orderedIds = json_decode((string) ($_POST['ordered_ids'] ?? '[]'), true);
+        if (is_array($orderedIds)) {
+            db()->beginTransaction();
+            $stmt = db()->prepare('UPDATE inventory_subcategories SET sort_order = ?, updated_at = NOW() WHERE id = ? AND shop_type = ?');
+            foreach (array_values($orderedIds) as $idx => $id) {
+                $stmt->execute([$idx + 1, (int) $id, $shop]);
+            }
+            db()->commit();
+        }
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     redirect('/admin/categories');
 }
 
@@ -74,8 +160,15 @@ $categoriesByShop = ['lx' => [], 'snd' => []];
 foreach ($categories as $cat) {
     $categoriesByShop[$cat['shop_type']][] = $cat;
 }
+$subcategoriesByShop = ['lx' => [], 'snd' => []];
+if ($hasSubcategoryTable) {
+    $subcategoryRows = db()->query('SELECT sc.*, ic.name AS category_name FROM inventory_subcategories sc LEFT JOIN inventory_categories ic ON ic.id = sc.category_id ORDER BY sc.shop_type, sc.sort_order, sc.name')->fetchAll();
+    foreach ($subcategoryRows as $subcat) {
+        $subcategoriesByShop[$subcat['shop_type']][] = $subcat;
+    }
+}
 
-render_page('Categories', function () use ($categoriesByShop): void {
+render_page('Categories', function () use ($categoriesByShop, $subcategoriesByShop, $hasSubcategoryTable): void {
     $shops = [
         'lx' => 'Lighting Categories',
         'snd' => 'Sound Categories',
@@ -151,6 +244,80 @@ render_page('Categories', function () use ($categoriesByShop): void {
                         </div>
                     </div>
                 </div>
+                <?php if ($hasSubcategoryTable): ?>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center">
+                            <h3 class="card-title"><?= e($shopLabel) ?> Subcategories</h3>
+                            <div class="ms-auto">
+                                <form method="post" onsubmit="return confirm('Clear all <?= e(strtoupper($shopKey)) ?> subcategories?')">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="clear_shop_subcategories">
+                                    <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                    <button class="btn btn-outline-danger btn-sm">Clear <?= e(strtoupper($shopKey)) ?> Subcategories</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="card-body border-bottom">
+                            <form method="post" class="row g-2 align-items-center">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="create_subcategory">
+                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                <div class="col-md-4"><input class="form-control" name="name" placeholder="New subcategory name" required></div>
+                                <div class="col-md-3">
+                                    <select class="form-select" name="category_id">
+                                        <option value="0">All Categories</option>
+                                        <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
+                                            <option value="<?= (int) $cat['id'] ?>"><?= e($cat['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-2"><input class="form-control" type="number" name="sort_order" value="0" placeholder="Sort"></div>
+                                <div class="col-md-3"><button class="btn btn-primary w-100"><i class="ti ti-folder-plus me-1"></i>Create Subcategory</button></div>
+                            </form>
+                        </div>
+                        <div class="list-group list-group-flush subcategory-manager-list" id="subcategory-list-<?= e($shopKey) ?>" data-shop="<?= e($shopKey) ?>" data-sortable='{"animation":150,"handle":".sortable-handle"}'>
+                            <?php foreach ($subcategoriesByShop[$shopKey] as $subcat): ?>
+                                <div class="list-group-item" data-subcategory-id="<?= (int) $subcat['id'] ?>">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <span class="sortable-handle cursor-move text-secondary d-inline-flex align-items-center" title="Drag to reorder" aria-hidden="true">
+                                                <i class="ti ti-grip-vertical"></i>
+                                            </span>
+                                        </div>
+                                        <div class="col-md-4"><input class="form-control" name="name" value="<?= e($subcat['name']) ?>" form="subcat-update-<?= (int) $subcat['id'] ?>" required></div>
+                                        <div class="col-md-3">
+                                            <select class="form-select" name="category_id" form="subcat-update-<?= (int) $subcat['id'] ?>">
+                                                <option value="0" <?= (int) ($subcat['category_id'] ?? 0) === 0 ? 'selected' : '' ?>>All Categories</option>
+                                                <?php foreach ($categoriesByShop[$shopKey] as $cat): ?>
+                                                    <option value="<?= (int) $cat['id'] ?>" <?= (int) $cat['id'] === (int) ($subcat['category_id'] ?? 0) ? 'selected' : '' ?>><?= e($cat['name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2"><input class="form-control" type="number" name="sort_order" value="<?= (int) $subcat['sort_order'] ?>" form="subcat-update-<?= (int) $subcat['id'] ?>"></div>
+                                        <div class="col-md text-end">
+                                            <form id="subcat-update-<?= (int) $subcat['id'] ?>" method="post" class="d-inline-block">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="action" value="update_subcategory">
+                                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                                <input type="hidden" name="id" value="<?= (int) $subcat['id'] ?>">
+                                                <button class="btn btn-icon btn-sm btn-primary" title="Update"><i class="ti ti-check"></i></button>
+                                            </form>
+                                            <form method="post" class="d-inline-block ms-1">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="action" value="delete_subcategory">
+                                                <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
+                                                <input type="hidden" name="id" value="<?= (int) $subcat['id'] ?>">
+                                                <button class="btn btn-icon btn-sm btn-outline-danger" title="Delete"><i class="ti ti-trash"></i></button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>
@@ -191,6 +358,38 @@ render_page('Categories', function () use ($categoriesByShop): void {
             });
             if (!response.ok) {
               alert('Could not save new category order. Please try again.');
+            }
+          }
+        });
+      });
+      document.querySelectorAll('.subcategory-manager-list').forEach((list) => {
+        const SortableLib = window.Sortable;
+        if (!SortableLib) return;
+        new SortableLib(list, {
+          animation: 150,
+          handle: '.sortable-handle',
+          ghostClass: 'sortable-ghost',
+          chosenClass: 'sortable-chosen',
+          onEnd: async () => {
+            const shopType = list.getAttribute('data-shop') || '';
+            const ids = Array.from(list.querySelectorAll('[data-subcategory-id]')).map((el) => Number(el.getAttribute('data-subcategory-id')));
+            list.querySelectorAll('[data-subcategory-id]').forEach((row, idx) => {
+              const sortInput = row.querySelector('input[name="sort_order"]');
+              if (sortInput instanceof HTMLInputElement) sortInput.value = String(idx + 1);
+            });
+            const body = new URLSearchParams();
+            body.set('_csrf', '<?= e(csrf_token()) ?>');
+            body.set('action', 'reorder_subcategories');
+            body.set('shop_type', shopType);
+            body.set('ordered_ids', JSON.stringify(ids));
+            const response = await fetch('/admin/categories', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body.toString(),
+            });
+            if (!response.ok) {
+              alert('Could not save new subcategory order. Please try again.');
             }
           }
         });

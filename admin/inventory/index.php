@@ -36,6 +36,21 @@ function inventory_has_subcategory_column(): bool
     return $hasColumn;
 }
 
+function inventory_has_subcategory_catalog_table(): bool
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+    try {
+        $stmt = db()->query("SHOW TABLES LIKE 'inventory_subcategories'");
+        $exists = (bool) $stmt?->fetchColumn();
+    } catch (Throwable) {
+        $exists = false;
+    }
+    return $exists;
+}
+
 function parse_import_rows(string $shop, string $text): array
 {
     $lines = preg_split('/\r\n|\r|\n/', trim($text));
@@ -244,14 +259,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $hasSubcategoryColumn = inventory_has_subcategory_column();
+$hasSubcategoryCatalogTable = inventory_has_subcategory_catalog_table();
 $cats = db()->query('SELECT id, shop_type, name FROM inventory_categories ORDER BY shop_type, sort_order, name')->fetchAll();
 $items = db()->query('SELECT ii.*, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ic.name AS category_name, ic.sort_order AS category_sort_order
     FROM inventory_items ii
     LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
     ORDER BY ii.shop_type, COALESCE(ic.sort_order, 2147483647), COALESCE(ic.name, ""), ii.sort_order, ii.id')->fetchAll();
 $catsByShop = ['lx' => [], 'snd' => []];
+$subcategoryOptionsByShop = ['lx' => [], 'snd' => []];
 foreach ($cats as $cat) {
     $catsByShop[$cat['shop_type']][] = $cat;
+}
+if ($hasSubcategoryCatalogTable) {
+    $subcatRows = db()->query('SELECT shop_type, name FROM inventory_subcategories ORDER BY shop_type, sort_order, name')->fetchAll();
+    foreach ($subcatRows as $subcat) {
+        $shop = (string) ($subcat['shop_type'] ?? '');
+        $name = trim((string) ($subcat['name'] ?? ''));
+        if (($shop === 'lx' || $shop === 'snd') && $name !== '') {
+            $subcategoryOptionsByShop[$shop][] = $name;
+        }
+    }
+    foreach ($subcategoryOptionsByShop as $shop => $values) {
+        $subcategoryOptionsByShop[$shop] = array_values(array_unique($values));
+    }
 }
 $itemsGroupedByShopCategory = ['lx' => [], 'snd' => []];
 foreach ($items as $item) {
@@ -262,7 +292,7 @@ foreach ($items as $item) {
     }
     $itemsGroupedByShopCategory[$shop][$group][] = $item;
 }
-render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCategory, $hasSubcategoryColumn): void {
+render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCategory, $hasSubcategoryColumn, $subcategoryOptionsByShop): void {
     $shops = [
         'lx' => 'Lighting Inventory',
         'snd' => 'Sound Inventory',
@@ -299,7 +329,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                         <input type="hidden" name="action" value="create_item">
                                         <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
                                         <div class="mb-2"><select class="form-select" name="category_id"><option value="">No category</option><?php foreach($catsByShop[$shopKey] as $cat): ?><option value="<?= (int)$cat['id'] ?>"><?= e($cat['name']) ?></option><?php endforeach; ?></select></div>
-                                        <?php if ($hasSubcategoryColumn): ?><div class="mb-2"><input class="form-control" name="subcategory_name" placeholder="Subcategory (optional)"></div><?php endif; ?>
+                                        <?php if ($hasSubcategoryColumn): ?>
+                                            <div class="mb-2">
+                                                <input class="form-control" name="subcategory_name" placeholder="Subcategory (optional)" list="subcategory-options-<?= e($shopKey) ?>">
+                                            </div>
+                                        <?php endif; ?>
                                         <div class="mb-2"><input class="form-control" name="name" placeholder="Name" required></div>
                                         <?php if ($shopKey === 'snd'): ?><div class="mb-2"><input class="form-control" name="sku" placeholder="SKU"></div><?php endif; ?>
                                         <div class="row g-2"><div class="col"><input class="form-control" type="number" name="shop_quantity" placeholder="Qty"></div><div class="col"><input class="form-control" name="unit" placeholder="Unit" value="ea"></div></div>
@@ -366,7 +400,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                                     <?php endforeach; ?>
                                                 </select>
                                             </td>
-                                            <?php if ($hasSubcategoryColumn): ?><td><input class="form-control" name="subcategory_name" value="<?= e((string) ($item['subcategory_name'] ?? '')) ?>" form="item-update-<?= (int) $item['id'] ?>"></td><?php endif; ?>
+                                            <?php if ($hasSubcategoryColumn): ?><td><input class="form-control" name="subcategory_name" value="<?= e((string) ($item['subcategory_name'] ?? '')) ?>" form="item-update-<?= (int) $item['id'] ?>" list="subcategory-options-<?= e($shopKey) ?>"></td><?php endif; ?>
                                             <td><input class="form-control" name="name" value="<?= e($item['name']) ?>" form="item-update-<?= (int) $item['id'] ?>" required></td>
                                             <?php if ($shopKey === 'snd'): ?><td><input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td><?php endif; ?>
                                             <td><input class="form-control" type="number" name="shop_quantity" value="<?= (int) $item['shop_quantity'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
@@ -399,6 +433,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                     </div>
                 </div>
             </div>
+            <datalist id="subcategory-options-<?= e($shopKey) ?>">
+                <?php foreach ($subcategoryOptionsByShop[$shopKey] as $subcatOption): ?>
+                    <option value="<?= e((string) $subcatOption) ?>"></option>
+                <?php endforeach; ?>
+            </datalist>
         </div>
     <?php endforeach; ?>
     </div>

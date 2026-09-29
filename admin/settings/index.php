@@ -15,6 +15,9 @@ if (!function_exists('app_config')) {
 }
 
 $user = require_permission('admin.access');
+$paperworkSettingsRef = file_exists(__DIR__ . '/../../shared/paperwork_export_settings_reference.php')
+    ? require __DIR__ . '/../../shared/paperwork_export_settings_reference.php'
+    : ['current_export_settings' => [], 'configurable_options' => [], 'show_checkbox_inputs' => []];
 
 function save_branding_asset(string $inputName, string $baseName, array $allowedMimeToExt): bool
 {
@@ -117,6 +120,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if (post('action') === 'save_paperwork_global') {
+        $checkboxInputs = $paperworkSettingsRef['show_checkbox_inputs'] ?? [];
+        $updates = [];
+        foreach (($paperworkSettingsRef['configurable_options'] ?? []) as $option) {
+            $settingKey = (string) ($option['setting_key'] ?? '');
+            $inputName = (string) ($option['input_name'] ?? '');
+            if ($settingKey === '' || $inputName === '') {
+                continue;
+            }
+            $type = (string) ($option['type'] ?? 'text');
+            if ($type === 'checkbox' || in_array($inputName, $checkboxInputs, true)) {
+                $updates[$settingKey] = isset($_POST[$inputName]) ? '1' : '0';
+            } else {
+                $updates[$settingKey] = trim((string) post($inputName, (string) ($option['default_value'] ?? '')));
+            }
+        }
+        $stmt = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES ("paperwork.global_layout_overrides", ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
+        $stmt->execute([json_encode($updates)]);
+        app_setting_clear_cache();
+        flash_set('success', 'Global paperwork settings saved.');
+    }
+
     redirect('/admin/settings');
 }
 
@@ -125,6 +150,8 @@ $appName = 'Backline';
 $madeIn = 'USA';
 $loginCardColor = '';
 $loginCardIcon = '';
+$paperworkGlobalOverrides = [];
+$paperworkLayout = $paperworkSettingsRef['current_export_settings'] ?? [];
 $settings = db()->query('SELECT key_name, value_json FROM app_settings WHERE key_name IN ("branding.app_name", "branding.made_in", "branding.login_card_color", "branding.login_card_icon")')->fetchAll();
 foreach ($settings as $row) {
     if ($row['key_name'] === 'branding.app_name') $appName = (string) json_decode((string) $row['value_json'], true);
@@ -132,8 +159,13 @@ foreach ($settings as $row) {
     if ($row['key_name'] === 'branding.login_card_color') $loginCardColor = (string) json_decode((string) $row['value_json'], true);
     if ($row['key_name'] === 'branding.login_card_icon') $loginCardIcon = (string) json_decode((string) $row['value_json'], true);
 }
+$paperworkGlobalRaw = app_setting('paperwork.global_layout_overrides', []);
+$paperworkGlobalOverrides = is_array($paperworkGlobalRaw) ? $paperworkGlobalRaw : (json_decode((string) $paperworkGlobalRaw, true) ?: []);
+if (is_array($paperworkGlobalOverrides)) {
+    $paperworkLayout = array_replace($paperworkLayout, $paperworkGlobalOverrides);
+}
 
-render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon): void {
+render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon, $paperworkSettingsRef, $paperworkLayout): void {
     ?>
     <div class="row row-cards">
         <div class="col-lg-6">
@@ -163,6 +195,47 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                         <div class="form-hint mb-3">Theme-specific LX/SND logos and login backgrounds will follow light/dark mode automatically.</div>
                         <button class="btn btn-primary">Save branding</button>
                     </form>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Global Paperwork Settings</h3></div>
+                    <div class="card-body">
+                        <form method="post" class="row g-3">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="action" value="save_paperwork_global">
+                            <?php $checkboxInputs = $paperworkSettingsRef['show_checkbox_inputs'] ?? []; ?>
+                            <?php foreach (($paperworkSettingsRef['configurable_options'] ?? []) as $option): ?>
+                                <?php
+                                $settingKey = (string) ($option['setting_key'] ?? '');
+                                $inputName = (string) ($option['input_name'] ?? '');
+                                if ($settingKey === '' || $inputName === '') continue;
+                                $label = (string) ($option['label'] ?? $inputName);
+                                $type = (string) ($option['type'] ?? 'text');
+                                $value = (string) ($paperworkLayout[$settingKey] ?? ($option['default_value'] ?? ''));
+                                ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><?= e($label) ?></label>
+                                    <?php if ($type === 'textarea'): ?>
+                                        <textarea class="form-control" name="<?= e($inputName) ?>" rows="4"><?= e($value) ?></textarea>
+                                    <?php elseif ($type === 'checkbox' || in_array($inputName, $checkboxInputs, true)): ?>
+                                        <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="<?= e($inputName) ?>" value="1" <?= $value === '1' ? 'checked' : '' ?>><span class="form-check-label">Enabled</span></label>
+                                    <?php elseif ($type === 'color'): ?>
+                                        <input class="form-control form-control-color" type="color" name="<?= e($inputName) ?>" value="<?= e($value !== '' ? $value : '#000000') ?>">
+                                    <?php elseif ($type === 'integer'): ?>
+                                        <input class="form-control" type="number" step="1" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                    <?php elseif ($type === 'decimal'): ?>
+                                        <input class="form-control" type="number" step="0.01" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                    <?php else: ?>
+                                        <input class="form-control" type="text" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                            <div class="col-12">
+                                <button class="btn btn-primary" type="submit">Save Global Paperwork Settings</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

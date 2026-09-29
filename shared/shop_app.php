@@ -332,7 +332,7 @@ if (!function_exists('render_shop_app_page')) {
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
                 }
                 $latestRevisionId = (int) ($latestRevision['id'] ?? 0);
-                redirect($appPath . '?show=' . $selectedShowId . '&tab=paperwork&preview=1&revision=' . $latestRevisionId);
+                redirect($appPath . '?show=' . $selectedShowId . '&tab=paperwork&revision=' . $latestRevisionId);
             }
             if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
                 flash_set('info', 'Label printing is not wired yet.');
@@ -349,6 +349,11 @@ if (!function_exists('render_shop_app_page')) {
             ? require __DIR__ . '/paperwork_export_settings_reference.php'
             : ['current_export_settings' => [], 'show_override_keys' => [], 'show_checkbox_inputs' => [], 'configurable_options' => []];
         $paperworkLayout = $paperworkSettings['current_export_settings'] ?? [];
+        $globalPaperworkRaw = app_setting('paperwork.global_layout_overrides', []);
+        $globalPaperworkOverrides = is_array($globalPaperworkRaw) ? $globalPaperworkRaw : (json_decode((string) $globalPaperworkRaw, true) ?: []);
+        if (is_array($globalPaperworkOverrides)) {
+            $paperworkLayout = array_replace($paperworkLayout, $globalPaperworkOverrides);
+        }
         $paperworkOverrides = [];
 
         if ($selectedShowId > 0) {
@@ -593,182 +598,60 @@ if (!function_exists('render_shop_app_page')) {
                     </div>
                 <?php elseif ($selectedShow && $currentTab === 'paperwork'): ?>
                     <?php
-                    $previewMode = (string) ($_GET['preview'] ?? '') === '1';
                     $layout = $paperworkLayout;
-                    $headerText = (string) ($layout['layout.header_text'] ?? 'Production Electrician Shop Order');
-                    $organizationText = (string) ($layout['layout.organization_text'] ?? '');
-                    $footerText = (string) ($layout['layout.footer_text'] ?? 'Prepared in Backline');
-                    $defaultNotes = preg_split('/\r\n|\r|\n/', (string) ($layout['layout.export_notes'] ?? '')) ?: [];
-                    $defaultNotes = array_values(array_filter(array_map(static fn ($n): string => trim((string) $n), $defaultNotes), static fn ($n): bool => $n !== ''));
                     $isInitialRevision = $currentRevisionLabel === '1.1';
                     $backTab = $isInitialRevision ? 'initial' : 'revisions';
                     $checkboxInputs = $paperworkSettings['show_checkbox_inputs'] ?? [];
+                    $paperworkUrl = '/shared/paperwork_export_template_reference.php?show_id=' . (int) $selectedShowId
+                        . '&revision_id=' . (int) $selectedRevisionId
+                        . '&type=order&shop=' . rawurlencode($shopType);
                     ?>
-                    <?php if (!$previewMode): ?>
-                        <div class="card">
-                            <div class="card-header"><h3 class="card-title mb-0">Paperwork Settings (Per Show)</h3></div>
-                            <div class="card-body">
-                                <form method="post" class="row g-3">
-                                    <?= csrf_input() ?>
-                                    <input type="hidden" name="action" value="save_paperwork_options">
-                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                    <input type="hidden" name="current_tab" value="paperwork">
-                                    <?php foreach (($paperworkSettings['configurable_options'] ?? []) as $option): ?>
-                                        <?php if (empty($option['show_override'])) continue; ?>
-                                        <?php
-                                        $settingKey = (string) ($option['setting_key'] ?? '');
-                                        $inputName = (string) ($option['input_name'] ?? '');
-                                        $label = (string) ($option['label'] ?? $inputName);
-                                        $type = (string) ($option['type'] ?? 'text');
-                                        $value = (string) ($layout[$settingKey] ?? ($option['default_value'] ?? ''));
-                                        ?>
-                                        <div class="col-md-6">
-                                            <label class="form-label"><?= e($label) ?></label>
-                                            <?php if ($type === 'textarea'): ?>
-                                                <textarea class="form-control" name="<?= e($inputName) ?>" rows="4"><?= e($value) ?></textarea>
-                                            <?php elseif (in_array($inputName, $checkboxInputs, true) || $type === 'checkbox'): ?>
-                                                <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="<?= e($inputName) ?>" value="1" <?= $value === '1' ? 'checked' : '' ?>><span class="form-check-label">Enabled</span></label>
-                                            <?php elseif ($type === 'color'): ?>
-                                                <input class="form-control form-control-color" type="color" name="<?= e($inputName) ?>" value="<?= e($value !== '' ? $value : '#000000') ?>">
-                                            <?php elseif ($type === 'integer'): ?>
-                                                <input class="form-control" type="number" step="1" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
-                                            <?php elseif ($type === 'decimal'): ?>
-                                                <input class="form-control" type="number" step="0.01" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
-                                            <?php else: ?>
-                                                <input class="form-control" type="text" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endforeach; ?>
-                                    <div class="col-12 d-flex justify-content-between">
-                                        <button class="btn btn-primary" type="submit">Save Paperwork Options</button>
-                                        <a class="btn btn-outline-primary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1<?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Open Paperwork Preview</a>
+                    <div class="card mb-3">
+                        <div class="card-header"><h3 class="card-title mb-0">Paperwork Settings (Per Show)</h3></div>
+                        <div class="card-body">
+                            <form method="post" class="row g-3">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="save_paperwork_options">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="current_tab" value="paperwork">
+                                <?php foreach (($paperworkSettings['configurable_options'] ?? []) as $option): ?>
+                                    <?php if (empty($option['show_override'])) continue; ?>
+                                    <?php
+                                    $settingKey = (string) ($option['setting_key'] ?? '');
+                                    $inputName = (string) ($option['input_name'] ?? '');
+                                    $label = (string) ($option['label'] ?? $inputName);
+                                    $type = (string) ($option['type'] ?? 'text');
+                                    $value = (string) ($layout[$settingKey] ?? ($option['default_value'] ?? ''));
+                                    ?>
+                                    <div class="col-md-6">
+                                        <label class="form-label"><?= e($label) ?></label>
+                                        <?php if ($type === 'textarea'): ?>
+                                            <textarea class="form-control" name="<?= e($inputName) ?>" rows="4"><?= e($value) ?></textarea>
+                                        <?php elseif (in_array($inputName, $checkboxInputs, true) || $type === 'checkbox'): ?>
+                                            <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="<?= e($inputName) ?>" value="1" <?= $value === '1' ? 'checked' : '' ?>><span class="form-check-label">Enabled</span></label>
+                                        <?php elseif ($type === 'color'): ?>
+                                            <input class="form-control form-control-color" type="color" name="<?= e($inputName) ?>" value="<?= e($value !== '' ? $value : '#000000') ?>">
+                                        <?php elseif ($type === 'integer'): ?>
+                                            <input class="form-control" type="number" step="1" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                        <?php elseif ($type === 'decimal'): ?>
+                                            <input class="form-control" type="number" step="0.01" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                        <?php else: ?>
+                                            <input class="form-control" type="text" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
+                                        <?php endif; ?>
                                     </div>
-                                </form>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="card mb-3 paperwork-preview-actions">
-                            <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                                <a class="btn btn-outline-secondary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($backTab) ?><?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Back to Show</a>
-                                <button type="button" class="btn btn-primary" id="download-paperwork-pdf">Download PDF</button>
-                            </div>
-                        </div>
-                        <?php
-                        $previewRows = [];
-                        foreach ($linesByCategory as $category => $subGroups) {
-                            foreach ($subGroups as $subcategory => $lines) {
-                                $previewRows[] = ['__type' => 'subcategory', 'category' => $category, 'subcategory' => $subcategory];
-                                foreach ($lines as $line) {
-                                    $previewRows[] = ['__type' => 'line', 'category' => $category, 'subcategory' => $subcategory, 'line' => $line];
-                                }
-                            }
-                        }
-                        $rowsPerPage = 28;
-                        $previewPages = array_chunk($previewRows, $rowsPerPage);
-                        if (!$previewPages) {
-                            $previewPages = [[]];
-                        }
-                        ?>
-                        <div class="paperwork-preview-wrap">
-                            <?php foreach ($previewPages as $pageIndex => $pageRows): ?>
-                                <div class="paperwork-page-break"></div>
-                                <div class="paperwork-page">
-                                    <div class="paperwork-top">
-                                        <div>
-                                            <h2 class="paperwork-title"><?= e($headerText) ?></h2>
-                                            <div class="paperwork-subtitle"><?= e((string) $selectedShow['show_name']) ?> · Revision <?= e($currentRevisionLabel) ?></div>
-                                        </div>
-                                        <div class="paperwork-org"><?= e($organizationText) ?> · Page <?= (int) ($pageIndex + 1) ?> / <?= count($previewPages) ?></div>
-                                    </div>
-                                    <table class="paperwork-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>Item</th>
-                                                <?php if ($shopType === 'snd'): ?><th>SKU</th><?php endif; ?>
-                                                <th>Used</th>
-                                                <th>Spare</th>
-                                                <th>Total</th>
-                                                <th>Unit</th>
-                                                <th>Action</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($pageRows as $row): ?>
-                                                <?php if (($row['__type'] ?? '') === 'subcategory'): ?>
-                                                    <tr><td colspan="<?= $shopType === 'snd' ? '9' : '8' ?>" class="paperwork-category-row"><?= e((string) ($row['category'] ?? '')) ?><?php if ((string) ($row['subcategory'] ?? '') !== ''): ?> <span class="paperwork-subcat">› <?= e((string) ($row['subcategory'] ?? '')) ?></span><?php endif; ?></td></tr>
-                                                <?php else: ?>
-                                                    <?php
-                                                    $line = $row['line'] ?? [];
-                                                    $noteParts = [];
-                                                    $lineNote = trim((string) ($line['line_note'] ?? ''));
-                                                    if ($lineNote !== '') {
-                                                        $noteParts[] = $lineNote;
-                                                    }
-                                                    $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
-                                                    if ($pullDate !== '') {
-                                                        $noteParts[] = 'Pull: ' . $pullDate;
-                                                    }
-                                                    $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
-                                                    if ($returnDate !== '') {
-                                                        $noteParts[] = 'Return: ' . $returnDate;
-                                                    }
-                                                    $qty = (int) ($line['qty'] ?? 0);
-                                                    $spares = (int) ($line['spares'] ?? 0);
-                                                    ?>
-                                                    <tr>
-                                                        <td><?= e((string) ($row['category'] ?? '')) ?></td>
-                                                        <td><?= e((string) ($line['item_name'] ?? '')) ?></td>
-                                                        <?php if ($shopType === 'snd'): ?><td><?= e((string) ($line['sku'] ?? '')) ?></td><?php endif; ?>
-                                                        <td><?= $qty ?></td>
-                                                        <td><?= $spares ?></td>
-                                                        <td><?= $qty + $spares ?></td>
-                                                        <td><?= e((string) ($line['unit'] ?? '')) ?></td>
-                                                        <td><?= e((string) ($line['action_code'] ?? 'blank')) ?></td>
-                                                        <td><?= e(implode(' | ', $noteParts)) ?></td>
-                                                    </tr>
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                    <?php if ($defaultNotes && $pageIndex === count($previewPages) - 1): ?>
-                                        <div class="paperwork-notes">
-                                            <h3>Important Notes</h3>
-                                            <ul>
-                                                <?php foreach ($defaultNotes as $note): ?>
-                                                    <li><?= e($note) ?></li>
-                                                <?php endforeach; ?>
-                                            </ul>
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="paperwork-footer"><?= e($footerText) ?></div>
+                                <?php endforeach; ?>
+                                <div class="col-12 d-flex justify-content-between">
+                                    <button class="btn btn-primary" type="submit">Save Paperwork Options</button>
+                                    <a class="btn btn-outline-primary" href="<?= e($paperworkUrl) ?>" target="_blank" rel="noopener">Open Download View</a>
                                 </div>
-                            <?php endforeach; ?>
+                            </form>
                         </div>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F4QdMdbC+aD9Y9ycYzaO+VxDRKCVh0b07XHtcwPa5RWPLXnw0lPwQBGzb62LF8A3+yQUwpsOSJyYjg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-                        <script>
-                          (() => {
-                            const button = document.getElementById('download-paperwork-pdf');
-                            if (!button || !window.html2pdf) return;
-                            button.addEventListener('click', () => {
-                              const preview = document.querySelector('.paperwork-preview-wrap');
-                              if (!preview) return;
-                              const filename = `<?= e(preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) ($selectedShow['show_name'] ?? 'show')) ?: 'show') ?>-<?= e(strtoupper($shopType)) ?>-rev-<?= e($currentRevisionLabel) ?>.pdf`;
-                              window.html2pdf()
-                                .set({
-                                  margin: [0, 0, 0, 0],
-                                  filename,
-                                  html2canvas: { scale: 2 },
-                                  jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-                                  pagebreak: { mode: ['css', 'legacy'] }
-                                })
-                                .from(preview)
-                                .save();
-                            });
-                          })();
-                        </script>
-                    <?php endif; ?>
+                    </div>
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <iframe src="<?= e($paperworkUrl) ?>" title="Paperwork export" style="display:block;width:100%;min-height:900px;border:0;"></iframe>
+                        </div>
+                    </div>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title">Revisions</h3></div>
