@@ -842,7 +842,7 @@ $includeBrandingLogo = (string) app_setting('paperwork.include_branding_logo', '
 $brandingLogoUrl = '';
 if ($includeBrandingLogo && function_exists('first_existing_brand_asset')) {
     $brandingDir = __DIR__ . '/../uploads/branding';
-    $brandingFile = first_existing_brand_asset($brandingDir, ['logo-dark.*', 'logo-light.*', 'logo.*']);
+    $brandingFile = first_existing_brand_asset($brandingDir, ['paperwork-made-in-logo.*', 'logo-dark.*', 'logo-light.*', 'logo.*']);
     if ($brandingFile) {
         $brandingLogoUrl = export_url('/uploads/branding/' . basename($brandingFile));
     }

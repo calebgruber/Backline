@@ -84,6 +84,53 @@ if (!function_exists('shop_store_show_upload')) {
     }
 }
 
+if (!function_exists('shop_sync_initial_line_to_revisions')) {
+    function shop_sync_initial_line_to_revisions(int $orderId, int $inventoryItemId, int $qty, int $spares, string $lineNote, ?string $pullDate, ?string $returnDate, int $sortOrder, bool $hasReturnDateColumn): void
+    {
+        $revisionStmt = db()->prepare('SELECT id FROM order_revisions WHERE order_id = ? AND revision_number > 1');
+        $revisionStmt->execute([$orderId]);
+        $revisionIds = array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $revisionStmt->fetchAll());
+        $revisionIds = array_values(array_filter($revisionIds, static fn ($id): bool => $id > 0));
+        if (empty($revisionIds)) {
+            return;
+        }
+
+        if ($hasReturnDateColumn) {
+            $insertStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, specific_return_date, action_code, sort_order, created_at, updated_at)
+                SELECT ?, ?, ?, ?, ?, ?, ?, "blank", ?, NOW(), NOW()
+                FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE revision_id = ? AND inventory_item_id = ?)');
+            $updateStmt = db()->prepare('UPDATE order_lines ol
+                JOIN order_revisions r ON r.id = ol.revision_id
+                SET ol.qty = ?, ol.spares = ?, ol.line_note = ?, ol.specific_pull_date = ?, ol.specific_return_date = ?, ol.sort_order = ?, ol.updated_at = NOW()
+                WHERE r.order_id = ? AND r.revision_number > 1 AND ol.inventory_item_id = ?');
+        } else {
+            $insertStmt = db()->prepare('INSERT INTO order_lines (revision_id, inventory_item_id, qty, spares, line_note, specific_pull_date, action_code, sort_order, created_at, updated_at)
+                SELECT ?, ?, ?, ?, ?, ?, "blank", ?, NOW(), NOW()
+                FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE revision_id = ? AND inventory_item_id = ?)');
+            $updateStmt = db()->prepare('UPDATE order_lines ol
+                JOIN order_revisions r ON r.id = ol.revision_id
+                SET ol.qty = ?, ol.spares = ?, ol.line_note = ?, ol.specific_pull_date = ?, ol.sort_order = ?, ol.updated_at = NOW()
+                WHERE r.order_id = ? AND r.revision_number > 1 AND ol.inventory_item_id = ?');
+        }
+
+        foreach ($revisionIds as $revisionId) {
+            if ($hasReturnDateColumn) {
+                $insertStmt->execute([$revisionId, $inventoryItemId, $qty, $spares, $lineNote, $pullDate, $returnDate, $sortOrder, $revisionId, $inventoryItemId]);
+            } else {
+                $insertStmt->execute([$revisionId, $inventoryItemId, $qty, $spares, $lineNote, $pullDate, $sortOrder, $revisionId, $inventoryItemId]);
+            }
+        }
+
+        if ($hasReturnDateColumn) {
+            $updateStmt->execute([$qty, $spares, $lineNote, $pullDate, $returnDate, $sortOrder, $orderId, $inventoryItemId]);
+        } else {
+            $updateStmt->execute([$qty, $spares, $lineNote, $pullDate, $sortOrder, $orderId, $inventoryItemId]);
+        }
+    }
+}
+
 if (!function_exists('render_shop_app_page')) {
     function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
@@ -222,9 +269,10 @@ if (!function_exists('render_shop_app_page')) {
             if ($action === 'save_lines') {
                 $orderId = (int) post('order_id');
                 $revisionId = (int) post('revision_id');
-                $checkStmt = db()->prepare('SELECT r.id FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
+                $checkStmt = db()->prepare('SELECT r.id, r.revision_number FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $checkStmt->execute([$revisionId, $orderId, $selectedShowId, $shopType]);
-                if ($checkStmt->fetchColumn()) {
+                $revisionRow = $checkStmt->fetch();
+                if ($revisionRow) {
                     try {
                         $lineIds = $_POST['line_id'] ?? [];
                         $qty = $_POST['qty'] ?? [];
@@ -237,6 +285,15 @@ if (!function_exists('render_shop_app_page')) {
                             $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
                         } else {
                             $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                        }
+                        $lineMeta = [];
+                        $lineMetaStmt = db()->prepare('SELECT id, inventory_item_id, sort_order FROM order_lines WHERE revision_id = ?');
+                        $lineMetaStmt->execute([$revisionId]);
+                        foreach ($lineMetaStmt->fetchAll() as $lineMetaRow) {
+                            $lineMeta[(int) ($lineMetaRow['id'] ?? 0)] = [
+                                'inventory_item_id' => (int) ($lineMetaRow['inventory_item_id'] ?? 0),
+                                'sort_order' => (int) ($lineMetaRow['sort_order'] ?? 0),
+                            ];
                         }
                         foreach ($lineIds as $idx => $lineId) {
                             $actionCode = (string) ($actions[$idx] ?? 'blank');
@@ -258,6 +315,22 @@ if (!function_exists('render_shop_app_page')) {
                             $args[] = (int) $lineId;
                             $args[] = $revisionId;
                             $upd->execute($args);
+                            if ((int) ($revisionRow['revision_number'] ?? 0) === 1) {
+                                $meta = $lineMeta[(int) $lineId] ?? null;
+                                if ($meta && (int) ($meta['inventory_item_id'] ?? 0) > 0) {
+                                    shop_sync_initial_line_to_revisions(
+                                        $orderId,
+                                        (int) $meta['inventory_item_id'],
+                                        (int) ($qty[$idx] ?? 0),
+                                        (int) ($spares[$idx] ?? 0),
+                                        trim((string) ($notes[$idx] ?? '')),
+                                        $pullDate === '' ? null : $pullDate,
+                                        $returnDate === '' ? null : $returnDate,
+                                        (int) ($meta['sort_order'] ?? 0),
+                                        $hasReturnDateColumn
+                                    );
+                                }
+                            }
                         }
                         flash_set('success', 'Revision lines saved.');
                     } catch (Throwable) {
@@ -270,9 +343,10 @@ if (!function_exists('render_shop_app_page')) {
                 $orderId = (int) post('order_id');
                 $revisionId = (int) post('revision_id');
                 $lineId = (int) post('line_id');
-                $checkStmt = db()->prepare('SELECT r.id FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
+                $checkStmt = db()->prepare('SELECT r.id, r.revision_number FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $checkStmt->execute([$revisionId, $orderId, $selectedShowId, $shopType]);
-                if ($checkStmt->fetchColumn() && $lineId > 0) {
+                $revisionRow = $checkStmt->fetch();
+                if ($revisionRow && $lineId > 0) {
                     $actionCode = (string) post('action_code', 'blank');
                     if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
                         $actionCode = 'blank';
@@ -280,12 +354,15 @@ if (!function_exists('render_shop_app_page')) {
                     $pullDate = trim((string) post('specific_pull_date', ''));
                     $returnDate = trim((string) post('specific_return_date', ''));
                     try {
+                        $qtyValue = (int) post('qty', '0');
+                        $sparesValue = (int) post('spares', '0');
+                        $lineNoteValue = trim((string) post('line_note', ''));
                         if ($hasReturnDateColumn) {
                             $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
                             $upd->execute([
-                                (int) post('qty', '0'),
-                                (int) post('spares', '0'),
-                                trim((string) post('line_note', '')),
+                                $qtyValue,
+                                $sparesValue,
+                                $lineNoteValue,
                                 $pullDate === '' ? null : $pullDate,
                                 $returnDate === '' ? null : $returnDate,
                                 $actionCode,
@@ -295,14 +372,32 @@ if (!function_exists('render_shop_app_page')) {
                         } else {
                             $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
                             $upd->execute([
-                                (int) post('qty', '0'),
-                                (int) post('spares', '0'),
-                                trim((string) post('line_note', '')),
+                                $qtyValue,
+                                $sparesValue,
+                                $lineNoteValue,
                                 $pullDate === '' ? null : $pullDate,
                                 $actionCode,
                                 $lineId,
                                 $revisionId,
                             ]);
+                        }
+                        if ((int) ($revisionRow['revision_number'] ?? 0) === 1) {
+                            $lineMetaStmt = db()->prepare('SELECT inventory_item_id, sort_order FROM order_lines WHERE id = ? AND revision_id = ? LIMIT 1');
+                            $lineMetaStmt->execute([$lineId, $revisionId]);
+                            $lineMeta = $lineMetaStmt->fetch();
+                            if ($lineMeta && (int) ($lineMeta['inventory_item_id'] ?? 0) > 0) {
+                                shop_sync_initial_line_to_revisions(
+                                    $orderId,
+                                    (int) $lineMeta['inventory_item_id'],
+                                    $qtyValue,
+                                    $sparesValue,
+                                    $lineNoteValue,
+                                    $pullDate === '' ? null : $pullDate,
+                                    $returnDate === '' ? null : $returnDate,
+                                    (int) ($lineMeta['sort_order'] ?? 0),
+                                    $hasReturnDateColumn
+                                );
+                            }
                         }
                     } catch (Throwable) {
                         http_response_code(500);

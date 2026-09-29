@@ -138,6 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES ("paperwork.global_layout_overrides", ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
         $stmt->execute([json_encode($updates)]);
+        $paperworkLogoMimes = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
+        save_branding_asset('paperwork_made_in_logo', 'paperwork-made-in-logo', $paperworkLogoMimes);
         $brandingLogoSetting = isset($_POST['paperwork_include_branding_logo']) ? '1' : '0';
         $stmtBranding = db()->prepare('INSERT INTO app_settings (`key_name`, `value_json`, `created_at`, `updated_at`) VALUES ("paperwork.include_branding_logo", ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
         $stmtBranding->execute([json_encode($brandingLogoSetting)]);
@@ -205,7 +207,7 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                 <div class="card">
                     <div class="card-header"><h3 class="card-title">Global Paperwork Settings</h3></div>
                     <div class="card-body">
-                        <form method="post" class="row g-3">
+                        <form method="post" enctype="multipart/form-data" class="row g-3">
                             <?= csrf_input() ?>
                             <input type="hidden" name="action" value="save_paperwork_global">
                             <?php $checkboxInputs = $paperworkSettingsRef['show_checkbox_inputs'] ?? []; ?>
@@ -235,6 +237,10 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                                     <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
+                            <div class="col-12">
+                                <label class="form-label">Made-in Logo (for cover footer)</label>
+                                <input class="form-control" type="file" name="paperwork_made_in_logo" accept="image/png,image/jpeg,image/webp">
+                            </div>
                             <div class="col-12">
                                 <label class="form-check mt-2">
                                     <input class="form-check-input" type="checkbox" name="paperwork_include_branding_logo" value="1" <?= $paperworkIncludeBrandingLogo ? 'checked' : '' ?>>
