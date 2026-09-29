@@ -169,7 +169,7 @@ if (!function_exists('list_revisions')) {
 if (!function_exists('revision_display_code')) {
     function revision_display_code(array $revision): string
     {
-        return '1.' . (int) ($revision['revision_number'] ?? 1);
+        return '1.' . max(0, (int) ($revision['revision_number'] ?? 1) - 1);
     }
 }
 
@@ -384,6 +384,21 @@ function export_notes_list(array $layout): array
     $notes = preg_split('/\r\n|\r|\n/', (string) ($layout['layout.export_notes'] ?? '')) ?: [];
     $notes = array_map(static fn ($note) => trim((string) $note), $notes);
     return array_values(array_filter($notes, static fn ($note) => $note !== ''));
+}
+
+function export_row_action_class(array $revision, array $item, array $line): string
+{
+    $action = strtolower((string) ($line['action'] ?? ''));
+    if ($action === 'notes') {
+        $action = 'note';
+    }
+    return match ($action) {
+        'add' => 'export-row-add',
+        'return' => 'export-row-return',
+        'exchange' => 'export-row-exchange',
+        'note' => 'export-row-note',
+        default => '',
+    };
 }
 
 function export_row_background(array $revision, array $item, array $line): string
@@ -822,7 +837,7 @@ $coverFooterLogoPath = sanitize_local_asset_path((string) ($layout['layout.cover
 $coverFooterLogoUrl = $coverFooterLogoPath ? export_url($coverFooterLogoPath) : '';
 $coverPreparedByName = trim((string) ($layout['layout.cover_prepared_by_name'] ?? ''));
 if ($coverPreparedByName === '') {
-    $coverPreparedByName = (string) (current_user()['display_name'] ?? '');
+    $coverPreparedByName = (string) (($user['display_name'] ?? $user['email'] ?? ''));
 }
 $footerText = trim((string) ($layout['layout.footer_text'] ?? ''));
 $globalFooterText = $coverPreparedByName !== '' ? 'Prepared by: ' . $coverPreparedByName : $footerText;
