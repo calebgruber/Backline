@@ -168,40 +168,44 @@ if (!function_exists('render_shop_app_page')) {
                 $checkStmt = db()->prepare('SELECT r.id FROM order_revisions r JOIN orders o ON o.id = r.order_id JOIN shows s ON s.id = o.show_id WHERE r.id = ? AND r.order_id = ? AND o.show_id = ? AND o.shop_type = ? AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $checkStmt->execute([$revisionId, $orderId, $selectedShowId, $shopType]);
                 if ($checkStmt->fetchColumn()) {
-                    $lineIds = $_POST['line_id'] ?? [];
-                    $qty = $_POST['qty'] ?? [];
-                    $spares = $_POST['spares'] ?? [];
-                    $notes = $_POST['line_note'] ?? [];
-                    $pullDates = $_POST['specific_pull_date'] ?? [];
-                    $returnDates = $_POST['specific_return_date'] ?? [];
-                    $actions = $_POST['action_code'] ?? [];
-                    if ($hasReturnDateColumn) {
-                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
-                    } else {
-                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
-                    }
-                    foreach ($lineIds as $idx => $lineId) {
-                        $actionCode = (string) ($actions[$idx] ?? 'blank');
-                        if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
-                            $actionCode = 'blank';
-                        }
-                        $pullDate = trim((string) ($pullDates[$idx] ?? ''));
-                        $returnDate = trim((string) ($returnDates[$idx] ?? ''));
-                        $args = [
-                            (int) ($qty[$idx] ?? 0),
-                            (int) ($spares[$idx] ?? 0),
-                            trim((string) ($notes[$idx] ?? '')),
-                            $pullDate === '' ? null : $pullDate,
-                        ];
+                    try {
+                        $lineIds = $_POST['line_id'] ?? [];
+                        $qty = $_POST['qty'] ?? [];
+                        $spares = $_POST['spares'] ?? [];
+                        $notes = $_POST['line_note'] ?? [];
+                        $pullDates = $_POST['specific_pull_date'] ?? [];
+                        $returnDates = $_POST['specific_return_date'] ?? [];
+                        $actions = $_POST['action_code'] ?? [];
                         if ($hasReturnDateColumn) {
-                            $args[] = $returnDate === '' ? null : $returnDate;
+                            $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                        } else {
+                            $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
                         }
-                        $args[] = $actionCode;
-                        $args[] = (int) $lineId;
-                        $args[] = $revisionId;
-                        $upd->execute($args);
+                        foreach ($lineIds as $idx => $lineId) {
+                            $actionCode = (string) ($actions[$idx] ?? 'blank');
+                            if (!in_array($actionCode, ['blank', 'add', 'return', 'exchange', 'notes'], true)) {
+                                $actionCode = 'blank';
+                            }
+                            $pullDate = trim((string) ($pullDates[$idx] ?? ''));
+                            $returnDate = trim((string) ($returnDates[$idx] ?? ''));
+                            $args = [
+                                (int) ($qty[$idx] ?? 0),
+                                (int) ($spares[$idx] ?? 0),
+                                trim((string) ($notes[$idx] ?? '')),
+                                $pullDate === '' ? null : $pullDate,
+                            ];
+                            if ($hasReturnDateColumn) {
+                                $args[] = $returnDate === '' ? null : $returnDate;
+                            }
+                            $args[] = $actionCode;
+                            $args[] = (int) $lineId;
+                            $args[] = $revisionId;
+                            $upd->execute($args);
+                        }
+                        flash_set('success', 'Revision lines saved.');
+                    } catch (Throwable) {
+                        flash_set('danger', 'Save failed. Please retry.');
                     }
-                    flash_set('success', 'Revision lines saved.');
                 }
             }
 
@@ -218,29 +222,36 @@ if (!function_exists('render_shop_app_page')) {
                     }
                     $pullDate = trim((string) post('specific_pull_date', ''));
                     $returnDate = trim((string) post('specific_return_date', ''));
-                    if ($hasReturnDateColumn) {
-                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
-                        $upd->execute([
-                            (int) post('qty', 0),
-                            (int) post('spares', 0),
-                            trim((string) post('line_note', '')),
-                            $pullDate === '' ? null : $pullDate,
-                            $returnDate === '' ? null : $returnDate,
-                            $actionCode,
-                            $lineId,
-                            $revisionId,
-                        ]);
-                    } else {
-                        $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
-                        $upd->execute([
-                            (int) post('qty', 0),
-                            (int) post('spares', 0),
-                            trim((string) post('line_note', '')),
-                            $pullDate === '' ? null : $pullDate,
-                            $actionCode,
-                            $lineId,
-                            $revisionId,
-                        ]);
+                    try {
+                        if ($hasReturnDateColumn) {
+                            $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, specific_return_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                            $upd->execute([
+                                (int) post('qty', '0'),
+                                (int) post('spares', '0'),
+                                trim((string) post('line_note', '')),
+                                $pullDate === '' ? null : $pullDate,
+                                $returnDate === '' ? null : $returnDate,
+                                $actionCode,
+                                $lineId,
+                                $revisionId,
+                            ]);
+                        } else {
+                            $upd = db()->prepare('UPDATE order_lines SET qty = ?, spares = ?, line_note = ?, specific_pull_date = ?, action_code = ?, updated_at = NOW() WHERE id = ? AND revision_id = ?');
+                            $upd->execute([
+                                (int) post('qty', '0'),
+                                (int) post('spares', '0'),
+                                trim((string) post('line_note', '')),
+                                $pullDate === '' ? null : $pullDate,
+                                $actionCode,
+                                $lineId,
+                                $revisionId,
+                            ]);
+                        }
+                    } catch (Throwable) {
+                        http_response_code(500);
+                        header('Content-Type: application/json');
+                        echo json_encode(['ok' => false]);
+                        exit;
                     }
                     header('Content-Type: application/json');
                     echo json_encode(['ok' => true]);
