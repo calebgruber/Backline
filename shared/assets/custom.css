@@ -130,6 +130,26 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   background: #DCEBFA !important;
 }
 
+html[data-bs-theme="dark"] .shop-line-row.shop-action-add td {
+  background: #1f3a2a !important;
+  color: #d9fbe3 !important;
+}
+
+html[data-bs-theme="dark"] .shop-line-row.shop-action-return td {
+  background: #422527 !important;
+  color: #ffd9d9 !important;
+}
+
+html[data-bs-theme="dark"] .shop-line-row.shop-action-exchange td {
+  background: #463b1f !important;
+  color: #ffeec5 !important;
+}
+
+html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
+  background: #1f3448 !important;
+  color: #d9ecff !important;
+}
+
 .paperwork-preview-wrap {
   display: flex;
   flex-direction: column;

@@ -95,16 +95,24 @@ if (!function_exists('find_show')) {
             return null;
         }
         $assistants = json_decode((string) ($show['assistants_json'] ?? ''), true);
+        $shopConcentration = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'sound' : 'lighting';
+        $isSound = $shopConcentration === 'sound';
         $show['ld_name'] = (string) ($show['lead_designer_name'] ?? '');
         $show['ld_email'] = (string) ($show['lead_designer_email'] ?? '');
         $show['ld_phone'] = (string) ($show['lead_designer_phone'] ?? '');
-        $show['assistant_ld_name'] = (string) ($show['ald_name'] ?? '');
-        $show['assistant_ld_email'] = (string) ($show['ald_email'] ?? '');
-        $show['assistant_ld_phone'] = (string) ($show['ald_phone'] ?? '');
+        $show['assistant_ld_name'] = $isSound
+            ? (string) ($show['assistant_snd_designer_name'] ?? '')
+            : (string) ($show['ald_name'] ?? '');
+        $show['assistant_ld_email'] = $isSound
+            ? (string) ($show['assistant_snd_designer_email'] ?? '')
+            : (string) ($show['ald_email'] ?? '');
+        $show['assistant_ld_phone'] = $isSound
+            ? (string) ($show['assistant_snd_designer_phone'] ?? '')
+            : (string) ($show['ald_phone'] ?? '');
         $show['assistant_shop_manager_name'] = (string) (($assistants['assistant_shop_manager']['name'] ?? '') ?: '');
         $show['assistant_shop_manager_email'] = (string) (($assistants['assistant_shop_manager']['email'] ?? '') ?: '');
         $show['assistant_shop_manager_phone'] = (string) (($assistants['assistant_shop_manager']['phone'] ?? '') ?: '');
-        $show['concentration'] = ((string) ($_GET['shop'] ?? 'lx')) === 'snd' ? 'sound' : 'lighting';
+        $show['concentration'] = $shopConcentration;
         $show['show_image_url'] = (string) ($show['show_image_path'] ?? '');
         return $show;
     }
@@ -1306,13 +1314,6 @@ $showImageUrl = $showImagePath !== '' && ($layout['layout.show_image'] ?? '1') =
         <?php if ($coverTheatreAddress !== ''): ?><p class="cover-venue-address"><?= h($coverTheatreAddress) ?></p><?php endif; ?>
         <p class="cover-document-title"><?= h($coverTitle) ?></p>
         <p class="cover-revision-current">&gt;&gt; <?= h(export_revision_history_label($revision)) ?> &lt;&lt;</p>
-        <?php if (count($revisionHistory) > 1): ?>
-        <div class="cover-revision-history">
-          <?php foreach (array_slice($revisionHistory, 1) as $historyRevision): ?>
-          <div><?= h(export_revision_history_label($historyRevision)) ?></div>
-          <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
       </div>
       </div>
 

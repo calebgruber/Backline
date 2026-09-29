@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!function_exists('shop_revision_label')) {
     function shop_revision_label(int $number): string
     {
-        return '1.' . max(1, $number);
+        return '1.' . max(0, $number - 1);
     }
 }
 
@@ -386,6 +386,9 @@ if (!function_exists('render_shop_app_page')) {
 
         $order = null;
         $revisions = [];
+        $initialRevision = null;
+        $revisionEntries = [];
+        $exportableRevisions = [];
         $selectedRevisionId = (int) ($_GET['revision'] ?? 0);
         $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         $linesByCategory = [];
@@ -413,27 +416,50 @@ if (!function_exists('render_shop_app_page')) {
                     $revisionRow['revision_label'] = shop_revision_label((int) ($revisionRow['revision_number'] ?? 1));
                 }
                 unset($revisionRow);
-                if ($selectedRevisionId <= 0 && !empty($revisions)) {
-                    $selectedRevisionId = (int) $revisions[0]['id'];
-                }
-                if ($selectedExportRevisionId <= 0 && !empty($revisions)) {
-                    $selectedExportRevisionId = (int) $revisions[0]['id'];
-                }
-                $revisionIds = array_map(static fn ($r): int => (int) ($r['id'] ?? 0), $revisions);
-                if ($selectedExportRevisionId > 0 && !in_array($selectedExportRevisionId, $revisionIds, true)) {
-                    $selectedExportRevisionId = (int) $revisions[0]['id'];
-                }
-                if ($currentTab === 'initial' && !empty($revisions)) {
-                    $initialRevision = null;
-                    foreach ($revisions as $candidateRevision) {
-                        if ((int) ($candidateRevision['revision_number'] ?? 0) === 1) {
-                            $initialRevision = $candidateRevision;
-                            break;
+
+                $revisionLineCounts = [];
+                if (!empty($revisions)) {
+                    $revisionIds = array_values(array_filter(array_map(static fn ($r): int => (int) ($r['id'] ?? 0), $revisions), static fn ($id): bool => $id > 0));
+                    if (!empty($revisionIds)) {
+                        $inPlaceholders = implode(',', array_fill(0, count($revisionIds), '?'));
+                        $countSql = 'SELECT revision_id, SUM(CASE WHEN qty > 0 OR spares > 0 OR TRIM(COALESCE(line_note, "")) <> "" OR action_code IN ("add","return","exchange","notes") OR COALESCE(specific_pull_date, "") <> ""' . ($hasReturnDateColumn ? ' OR COALESCE(specific_return_date, "") <> ""' : '') . ' THEN 1 ELSE 0 END) AS exportable_count FROM order_lines WHERE revision_id IN (' . $inPlaceholders . ') GROUP BY revision_id';
+                        $countStmt = db()->prepare($countSql);
+                        $countStmt->execute($revisionIds);
+                        foreach ($countStmt->fetchAll() as $row) {
+                            $revisionLineCounts[(int) ($row['revision_id'] ?? 0)] = (int) ($row['exportable_count'] ?? 0);
                         }
                     }
-                    if ($initialRevision !== null) {
-                        $selectedRevisionId = (int) $initialRevision['id'];
+                }
+
+                foreach ($revisions as $candidateRevision) {
+                    $candidateId = (int) ($candidateRevision['id'] ?? 0);
+                    $candidateNumber = (int) ($candidateRevision['revision_number'] ?? 0);
+                    $candidateRevision['has_exportable_lines'] = (($revisionLineCounts[$candidateId] ?? 0) > 0) ? 1 : 0;
+                    if ($candidateNumber === 1) {
+                        $initialRevision = $candidateRevision;
+                    } elseif ($candidateNumber > 1) {
+                        $revisionEntries[] = $candidateRevision;
                     }
+                    if (!empty($candidateRevision['has_exportable_lines'])) {
+                        $exportableRevisions[] = $candidateRevision;
+                    }
+                }
+
+                if ($currentTab === 'initial') {
+                    $selectedRevisionId = (int) ($initialRevision['id'] ?? 0);
+                } elseif ($currentTab === 'revisions') {
+                    if ($selectedRevisionId <= 0 || !in_array($selectedRevisionId, array_map(static fn ($r): int => (int) ($r['id'] ?? 0), $revisionEntries), true)) {
+                        $selectedRevisionId = (int) ($revisionEntries[0]['id'] ?? 0);
+                    }
+                } elseif ($selectedRevisionId <= 0 && $initialRevision !== null) {
+                    $selectedRevisionId = (int) $initialRevision['id'];
+                }
+
+                if ($selectedExportRevisionId <= 0 && !empty($exportableRevisions)) {
+                    $selectedExportRevisionId = (int) ($exportableRevisions[0]['id'] ?? 0);
+                }
+                if ($selectedExportRevisionId > 0 && !in_array($selectedExportRevisionId, array_map(static fn ($r): int => (int) ($r['id'] ?? 0), $exportableRevisions), true)) {
+                    $selectedExportRevisionId = (int) ($exportableRevisions[0]['id'] ?? 0);
                 }
 
                 if ($selectedRevisionId > 0) {
@@ -505,7 +531,7 @@ if (!function_exists('render_shop_app_page')) {
             $paperworkLayout = array_replace($paperworkLayout, $paperworkOverrides);
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $initialRevision, $revisionEntries, $exportableRevisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -704,14 +730,14 @@ if (!function_exists('render_shop_app_page')) {
                 <?php elseif ($selectedShow && $currentTab === 'exports'): ?>
                     <?php
                     $selectedExport = null;
-                    foreach ($revisions as $rev) {
+                    foreach ($exportableRevisions as $rev) {
                         if ((int) $rev['id'] === (int) $selectedExportRevisionId) {
                             $selectedExport = $rev;
                             break;
                         }
                     }
-                    if ($selectedExport === null && !empty($revisions)) {
-                        $selectedExport = $revisions[0];
+                    if ($selectedExport === null && !empty($exportableRevisions)) {
+                        $selectedExport = $exportableRevisions[0];
                     }
                     $exportRevisionId = (int) ($selectedExport['id'] ?? 0);
                     $paperworkUrl = '/shared/paperwork_export_template_reference.php?show_id=' . (int) $selectedShowId
@@ -719,8 +745,8 @@ if (!function_exists('render_shop_app_page')) {
                         . '&type=order&shop=' . rawurlencode($shopType)
                         . '&embed=1';
                     ?>
-                    <?php if (empty($revisions)): ?>
-                        <div class="card"><div class="card-body text-secondary">Create an initial order first, then exports will be available.</div></div>
+                    <?php if (empty($exportableRevisions)): ?>
+                        <div class="card"><div class="card-body text-secondary">No exportable paperwork yet. Add line quantities/notes/actions, let autosave run, then export.</div></div>
                     <?php else: ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title mb-0">Exports</h3></div>
@@ -731,10 +757,10 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="col-md-8">
                                     <label class="form-label">Export Revision</label>
                                     <select class="form-select" name="export_revision" onchange="this.form.submit()">
-                                        <?php foreach ($revisions as $rev): ?>
+                                        <?php foreach ($exportableRevisions as $rev): ?>
                                             <?php
                                             $label = (int) ($rev['revision_number'] ?? 0) === 1
-                                                ? 'Initial Order (' . (string) ($rev['revision_label'] ?? '1.1') . ')'
+                                                ? 'Initial Order (' . (string) ($rev['revision_label'] ?? '1.0') . ')'
                                                 : 'Revision ' . (string) ($rev['revision_label'] ?? '');
                                             ?>
                                             <option value="<?= (int) $rev['id'] ?>" <?= (int) $rev['id'] === $exportRevisionId ? 'selected' : '' ?>><?= e($label) ?></option>
@@ -777,14 +803,14 @@ if (!function_exists('render_shop_app_page')) {
                                 <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
                                 <button class="btn btn-outline-primary btn-sm">Add Revision</button>
                             </form>
-                            <?php foreach ($revisions as $rev): ?>
+                            <?php foreach ($revisionEntries as $rev): ?>
                                 <a class="btn btn-sm <?= ((int) $rev['id'] === (int) $selectedRevisionId) ? 'btn-primary' : 'btn-outline-primary' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=revisions&revision=<?= (int) $rev['id'] ?>">
                                     <?= e((string) $rev['revision_label']) ?>
                                 </a>
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    <?php if ($selectedRevisionId > 0): ?>
+                    <?php if (!empty($revisionEntries) && $selectedRevisionId > 0): ?>
                         <div class="card">
                             <div class="card-header"><h3 class="card-title">Revision Lines</h3></div>
                             <div class="card-body p-0 js-shop-lines-editor">
