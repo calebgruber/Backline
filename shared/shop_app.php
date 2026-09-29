@@ -28,6 +28,23 @@ if (!function_exists('shop_has_order_line_return_date_column')) {
     }
 }
 
+if (!function_exists('shop_has_inventory_subcategory_column')) {
+    function shop_has_inventory_subcategory_column(): bool
+    {
+        static $hasColumn = null;
+        if ($hasColumn !== null) {
+            return $hasColumn;
+        }
+        try {
+            $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
+            $hasColumn = (bool) $stmt->fetch();
+        } catch (Throwable) {
+            $hasColumn = false;
+        }
+        return $hasColumn;
+    }
+}
+
 if (!function_exists('render_shop_app_page')) {
     function render_shop_app_page(array $user, string $shopType, string $pageTitle, string $heading, string $scaffoldCopy, bool $showFirstNav = false): void
     {
@@ -65,6 +82,7 @@ if (!function_exists('render_shop_app_page')) {
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         $hasReturnDateColumn = shop_has_order_line_return_date_column();
+        $hasSubcategoryColumn = shop_has_inventory_subcategory_column();
         if (!in_array($currentTab, $allowedTabs, true)) {
             $currentTab = 'info';
         }
@@ -344,19 +362,19 @@ if (!function_exists('render_shop_app_page')) {
                     $ensureStmt->execute([$selectedRevisionId, $shopType, $selectedRevisionId]);
 
                     if ($hasReturnDateColumn) {
-                        $lineStmt = db()->prepare('SELECT ol.*, ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                        $lineStmt = db()->prepare('SELECT ol.*, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
                             FROM order_lines ol
                             JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                             LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
                             WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ' . ($hasSubcategoryColumn ? 'COALESCE(ii.subcategory_name, "")' : '""') . ', ii.sort_order, ii.name');
                     } else {
-                        $lineStmt = db()->prepare('SELECT ol.*, NULL AS specific_return_date, ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
+                        $lineStmt = db()->prepare('SELECT ol.*, NULL AS specific_return_date, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ii.name AS item_name, ii.sku, ii.unit, ic.name AS category_name
                             FROM order_lines ol
                             JOIN inventory_items ii ON ii.id = ol.inventory_item_id
                             LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
                             WHERE ol.revision_id = ? AND ii.is_spacer = 0
-                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ii.sort_order, ii.name');
+                            ORDER BY COALESCE(ic.sort_order, 9999), COALESCE(ic.name, "Uncategorized"), ' . ($hasSubcategoryColumn ? 'COALESCE(ii.subcategory_name, "")' : '""') . ', ii.sort_order, ii.name');
                     }
                     $lineStmt->execute([$selectedRevisionId]);
                     $lines = $lineStmt->fetchAll();
@@ -365,13 +383,17 @@ if (!function_exists('render_shop_app_page')) {
                         if ($cat === '') {
                             $cat = 'Uncategorized';
                         }
-                        $linesByCategory[$cat][] = $line;
+                        $sub = trim((string) ($line['subcategory_name'] ?? ''));
+                        if ($sub === '') {
+                            $sub = 'General';
+                        }
+                        $linesByCategory[$cat][$sub][] = $line;
                     }
                 }
             }
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $selectedRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -412,14 +434,12 @@ if (!function_exists('render_shop_app_page')) {
                 <?php if ($selectedShow): ?>
                     <div class="shop-workspace-banner mb-3">
                         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                            <div>
-                                <a class="btn btn-outline-danger" href="/dash/home">Exit Show</a>
-                            </div>
                             <div class="text-center flex-fill">
                                 <div class="h1 mb-1"><?= e((string) $selectedShow['show_name']) ?></div>
                                 <div class="h3 mb-0 text-secondary">Revision <?= e($currentRevisionLabel) ?></div>
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
+                                <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
                                 <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=paperwork&preview=1">Export Latest Paperwork</a>
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
@@ -433,6 +453,11 @@ if (!function_exists('render_shop_app_page')) {
                             </div>
                         </div>
                     </div>
+                    <ul class="nav nav-tabs mb-3">
+                        <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
+                            <li class="nav-item"><a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
                 <?php elseif (!$showFirstNav): ?>
                     <form method="get" class="row g-2 align-items-end mb-3">
                         <div class="col-md-12">
@@ -530,83 +555,104 @@ if (!function_exists('render_shop_app_page')) {
                             <p class="mb-0">Use “Export Latest Paperwork” to open print preview.</p>
                         </div></div>
                     <?php else: ?>
-                        <div class="card mb-3">
+                        <div class="card mb-3 paperwork-preview-actions">
                             <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
                                 <a class="btn btn-outline-secondary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($backTab) ?><?= $selectedRevisionId > 0 ? '&revision=' . (int) $selectedRevisionId : '' ?>">Back to Show</a>
                                 <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
                             </div>
                         </div>
+                        <?php
+                        $previewRows = [];
+                        foreach ($linesByCategory as $category => $subGroups) {
+                            foreach ($subGroups as $subcategory => $lines) {
+                                $previewRows[] = ['__type' => 'subcategory', 'category' => $category, 'subcategory' => $subcategory];
+                                foreach ($lines as $line) {
+                                    $previewRows[] = ['__type' => 'line', 'category' => $category, 'subcategory' => $subcategory, 'line' => $line];
+                                }
+                            }
+                        }
+                        $rowsPerPage = 28;
+                        $previewPages = array_chunk($previewRows, $rowsPerPage);
+                        if (!$previewPages) {
+                            $previewPages = [[]];
+                        }
+                        ?>
                         <div class="paperwork-preview-wrap">
-                            <div class="paperwork-page">
-                                <div class="paperwork-top">
-                                    <div>
-                                        <h2 class="paperwork-title"><?= e($headerText) ?></h2>
-                                        <div class="paperwork-subtitle"><?= e((string) $selectedShow['show_name']) ?> · Revision <?= e($currentRevisionLabel) ?></div>
+                            <?php foreach ($previewPages as $pageIndex => $pageRows): ?>
+                                <div class="paperwork-page-break"></div>
+                                <div class="paperwork-page">
+                                    <div class="paperwork-top">
+                                        <div>
+                                            <h2 class="paperwork-title"><?= e($headerText) ?></h2>
+                                            <div class="paperwork-subtitle"><?= e((string) $selectedShow['show_name']) ?> · Revision <?= e($currentRevisionLabel) ?></div>
+                                        </div>
+                                        <div class="paperwork-org"><?= e($organizationText) ?> · Page <?= (int) ($pageIndex + 1) ?> / <?= count($previewPages) ?></div>
                                     </div>
-                                    <div class="paperwork-org"><?= e($organizationText) ?></div>
+                                    <table class="paperwork-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Item</th>
+                                                <?php if ($shopType === 'snd'): ?><th>SKU</th><?php endif; ?>
+                                                <th>Used</th>
+                                                <th>Spare</th>
+                                                <th>Total</th>
+                                                <th>Unit</th>
+                                                <th>Action</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($pageRows as $row): ?>
+                                                <?php if (($row['__type'] ?? '') === 'subcategory'): ?>
+                                                    <tr><td colspan="<?= $shopType === 'snd' ? '9' : '8' ?>" class="paperwork-category-row"><?= e((string) ($row['category'] ?? '')) ?><?php if ((string) ($row['subcategory'] ?? '') !== ''): ?> <span class="paperwork-subcat">› <?= e((string) ($row['subcategory'] ?? '')) ?></span><?php endif; ?></td></tr>
+                                                <?php else: ?>
+                                                    <?php
+                                                    $line = $row['line'] ?? [];
+                                                    $noteParts = [];
+                                                    $lineNote = trim((string) ($line['line_note'] ?? ''));
+                                                    if ($lineNote !== '') {
+                                                        $noteParts[] = $lineNote;
+                                                    }
+                                                    $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
+                                                    if ($pullDate !== '') {
+                                                        $noteParts[] = 'Pull: ' . $pullDate;
+                                                    }
+                                                    $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
+                                                    if ($returnDate !== '') {
+                                                        $noteParts[] = 'Return: ' . $returnDate;
+                                                    }
+                                                    $qty = (int) ($line['qty'] ?? 0);
+                                                    $spares = (int) ($line['spares'] ?? 0);
+                                                    ?>
+                                                    <tr>
+                                                        <td><?= e((string) ($row['category'] ?? '')) ?></td>
+                                                        <td><?= e((string) ($line['item_name'] ?? '')) ?></td>
+                                                        <?php if ($shopType === 'snd'): ?><td><?= e((string) ($line['sku'] ?? '')) ?></td><?php endif; ?>
+                                                        <td><?= $qty ?></td>
+                                                        <td><?= $spares ?></td>
+                                                        <td><?= $qty + $spares ?></td>
+                                                        <td><?= e((string) ($line['unit'] ?? '')) ?></td>
+                                                        <td><?= e((string) ($line['action_code'] ?? 'blank')) ?></td>
+                                                        <td><?= e(implode(' | ', $noteParts)) ?></td>
+                                                    </tr>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                    <?php if ($defaultNotes && $pageIndex === count($previewPages) - 1): ?>
+                                        <div class="paperwork-notes">
+                                            <h3>Important Notes</h3>
+                                            <ul>
+                                                <?php foreach ($defaultNotes as $note): ?>
+                                                    <li><?= e($note) ?></li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="paperwork-footer"><?= e($footerText) ?></div>
                                 </div>
-                                <table class="paperwork-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Category</th>
-                                            <th>Item</th>
-                                            <?php if ($shopType === 'snd'): ?><th>SKU</th><?php endif; ?>
-                                            <th>Used</th>
-                                            <th>Spare</th>
-                                            <th>Total</th>
-                                            <th>Unit</th>
-                                            <th>Action</th>
-                                            <th>Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($linesByCategory as $category => $lines): ?>
-                                            <tr><td colspan="<?= $shopType === 'snd' ? '9' : '8' ?>" class="paperwork-category-row"><?= e($category) ?></td></tr>
-                                            <?php foreach ($lines as $line): ?>
-                                                <?php
-                                                $noteParts = [];
-                                                $lineNote = trim((string) ($line['line_note'] ?? ''));
-                                                if ($lineNote !== '') {
-                                                    $noteParts[] = $lineNote;
-                                                }
-                                                $pullDate = trim((string) ($line['specific_pull_date'] ?? ''));
-                                                if ($pullDate !== '') {
-                                                    $noteParts[] = 'Pull: ' . $pullDate;
-                                                }
-                                                $returnDate = trim((string) ($line['specific_return_date'] ?? ''));
-                                                if ($returnDate !== '') {
-                                                    $noteParts[] = 'Return: ' . $returnDate;
-                                                }
-                                                $qty = (int) ($line['qty'] ?? 0);
-                                                $spares = (int) ($line['spares'] ?? 0);
-                                                ?>
-                                                <tr>
-                                                    <td><?= e((string) $category) ?></td>
-                                                    <td><?= e((string) ($line['item_name'] ?? '')) ?></td>
-                                                    <?php if ($shopType === 'snd'): ?><td><?= e((string) ($line['sku'] ?? '')) ?></td><?php endif; ?>
-                                                    <td><?= $qty ?></td>
-                                                    <td><?= $spares ?></td>
-                                                    <td><?= $qty + $spares ?></td>
-                                                    <td><?= e((string) ($line['unit'] ?? '')) ?></td>
-                                                    <td><?= e((string) ($line['action_code'] ?? 'blank')) ?></td>
-                                                    <td><?= e(implode(' | ', $noteParts)) ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                                <?php if ($defaultNotes): ?>
-                                    <div class="paperwork-notes">
-                                        <h3>Important Notes</h3>
-                                        <ul>
-                                            <?php foreach ($defaultNotes as $note): ?>
-                                                <li><?= e($note) ?></li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="paperwork-footer"><?= e($footerText) ?></div>
-                            </div>
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
@@ -666,7 +712,8 @@ if (!function_exists('render_shop_app_page')) {
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
                                             <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
-                                            <?php foreach ($linesByCategory as $category => $lines): ?>
+                                            <?php foreach ($linesByCategory as $category => $subGroups): ?>
+                                                <?php $lineCount = 0; foreach ($subGroups as $subLinesForCount) { $lineCount += count($subLinesForCount); } ?>
                                                 <?php $categoryKey = 'rev-cat-' . substr(md5($category), 0, 12); ?>
                                                 <tbody>
                                                     <tr class="category-header-row shop-category-header" data-target="<?= e($categoryKey) ?>" data-expanded="0">
@@ -674,48 +721,52 @@ if (!function_exists('render_shop_app_page')) {
                                                             <button type="button" class="btn btn-ghost-secondary btn-sm js-toggle-category">
                                                                 <span class="shop-category-toggle-icon me-1">▶</span>
                                                                 <strong><?= e($category) ?></strong>
-                                                                <span class="badge bg-secondary-lt ms-2"><?= count($lines) ?></span>
+                                                                <span class="badge bg-secondary-lt ms-2"><?= (int) $lineCount ?></span>
                                                             </button>
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
-                                                <?php foreach ($lines as $line): ?>
-                                                    <?php
-                                                    $searchBlob = strtolower(trim(implode(' ', [
-                                                        (string) $category,
-                                                        (string) ($line['item_name'] ?? ''),
-                                                        (string) ($line['sku'] ?? ''),
-                                                        (string) ($line['line_note'] ?? ''),
-                                                    ])));
-                                                    ?>
-                                                    <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
-                                                        <td><?= e($category) ?></td>
-                                                        <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
-                                                        <td>
-                                                            <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
-                                                            <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
-                                                        </td>
-                                                        <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
-                                                        <td><span class="badge bg-azure-lt js-row-total">0</span></td>
-                                                        <td>
-                                                            <select class="form-select js-live-field" name="action_code[]">
-                                                                <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
-                                                                    <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
-                                                                <?php endforeach; ?>
-                                                            </select>
-                                                        </td>
-                                                        <td>
-                                                            <details>
-                                                                <summary class="text-primary">Pull/Return</summary>
-                                                                <div class="mt-2 d-grid gap-2">
-                                                                    <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
-                                                                    <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
-                                                                </div>
-                                                            </details>
-                                                        </td>
-                                                        <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
-                                                    </tr>
+                                                <?php foreach ($subGroups as $subcategory => $lines): ?>
+                                                    <tr class="shop-subcategory-row"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <?php foreach ($lines as $line): ?>
+                                                        <?php
+                                                        $searchBlob = strtolower(trim(implode(' ', [
+                                                            (string) $category,
+                                                            (string) $subcategory,
+                                                            (string) ($line['item_name'] ?? ''),
+                                                            (string) ($line['sku'] ?? ''),
+                                                            (string) ($line['line_note'] ?? ''),
+                                                        ])));
+                                                        ?>
+                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
+                                                            <td><?= e($category) ?></td>
+                                                            <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
+                                                            <td>
+                                                                <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
+                                                                <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                            </td>
+                                                            <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                            <td><span class="badge bg-azure-lt js-row-total">0</span></td>
+                                                            <td>
+                                                                <select class="form-select js-live-field" name="action_code[]">
+                                                                    <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
+                                                                        <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <details>
+                                                                    <summary class="text-primary">Pull/Return</summary>
+                                                                    <div class="mt-2 d-grid gap-2">
+                                                                        <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
+                                                                        <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
+                                                                    </div>
+                                                                </details>
+                                                            </td>
+                                                            <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
                                                 <?php endforeach; ?>
                                                 </tbody>
                                             <?php endforeach; ?>
@@ -780,7 +831,8 @@ if (!function_exists('render_shop_app_page')) {
                                     <div class="table-responsive">
                                         <table class="table table-vcenter">
                                             <thead><tr><th style="width: 18%">Category</th><th>Item</th><th style="width: 90px">Qty</th><th style="width: 90px">Spares</th><th style="width: 90px">Total</th><th style="width: 140px">Action</th><th style="width: 220px">Dates</th><th>Note</th></tr></thead>
-                                            <?php foreach ($linesByCategory as $category => $lines): ?>
+                                            <?php foreach ($linesByCategory as $category => $subGroups): ?>
+                                                <?php $lineCount = 0; foreach ($subGroups as $subLinesForCount) { $lineCount += count($subLinesForCount); } ?>
                                                 <?php $categoryKey = 'init-cat-' . substr(md5($category), 0, 12); ?>
                                                 <tbody>
                                                     <tr class="category-header-row shop-category-header" data-target="<?= e($categoryKey) ?>" data-expanded="0">
@@ -788,48 +840,52 @@ if (!function_exists('render_shop_app_page')) {
                                                             <button type="button" class="btn btn-ghost-secondary btn-sm js-toggle-category">
                                                                 <span class="shop-category-toggle-icon me-1">▶</span>
                                                                 <strong><?= e($category) ?></strong>
-                                                                <span class="badge bg-secondary-lt ms-2"><?= count($lines) ?></span>
+                                                                <span class="badge bg-secondary-lt ms-2"><?= (int) $lineCount ?></span>
                                                             </button>
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                                 <tbody id="<?= e($categoryKey) ?>" class="shop-category-group" data-category="<?= e(strtolower($category)) ?>" style="display:none;">
-                                                <?php foreach ($lines as $line): ?>
-                                                    <?php
-                                                    $searchBlob = strtolower(trim(implode(' ', [
-                                                        (string) $category,
-                                                        (string) ($line['item_name'] ?? ''),
-                                                        (string) ($line['sku'] ?? ''),
-                                                        (string) ($line['line_note'] ?? ''),
-                                                    ])));
-                                                    ?>
-                                                    <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
-                                                        <td><?= e($category) ?></td>
-                                                        <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
-                                                        <td>
-                                                            <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
-                                                            <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
-                                                        </td>
-                                                        <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
-                                                        <td><span class="badge bg-azure-lt js-row-total">0</span></td>
-                                                        <td>
-                                                            <select class="form-select js-live-field" name="action_code[]">
-                                                                <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
-                                                                    <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
-                                                                <?php endforeach; ?>
-                                                            </select>
-                                                        </td>
-                                                        <td>
-                                                            <details>
-                                                                <summary class="text-primary">Pull/Return</summary>
-                                                                <div class="mt-2 d-grid gap-2">
-                                                                    <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
-                                                                    <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
-                                                                </div>
-                                                            </details>
-                                                        </td>
-                                                        <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
-                                                    </tr>
+                                                <?php foreach ($subGroups as $subcategory => $lines): ?>
+                                                    <tr class="shop-subcategory-row"><td colspan="8"><span class="badge bg-blue-lt"><?= e($subcategory) ?></span></td></tr>
+                                                    <?php foreach ($lines as $line): ?>
+                                                        <?php
+                                                        $searchBlob = strtolower(trim(implode(' ', [
+                                                            (string) $category,
+                                                            (string) $subcategory,
+                                                            (string) ($line['item_name'] ?? ''),
+                                                            (string) ($line['sku'] ?? ''),
+                                                            (string) ($line['line_note'] ?? ''),
+                                                        ])));
+                                                        ?>
+                                                        <tr class="shop-line-row" data-line-id="<?= (int) $line['id'] ?>" data-search="<?= e($searchBlob) ?>">
+                                                            <td><?= e($category) ?></td>
+                                                            <td><?= e((string) $line['item_name']) ?><?php if ($shopType === 'snd' && (string) $line['sku'] !== ''): ?> <span class="text-secondary small">(<?= e((string) $line['sku']) ?>)</span><?php endif; ?></td>
+                                                            <td>
+                                                                <input type="hidden" name="line_id[]" value="<?= (int) $line['id'] ?>">
+                                                                <input class="form-control js-live-field js-qty" type="number" min="0" name="qty[]" value="<?= (int) $line['qty'] ?>">
+                                                            </td>
+                                                            <td><input class="form-control js-live-field js-spares" type="number" min="0" name="spares[]" value="<?= (int) $line['spares'] ?>"></td>
+                                                            <td><span class="badge bg-azure-lt js-row-total">0</span></td>
+                                                            <td>
+                                                                <select class="form-select js-live-field" name="action_code[]">
+                                                                    <?php foreach (['blank' => '—', 'add' => 'Add', 'return' => 'Return', 'exchange' => 'Exchange', 'notes' => 'Notes'] as $value => $label): ?>
+                                                                        <option value="<?= e($value) ?>" <?= ((string) $line['action_code'] === $value) ? 'selected' : '' ?>><?= e($label) ?></option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <details>
+                                                                    <summary class="text-primary">Pull/Return</summary>
+                                                                    <div class="mt-2 d-grid gap-2">
+                                                                        <input class="form-control js-live-field" type="date" name="specific_pull_date[]" value="<?= e((string) ($line['specific_pull_date'] ?? '')) ?>" aria-label="Specific pull date">
+                                                                        <input class="form-control js-live-field" type="date" name="specific_return_date[]" value="<?= e((string) ($line['specific_return_date'] ?? '')) ?>" aria-label="Specific return date">
+                                                                    </div>
+                                                                </details>
+                                                            </td>
+                                                            <td><input class="form-control js-live-field" name="line_note[]" value="<?= e((string) $line['line_note']) ?>"></td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
                                                 <?php endforeach; ?>
                                                 </tbody>
                                             <?php endforeach; ?>

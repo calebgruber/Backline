@@ -109,10 +109,26 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   color: #94a3b8 !important;
 }
 
+.shop-subcategory-row td {
+  background: rgba(59, 130, 246, .08);
+  border-top: 1px solid rgba(59, 130, 246, .18);
+}
+
 .paperwork-preview-wrap {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 1rem 0 2rem;
+}
+
+.paperwork-page-break {
+  width: 8.5in;
+  border-top: 2px dashed rgba(148, 163, 184, .75);
+  margin: .75rem auto;
+}
+
+.paperwork-page-break:first-child {
+  display: none;
 }
 
 .paperwork-page {
@@ -170,6 +186,11 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
   font-weight: 700;
 }
 
+.paperwork-subcat {
+  color: #4b5563;
+  font-weight: 500;
+}
+
 .paperwork-notes {
   margin-top: .22in;
 }
@@ -212,6 +233,10 @@ html[data-bs-theme="dark"] .card.card-title-enhanced {
 
   .paperwork-preview-wrap {
     padding: 0 !important;
+  }
+
+  .paperwork-page-break {
+    display: none !important;
   }
 
   .paperwork-page {

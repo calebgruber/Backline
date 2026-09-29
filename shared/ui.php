@@ -178,6 +178,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     </header>
 
     <?php if ($user): ?>
+    <?php $showWorkspaceOwnTabs = ($isLxAppContext || $isSndAppContext) && $selectedShopShowId > 0; ?>
+    <?php if (!$showWorkspaceOwnTabs): ?>
     <header class="navbar-expand-md">
         <div class="collapse navbar-collapse" id="navbar-menu">
             <div class="navbar">
@@ -217,6 +219,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
             </div>
         </div>
     </header>
+    <?php endif; ?>
     <?php endif; ?>
 
     <div class="page-wrapper">

@@ -16,6 +16,21 @@ if (!function_exists('app_config')) {
 
 $user = require_permission('inventory.manage');
 
+function inventory_has_subcategory_column(): bool
+{
+    static $hasColumn = null;
+    if ($hasColumn !== null) {
+        return $hasColumn;
+    }
+    try {
+        $stmt = db()->query("SHOW COLUMNS FROM inventory_items LIKE 'subcategory_name'");
+        $hasColumn = (bool) $stmt->fetch();
+    } catch (Throwable) {
+        $hasColumn = false;
+    }
+    return $hasColumn;
+}
+
 function parse_import_rows(string $shop, string $text): array
 {
     $lines = preg_split('/\r\n|\r|\n/', trim($text));
@@ -58,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
     $shop = post('shop_type');
+    $hasSubcategoryColumn = inventory_has_subcategory_column();
 
     if ($action === 'create_item') {
         $requestedSortOrder = (int) post('sort_order', '0');
@@ -66,30 +82,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nextSortStmt->execute([$shop]);
             $requestedSortOrder = (int) $nextSortStmt->fetchColumn();
         }
-        $stmt = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
-        $stmt->execute([
-            $shop,
-            (int) post('category_id', '0') ?: null,
-            post('name'),
-            $shop === 'snd' ? (post('sku') ?: null) : null,
-            (int) post('shop_quantity', '0'),
-            post('unit', 'ea'),
-            '',
-            post('description'),
-            isset($_POST['is_spacer']) ? 1 : 0,
-            $requestedSortOrder,
-        ]);
+        if ($hasSubcategoryColumn) {
+            $stmt = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, subcategory_name, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+            $stmt->execute([
+                $shop,
+                (int) post('category_id', '0') ?: null,
+                ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null,
+                post('name'),
+                $shop === 'snd' ? (post('sku') ?: null) : null,
+                (int) post('shop_quantity', '0'),
+                post('unit', 'ea'),
+                '',
+                post('description'),
+                isset($_POST['is_spacer']) ? 1 : 0,
+                $requestedSortOrder,
+            ]);
+        } else {
+            $stmt = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+            $stmt->execute([
+                $shop,
+                (int) post('category_id', '0') ?: null,
+                post('name'),
+                $shop === 'snd' ? (post('sku') ?: null) : null,
+                (int) post('shop_quantity', '0'),
+                post('unit', 'ea'),
+                '',
+                post('description'),
+                isset($_POST['is_spacer']) ? 1 : 0,
+                $requestedSortOrder,
+            ]);
+        }
         flash_set('success', strtoupper($shop) . ' item created.');
     }
 
     if ($action === 'update_item') {
         if ($shop === 'snd') {
-            $stmt = db()->prepare('UPDATE inventory_items
+            $sql = $hasSubcategoryColumn
+                ? 'UPDATE inventory_items
+                SET category_id = ?, subcategory_name = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                WHERE id = ? AND shop_type = ?'
+                : 'UPDATE inventory_items
                 SET category_id = ?, name = ?, sku = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?');
-            $stmt->execute([
+                WHERE id = ? AND shop_type = ?';
+            $stmt = db()->prepare($sql);
+            $params = [
                 (int) post('category_id', '0') ?: null,
+            ];
+            if ($hasSubcategoryColumn) {
+                $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
+            }
+            $params = array_merge($params, [
                 post('name'),
                 post('sku') ?: null,
                 (int) post('shop_quantity', '0'),
@@ -100,12 +144,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int) post('id'),
                 $shop,
             ]);
+            $stmt->execute($params);
         } else {
-            $stmt = db()->prepare('UPDATE inventory_items
+            $sql = $hasSubcategoryColumn
+                ? 'UPDATE inventory_items
+                SET category_id = ?, subcategory_name = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
+                WHERE id = ? AND shop_type = ?'
+                : 'UPDATE inventory_items
                 SET category_id = ?, name = ?, shop_quantity = ?, unit = ?, description = ?, is_spacer = ?, sort_order = ?, updated_at = NOW()
-                WHERE id = ? AND shop_type = ?');
-            $stmt->execute([
+                WHERE id = ? AND shop_type = ?';
+            $stmt = db()->prepare($sql);
+            $params = [
                 (int) post('category_id', '0') ?: null,
+            ];
+            if ($hasSubcategoryColumn) {
+                $params[] = ($subcat = trim(post('subcategory_name', ''))) !== '' ? $subcat : null;
+            }
+            $params = array_merge($params, [
                 post('name'),
                 (int) post('shop_quantity', '0'),
                 post('unit', 'ea'),
@@ -115,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int) post('id'),
                 $shop,
             ]);
+            $stmt->execute($params);
         }
         flash_set('success', 'Item updated.');
     }
@@ -150,8 +206,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $catId = (int) db()->lastInsertId();
                 $nextCategorySortOrder++;
             }
-            $ins = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())');
+            if ($hasSubcategoryColumn) {
+                $ins = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, subcategory_name, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())');
+            } else {
+                $ins = db()->prepare('INSERT INTO inventory_items (shop_type, category_id, name, sku, shop_quantity, unit, default_note, description, is_spacer, sort_order, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())');
+            }
             $ins->execute([$shop, $catId ?: null, $row['name'], $row['sku'], $row['shop_quantity'], $row['unit'], '', $row['description'], $nextItemSortOrder]);
             $nextItemSortOrder++;
         }
@@ -177,8 +238,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('/admin/inventory');
 }
 
+$hasSubcategoryColumn = inventory_has_subcategory_column();
 $cats = db()->query('SELECT id, shop_type, name FROM inventory_categories ORDER BY shop_type, sort_order, name')->fetchAll();
-$items = db()->query('SELECT ii.*, ic.name AS category_name, ic.sort_order AS category_sort_order
+$items = db()->query('SELECT ii.*, ' . ($hasSubcategoryColumn ? 'ii.subcategory_name,' : 'NULL AS subcategory_name,') . ' ic.name AS category_name, ic.sort_order AS category_sort_order
     FROM inventory_items ii
     LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
     ORDER BY ii.shop_type, COALESCE(ic.sort_order, 2147483647), COALESCE(ic.name, ""), ii.sort_order, ii.id')->fetchAll();
@@ -195,7 +257,7 @@ foreach ($items as $item) {
     }
     $itemsGroupedByShopCategory[$shop][$group][] = $item;
 }
-render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCategory): void {
+render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCategory, $hasSubcategoryColumn): void {
     $shops = [
         'lx' => 'Lighting Inventory',
         'snd' => 'Sound Inventory',
@@ -232,6 +294,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                         <input type="hidden" name="action" value="create_item">
                                         <input type="hidden" name="shop_type" value="<?= e($shopKey) ?>">
                                         <div class="mb-2"><select class="form-select" name="category_id"><option value="">No category</option><?php foreach($catsByShop[$shopKey] as $cat): ?><option value="<?= (int)$cat['id'] ?>"><?= e($cat['name']) ?></option><?php endforeach; ?></select></div>
+                                        <?php if ($hasSubcategoryColumn): ?><div class="mb-2"><input class="form-control" name="subcategory_name" placeholder="Subcategory (optional)"></div><?php endif; ?>
                                         <div class="mb-2"><input class="form-control" name="name" placeholder="Name" required></div>
                                         <?php if ($shopKey === 'snd'): ?><div class="mb-2"><input class="form-control" name="sku" placeholder="SKU"></div><?php endif; ?>
                                         <div class="row g-2"><div class="col"><input class="form-control" type="number" name="shop_quantity" placeholder="Qty"></div><div class="col"><input class="form-control" name="unit" placeholder="Unit" value="ea"></div></div>
@@ -273,11 +336,11 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter inventory-table">
-                                <thead><tr><th class="w-1"></th><th>Category</th><th>Name</th><?php if ($shopKey === 'snd'): ?><th>SKU</th><?php endif; ?><th>Qty</th><th>Unit</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
+                                <thead><tr><th class="w-1"></th><th>Category</th><?php if ($hasSubcategoryColumn): ?><th>Subcategory</th><?php endif; ?><th>Name</th><?php if ($shopKey === 'snd'): ?><th>SKU</th><?php endif; ?><th>Qty</th><th>Unit</th><th>Description</th><th>Spacer</th><th>Sort</th><th class="text-end">Actions</th></tr></thead>
                                 <?php foreach ($itemsGroupedByShopCategory[$shopKey] as $categoryName => $groupItems): ?>
                                 <tbody>
                                     <tr class="category-header-row" data-target="cat-<?= e($shopKey) ?>-<?= md5($categoryName) ?>" data-category-name="<?= e($categoryName) ?>" data-shop="<?= e($shopKey) ?>">
-                                        <td colspan="<?= $shopKey === 'snd' ? '10' : '9' ?>">
+                                        <td colspan="<?= $shopKey === 'snd' ? ($hasSubcategoryColumn ? '11' : '10') : ($hasSubcategoryColumn ? '10' : '9') ?>">
                                             <button type="button" class="btn btn-link p-0 text-reset category-toggle-btn"><i class="ti ti-chevron-right me-2"></i><i class="ti ti-folder me-1"></i><strong><?= e($categoryName) ?></strong></button>
                                         </td>
                                     </tr>
@@ -298,6 +361,7 @@ render_page('Inventory', function () use ($catsByShop, $itemsGroupedByShopCatego
                                                     <?php endforeach; ?>
                                                 </select>
                                             </td>
+                                            <?php if ($hasSubcategoryColumn): ?><td><input class="form-control" name="subcategory_name" value="<?= e((string) ($item['subcategory_name'] ?? '')) ?>" form="item-update-<?= (int) $item['id'] ?>"></td><?php endif; ?>
                                             <td><input class="form-control" name="name" value="<?= e($item['name']) ?>" form="item-update-<?= (int) $item['id'] ?>" required></td>
                                             <?php if ($shopKey === 'snd'): ?><td><input class="form-control" name="sku" value="<?= e((string) $item['sku']) ?>" form="item-update-<?= (int) $item['id'] ?>"></td><?php endif; ?>
                                             <td><input class="form-control" type="number" name="shop_quantity" value="<?= (int) $item['shop_quantity'] ?>" form="item-update-<?= (int) $item['id'] ?>"></td>
