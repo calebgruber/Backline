@@ -112,6 +112,9 @@ if (!function_exists('find_show')) {
         $show['assistant_shop_manager_name'] = (string) (($assistants['assistant_shop_manager']['name'] ?? '') ?: '');
         $show['assistant_shop_manager_email'] = (string) (($assistants['assistant_shop_manager']['email'] ?? '') ?: '');
         $show['assistant_shop_manager_phone'] = (string) (($assistants['assistant_shop_manager']['phone'] ?? '') ?: '');
+        $show['production_electrician_name'] = (string) (($show['production_contact_name'] ?? '') ?: ($show['shop_manager_name'] ?? ''));
+        $show['production_electrician_email'] = (string) (($show['production_contact_email'] ?? '') ?: ($show['shop_manager_email'] ?? ''));
+        $show['production_electrician_phone'] = (string) (($show['production_contact_phone'] ?? '') ?: ($show['shop_manager_phone'] ?? ''));
         $show['concentration'] = $shopConcentration;
         $show['show_image_url'] = (string) ($show['show_image_path'] ?? '');
         return $show;
@@ -847,6 +850,7 @@ if ($includeBrandingLogo && function_exists('first_existing_brand_asset')) {
         $brandingLogoUrl = export_url('/uploads/branding/' . basename($brandingFile));
     }
 }
+$renderPairedFooterLogos = $coverFooterLogoUrl !== '' && $brandingLogoUrl !== '' && $coverFooterLogoUrl !== $brandingLogoUrl;
 $coverPreparedByName = trim((string) ($layout['layout.cover_prepared_by_name'] ?? ''));
 if ($coverPreparedByName === '') {
     $coverPreparedByName = (string) (($user['display_name'] ?? $user['email'] ?? ''));
@@ -1316,6 +1320,10 @@ $productionLabel = show_concentration($show) === 'sound' ? 'Production Audio' : 
       max-width: 2.2in;
       max-height: 0.8in;
     }
+    .cover-footer-logo-match-size img {
+      max-width: 2.2in;
+      max-height: 0.8in;
+    }
     .cover-footer-prepared-by {
       font-weight: 600;
       text-align: center;
@@ -1359,7 +1367,7 @@ $productionLabel = show_concentration($show) === 'sound' ? 'Production Audio' : 
       </div>
 
       <div class="footer cover-footer">
-        <?php if ($coverFooterLogoUrl !== '' && $brandingLogoUrl !== ''): ?>
+        <?php if ($renderPairedFooterLogos): ?>
         <div class="cover-footer-logos">
           <div class="cover-footer-logo"><img src="<?= h($coverFooterLogoUrl) ?>" alt="Cover footer logo"></div>
           <div class="cover-footer-logo"><img src="<?= h($brandingLogoUrl) ?>" alt="Backline branding logo"></div>
@@ -1367,7 +1375,7 @@ $productionLabel = show_concentration($show) === 'sound' ? 'Production Audio' : 
         <?php elseif ($coverFooterLogoUrl !== ''): ?>
         <div class="cover-footer-logo"><img src="<?= h($coverFooterLogoUrl) ?>" alt="Cover footer logo"></div>
         <?php elseif ($brandingLogoUrl !== ''): ?>
-        <div class="cover-footer-logo"><img src="<?= h($brandingLogoUrl) ?>" alt="Backline branding logo"></div>
+        <div class="cover-footer-logo cover-footer-logo-match-size"><img src="<?= h($brandingLogoUrl) ?>" alt="Backline branding logo"></div>
         <?php endif; ?>
         <?php if ($coverPreparedByName !== ''): ?><div class="cover-footer-prepared-by">Prepared by: <?= h($coverPreparedByName) ?></div><?php endif; ?>
         <?php if ($coverPreparedByName === '' && $globalFooterText !== ''): ?><span><?= h($globalFooterText) ?></span><?php endif; ?>

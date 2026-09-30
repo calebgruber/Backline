@@ -136,15 +136,35 @@ if (!function_exists('render_shop_app_page')) {
     {
         $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
+        $hasShowAccessTable = show_user_access_table_exists();
         $showListStmt = $isAdmin
             ? (function () use ($shopType) {
-                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address, show_image_path FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
-                $stmt->execute([$shopType]);
+                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, production_contact_name, production_contact_email, production_contact_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address, show_image_path, owner_user_id FROM shows WHERE deleted_at IS NULL ORDER BY show_name');
+                $stmt->execute();
                 return $stmt;
             })()
-            : (function () use ($user, $shopType) {
-                $stmt = db()->prepare('SELECT id, show_name, show_scope, theatre_name, shop_name, lead_designer_name, lead_designer_email, lead_designer_phone, ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone, shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date, opening_date, closing_date, theatre_address, shop_address, show_image_path FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both", ?) ORDER BY show_name');
-                $stmt->execute([(int) $user['id'], $shopType]);
+            : (function () use ($user, $hasShowAccessTable) {
+                if ($hasShowAccessTable) {
+                    $stmt = db()->prepare('SELECT s.id, s.show_name, s.show_scope, s.theatre_name, s.shop_name, s.lead_designer_name, s.lead_designer_email, s.lead_designer_phone, s.ald_name, s.ald_email, s.ald_phone, s.assistant_snd_designer_name, s.assistant_snd_designer_email, s.assistant_snd_designer_phone, s.production_contact_name, s.production_contact_email, s.production_contact_phone, s.shop_manager_name, s.shop_manager_email, s.shop_manager_phone, s.assistants_json, s.pull_date, s.return_date, s.strike_date, s.opening_date, s.closing_date, s.theatre_address, s.shop_address, s.show_image_path, s.owner_user_id
+                        FROM shows s
+                        WHERE s.deleted_at IS NULL
+                          AND (
+                            s.owner_user_id = ?
+                            OR EXISTS (
+                                SELECT 1
+                                FROM show_user_access sua
+                                WHERE sua.show_id = s.id AND sua.user_id = ?
+                            )
+                          )
+                        ORDER BY s.show_name');
+                    $stmt->execute([(int) $user['id'], (int) $user['id']]);
+                } else {
+                    $stmt = db()->prepare('SELECT s.id, s.show_name, s.show_scope, s.theatre_name, s.shop_name, s.lead_designer_name, s.lead_designer_email, s.lead_designer_phone, s.ald_name, s.ald_email, s.ald_phone, s.assistant_snd_designer_name, s.assistant_snd_designer_email, s.assistant_snd_designer_phone, s.production_contact_name, s.production_contact_email, s.production_contact_phone, s.shop_manager_name, s.shop_manager_email, s.shop_manager_phone, s.assistants_json, s.pull_date, s.return_date, s.strike_date, s.opening_date, s.closing_date, s.theatre_address, s.shop_address, s.show_image_path, s.owner_user_id
+                        FROM shows s
+                        WHERE s.deleted_at IS NULL AND s.owner_user_id = ?
+                        ORDER BY s.show_name');
+                    $stmt->execute([(int) $user['id']]);
+                }
                 return $stmt;
             })();
         $shows = $showListStmt->fetchAll();
@@ -164,7 +184,11 @@ if (!function_exists('render_shop_app_page')) {
             $selectedShowId = 0;
         }
 
-        $showAccessCondition = $isAdmin ? '' : ' AND s.owner_user_id = ' . (int) $user['id'] . ' AND COALESCE(s.show_scope, "both") IN ("both", ' . db()->quote($shopType) . ')';
+        $showAccessCondition = $isAdmin
+            ? ''
+            : ($hasShowAccessTable
+                ? ' AND (s.owner_user_id = ' . (int) $user['id'] . ' OR EXISTS (SELECT 1 FROM show_user_access sua WHERE sua.show_id = s.id AND sua.user_id = ' . (int) $user['id'] . '))'
+                : ' AND s.owner_user_id = ' . (int) $user['id']);
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork', 'exports'];
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         $hasReturnDateColumn = shop_has_order_line_return_date_column();
@@ -453,6 +477,40 @@ if (!function_exists('render_shop_app_page')) {
                 flash_set('success', 'Paperwork options saved.');
             }
 
+            if ($action === 'invite_user' && $selectedShowId > 0 && $selectedShow) {
+                if (!$hasShowAccessTable) {
+                    flash_set('warning', 'Run pending migrations before inviting users to shows.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
+                $isShowOwner = (int) ($selectedShow['owner_user_id'] ?? 0) === (int) $user['id'];
+                if (!$isAdmin && !$isShowOwner) {
+                    flash_set('danger', 'Only the show owner or admins can invite users to this show.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
+                $inviteUserId = (int) post('invite_user_id', '0');
+                if ($inviteUserId <= 0) {
+                    flash_set('warning', 'Select a user to invite.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
+                $userCheck = db()->prepare('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+                $userCheck->execute([$inviteUserId]);
+                if (!$userCheck->fetchColumn()) {
+                    flash_set('warning', 'That user no longer exists.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
+                if ($inviteUserId === (int) ($selectedShow['owner_user_id'] ?? 0)) {
+                    flash_set('info', 'Show owners already have access.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
+                $insertInvite = db()->prepare('INSERT IGNORE INTO show_user_access (show_id, user_id, invited_by_user_id, created_at) VALUES (?, ?, ?, NOW())');
+                $insertInvite->execute([$selectedShowId, $inviteUserId, (int) $user['id']]);
+                if ($insertInvite->rowCount() > 0) {
+                    flash_set('success', 'User invited to this show.');
+                } else {
+                    flash_set('info', 'User already has access to this show.');
+                }
+            }
+
             if ($action === 'export_latest' && $selectedShowId > 0) {
                 $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $orderStmt->execute([$selectedShowId, $shopType]);
@@ -497,6 +555,10 @@ if (!function_exists('render_shop_app_page')) {
             $paperworkLayout = array_replace($paperworkLayout, $globalPaperworkOverrides);
         }
         $paperworkOverrides = [];
+        $inviteSearchTerm = trim((string) ($_GET['invite_q'] ?? ''));
+        $inviteCandidates = [];
+        $showAccessUsers = [];
+        $canManageShowAccess = false;
 
         if ($selectedShowId > 0) {
             $orderStmt = db()->prepare('SELECT o.* FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
@@ -624,9 +686,50 @@ if (!function_exists('render_shop_app_page')) {
                 }
             }
             $paperworkLayout = array_replace($paperworkLayout, $paperworkOverrides);
+            if ($selectedShow) {
+                $canManageShowAccess = $isAdmin || ((int) ($selectedShow['owner_user_id'] ?? 0) === (int) $user['id']);
+                if ($hasShowAccessTable) {
+                    $accessStmt = db()->prepare('SELECT u.id, u.name, u.email, CASE WHEN u.id = s.owner_user_id THEN 1 ELSE 0 END AS is_owner
+                        FROM users u
+                        JOIN shows s ON s.id = ?
+                        LEFT JOIN show_user_access sua ON sua.show_id = s.id AND sua.user_id = u.id
+                        WHERE u.deleted_at IS NULL
+                          AND (u.id = s.owner_user_id OR sua.user_id IS NOT NULL)
+                        ORDER BY is_owner DESC, u.name ASC, u.email ASC');
+                    $accessStmt->execute([$selectedShowId]);
+                    $showAccessUsers = $accessStmt->fetchAll();
+
+                    if ($canManageShowAccess && $currentTab === 'info' && $inviteSearchTerm !== '') {
+                        $like = '%' . $inviteSearchTerm . '%';
+                        $candidateStmt = db()->prepare('SELECT u.id, u.name, u.email
+                            FROM users u
+                            LEFT JOIN show_user_access sua ON sua.show_id = ? AND sua.user_id = u.id
+                            WHERE u.deleted_at IS NULL
+                              AND (u.name LIKE ? OR u.email LIKE ?)
+                              AND u.id <> ?
+                              AND sua.user_id IS NULL
+                            ORDER BY u.name ASC, u.email ASC
+                            LIMIT 20');
+                        $candidateStmt->execute([$selectedShowId, $like, $like, (int) ($selectedShow['owner_user_id'] ?? 0)]);
+                        $inviteCandidates = $candidateStmt->fetchAll();
+                    }
+                } else {
+                    $ownerRowStmt = db()->prepare('SELECT id, name, email FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+                    $ownerRowStmt->execute([(int) ($selectedShow['owner_user_id'] ?? 0)]);
+                    $ownerRow = $ownerRowStmt->fetch();
+                    if ($ownerRow) {
+                        $showAccessUsers[] = [
+                            'id' => (int) ($ownerRow['id'] ?? 0),
+                            'name' => (string) ($ownerRow['name'] ?? ''),
+                            'email' => (string) ($ownerRow['email'] ?? ''),
+                            'is_owner' => 1,
+                        ];
+                    }
+                }
+            }
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $initialRevision, $revisionEntries, $exportableRevisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $initialRevision, $revisionEntries, $exportableRevisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout, $canManageShowAccess, $showAccessUsers, $inviteSearchTerm, $inviteCandidates, $hasShowAccessTable): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -735,6 +838,11 @@ if (!function_exists('render_shop_app_page')) {
                                     $assistantEmail,
                                     $assistantPhone,
                                 ], static fn ($v) => $v !== '')));
+                                $productionName = trim((string) (($selectedShow['production_contact_name'] ?? '') ?: ($selectedShow['shop_manager_name'] ?? '')));
+                                $productionContact = implode(' · ', array_values(array_filter([
+                                    trim((string) (($selectedShow['production_contact_email'] ?? '') ?: ($selectedShow['shop_manager_email'] ?? ''))),
+                                    trim((string) (($selectedShow['production_contact_phone'] ?? '') ?: ($selectedShow['shop_manager_phone'] ?? ''))),
+                                ], static fn ($v) => $v !== '')));
                                 $shopManagerContact = implode(' · ', array_values(array_filter([
                                     trim((string) ($selectedShow['shop_manager_email'] ?? '')),
                                     trim((string) ($selectedShow['shop_manager_phone'] ?? '')),
@@ -757,6 +865,8 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="col-md-6"><div class="small text-secondary">Lead Contact</div><div><?= e($leadContact !== '' ? $leadContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant</div><div><?= e($displayOrDash($assistantName)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Contact</div><div><?= e($assistantContact !== '' ? $assistantContact : '—') ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary"><?= e($shopType === 'snd' ? 'Production Audio' : 'Production Electrician') ?></div><div><?= e($displayOrDash($productionName)) ?></div></div>
+                                <div class="col-md-6"><div class="small text-secondary"><?= e(($shopType === 'snd' ? 'Production Audio' : 'Production Electrician') . ' Contact') ?></div><div><?= e($productionContact !== '' ? $productionContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager</div><div><?= e($displayOrDash($selectedShow['shop_manager_name'] ?? null)) ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Shop Manager Contact</div><div><?= e($shopManagerContact !== '' ? $shopManagerContact : '—') ?></div></div>
                                 <div class="col-md-6"><div class="small text-secondary">Assistant Shop Manager</div><div><?= e($assistantShopManagerName !== '' ? $assistantShopManagerName : '—') ?></div></div>
@@ -765,6 +875,70 @@ if (!function_exists('render_shop_app_page')) {
                                 <div class="col-md-6"><div class="small text-secondary">Opening / Closing</div><div><?= e($displayOrDash($selectedShow['opening_date'] ?? null)) ?> / <?= e($displayOrDash($selectedShow['closing_date'] ?? null)) ?></div></div>
                                 <div class="col-12"><div class="small text-secondary">Theatre Address</div><div><?= nl2br(e($displayOrDash($selectedShow['theatre_address'] ?? null))) ?></div></div>
                                 <div class="col-12"><div class="small text-secondary">Shop Address</div><div><?= nl2br(e($displayOrDash($selectedShow['shop_address'] ?? null))) ?></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card mt-3">
+                        <div class="card-header"><h3 class="card-title mb-0">Show Access</h3></div>
+                        <div class="card-body">
+                            <?php if ($canManageShowAccess): ?>
+                                <?php if ($hasShowAccessTable): ?>
+                                    <form method="get" class="row g-2 align-items-end mb-3">
+                                        <input type="hidden" name="show" value="<?= (int) $selectedShowId ?>">
+                                        <input type="hidden" name="tab" value="info">
+                                        <div class="col-md-8">
+                                            <label class="form-label">Search user by name or email</label>
+                                            <input class="form-control" type="search" name="invite_q" value="<?= e($inviteSearchTerm) ?>" placeholder="Start typing a name...">
+                                        </div>
+                                        <div class="col-md-4 d-grid">
+                                            <button class="btn btn-outline-primary" type="submit">Search</button>
+                                        </div>
+                                    </form>
+                                    <?php if ($inviteSearchTerm !== ''): ?>
+                                        <div class="list-group mb-3">
+                                            <?php if (!$inviteCandidates): ?>
+                                                <div class="list-group-item text-secondary">No users found.</div>
+                                            <?php else: ?>
+                                                <?php foreach ($inviteCandidates as $candidate): ?>
+                                                    <div class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                                                        <div>
+                                                            <div class="fw-semibold"><?= e((string) ($candidate['name'] ?? '')) ?></div>
+                                                            <div class="small text-secondary"><?= e((string) ($candidate['email'] ?? '')) ?></div>
+                                                        </div>
+                                                        <form method="post" class="m-0">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="action" value="invite_user">
+                                                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                                            <input type="hidden" name="current_tab" value="info">
+                                                            <input type="hidden" name="invite_user_id" value="<?= (int) $candidate['id'] ?>">
+                                                            <button class="btn btn-primary btn-sm" type="submit">Invite</button>
+                                                        </form>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <div class="alert alert-warning mb-3">Run pending migrations to enable show invites.</div>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                            <div class="table-responsive">
+                                <table class="table table-vcenter">
+                                    <thead><tr><th>User</th><th>Email</th><th>Access</th></tr></thead>
+                                    <tbody>
+                                    <?php if (!$showAccessUsers): ?>
+                                        <tr><td colspan="3" class="text-secondary">No users assigned yet.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($showAccessUsers as $accessUser): ?>
+                                            <tr>
+                                                <td><?= e((string) ($accessUser['name'] ?? '')) ?></td>
+                                                <td><?= e((string) ($accessUser['email'] ?? '')) ?></td>
+                                                <td><?= (int) ($accessUser['is_owner'] ?? 0) === 1 ? 'Owner' : 'Invited' ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

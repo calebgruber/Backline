@@ -18,29 +18,14 @@ $user = require_auth();
 $isAdmin = user_has_permission($user, 'admin.access');
 $canLx = $isAdmin || user_has_permission($user, 'lx.access') || user_has_permission($user, 'lx.shop');
 $canSnd = $isAdmin || user_has_permission($user, 'snd.access') || user_has_permission($user, 'snd.shop');
-$allowedShowScopes = [];
-if ($canLx && $canSnd) {
-    $allowedShowScopes = ['both', 'lx', 'snd'];
-} elseif ($canLx) {
-    $allowedShowScopes = ['lx'];
-} elseif ($canSnd) {
-    $allowedShowScopes = ['snd'];
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
 
     if ($action === 'save') {
-        if (empty($allowedShowScopes)) {
-            flash_set('danger', 'You do not have access to create or edit show scopes.');
-            redirect('/dash/shows');
-        }
         $showId = (int) post('show_id', '0');
-        $showScope = strtolower(trim((string) post('show_scope', 'both')));
-        if (!in_array($showScope, $allowedShowScopes, true)) {
-            $showScope = $allowedShowScopes[0];
-        }
+        $showScope = 'both';
         $assistantCombinedName = post('assistant_combined_name');
         $assistantCombinedEmail = post('assistant_combined_email', '');
         $assistantCombinedPhone = post('assistant_combined_phone', '');
@@ -57,6 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'assistant_combined_name' => $assistantCombinedName,
             'assistant_combined_email' => $assistantCombinedEmail,
             'assistant_combined_phone' => $assistantCombinedPhone,
+            'production_contact_name' => post('production_contact_name', ''),
+            'production_contact_email' => post('production_contact_email', ''),
+            'production_contact_phone' => post('production_contact_phone', ''),
+            'shop_manager_name' => post('shop_manager_name', ''),
             'shop_manager_email' => post('shop_manager_email', ''),
             'shop_manager_phone' => post('shop_manager_phone', ''),
             'assistant_shop_manager_name' => $assistantShopManager['name'],
@@ -68,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         foreach ($requiredChecks as $field => $val) {
             if (trim((string) $val) === '') {
-                flash_set('danger', 'Please complete all required assistant/production contact fields and opening/closing/pull dates.');
+                flash_set('danger', 'Please complete all required crew, production, and shop contact fields plus opening/closing/pull dates.');
                 redirect('/dash/shows' . ($showId > 0 ? '?edit=' . $showId : ''));
             }
         }
@@ -87,6 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $assistantCombinedName,
             $assistantCombinedEmail,
             $assistantCombinedPhone,
+            post('production_contact_name'),
+            post('production_contact_email', ''),
+            post('production_contact_phone', ''),
             post('shop_manager_name'),
             post('shop_manager_email', ''),
             post('shop_manager_phone', ''),
@@ -105,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = db()->prepare('UPDATE shows SET
                     show_name = ?, theatre_name = ?, shop_name = ?, show_scope = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
                     ald_name = ?, ald_email = ?, ald_phone = ?, assistant_snd_designer_name = ?, assistant_snd_designer_email = ?, assistant_snd_designer_phone = ?,
+                    production_contact_name = ?, production_contact_email = ?, production_contact_phone = ?,
                     shop_manager_name = ?, shop_manager_email = ?, shop_manager_phone = ?, assistants_json = ?, pull_date = NULLIF(?, ""), return_date = NULLIF(?, ""),
                     strike_date = NULLIF(?, ""), opening_date = NULLIF(?, ""), closing_date = NULLIF(?, ""), theatre_address = ?, shop_address = ?, updated_at = NOW()
                     WHERE id = ? AND deleted_at IS NULL');
@@ -113,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = db()->prepare('UPDATE shows SET
                     show_name = ?, theatre_name = ?, shop_name = ?, show_scope = ?, lead_designer_name = ?, lead_designer_email = ?, lead_designer_phone = ?,
                     ald_name = ?, ald_email = ?, ald_phone = ?, assistant_snd_designer_name = ?, assistant_snd_designer_email = ?, assistant_snd_designer_phone = ?,
+                    production_contact_name = ?, production_contact_email = ?, production_contact_phone = ?,
                     shop_manager_name = ?, shop_manager_email = ?, shop_manager_phone = ?, assistants_json = ?, pull_date = NULLIF(?, ""), return_date = NULLIF(?, ""),
                     strike_date = NULLIF(?, ""), opening_date = NULLIF(?, ""), closing_date = NULLIF(?, ""), theatre_address = ?, shop_address = ?, updated_at = NOW()
                     WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL');
@@ -123,10 +117,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = db()->prepare('INSERT INTO shows (
                 owner_user_id, show_name, theatre_name, shop_name, show_scope, lead_designer_name, lead_designer_email, lead_designer_phone,
                 ald_name, ald_email, ald_phone, assistant_snd_designer_name, assistant_snd_designer_email, assistant_snd_designer_phone,
+                production_contact_name, production_contact_email, production_contact_phone,
                 shop_manager_name, shop_manager_email, shop_manager_phone, assistants_json, pull_date, return_date, strike_date,
                 opening_date, closing_date, theatre_address, shop_address, created_at, updated_at
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ""), NULLIF(?, ""), NULLIF(?, ""),
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ""), NULLIF(?, ""), NULLIF(?, ""),
                 NULLIF(?, ""), NULLIF(?, ""), ?, ?, NOW(), NOW()
             )');
             $stmt->execute([(int) $user['id'], ...$payload]);
@@ -160,18 +155,8 @@ foreach ($shows as $show) {
     }
 }
 
-render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedShowScopes, $canLx, $canSnd): void {
+render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $canLx, $canSnd): void {
     $value = static fn (string $key) => $editingShow[$key] ?? '';
-    $showScopeValue = strtolower(trim((string) $value('show_scope')));
-    if (!in_array($showScopeValue, $allowedShowScopes, true)) {
-        $showScopeValue = $allowedShowScopes[0] ?? 'both';
-    }
-    $scopeLabelMap = [
-        'both' => 'Both LX + SND',
-        'lx' => 'LX only',
-        'snd' => 'SND only',
-    ];
-    $currentScopeLabel = $scopeLabelMap[$showScopeValue] ?? 'Select scope';
     $assistantCombinedName = trim((string) ($editingShow['assistant_snd_designer_name'] ?? '')) !== ''
         ? (string) ($editingShow['assistant_snd_designer_name'] ?? '')
         : (string) ($editingShow['ald_name'] ?? '');
@@ -181,6 +166,15 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
     $assistantCombinedPhone = trim((string) ($editingShow['assistant_snd_designer_phone'] ?? '')) !== ''
         ? (string) ($editingShow['assistant_snd_designer_phone'] ?? '')
         : (string) ($editingShow['ald_phone'] ?? '');
+    $productionContactName = trim((string) ($editingShow['production_contact_name'] ?? '')) !== ''
+        ? (string) ($editingShow['production_contact_name'] ?? '')
+        : (string) ($editingShow['shop_manager_name'] ?? '');
+    $productionContactEmail = trim((string) ($editingShow['production_contact_email'] ?? '')) !== ''
+        ? (string) ($editingShow['production_contact_email'] ?? '')
+        : (string) ($editingShow['shop_manager_email'] ?? '');
+    $productionContactPhone = trim((string) ($editingShow['production_contact_phone'] ?? '')) !== ''
+        ? (string) ($editingShow['production_contact_phone'] ?? '')
+        : (string) ($editingShow['shop_manager_phone'] ?? '');
     $assistantShopManager = ['name' => '', 'email' => '', 'phone' => ''];
     $assistantsRaw = (string) ($editingShow['assistants_json'] ?? '');
     if ($assistantsRaw !== '') {
@@ -208,24 +202,10 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
                             <div class="col-md-6"><input class="form-control" name="show_name" placeholder="Show Name" value="<?= e((string) $value('show_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="theatre_name" placeholder="Theatre Name" value="<?= e((string) $value('theatre_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="shop_name" placeholder="Shop Name" value="<?= e((string) $value('shop_name')) ?>" required></div>
-                            <div class="col-md-6">
-                                <input type="hidden" name="show_scope" id="show-scope-value" value="<?= e($showScopeValue) ?>">
-                                <details class="role-dropdown">
-                                    <summary class="form-select role-dropdown-summary" id="show-scope-summary"><?= e($currentScopeLabel) ?></summary>
-                                    <div class="role-dropdown-menu">
-                                        <?php foreach ($allowedShowScopes as $scopeKey): ?>
-                                            <?php $scopeLabel = $scopeLabelMap[$scopeKey] ?? strtoupper($scopeKey); ?>
-                                            <label class="form-check mb-1">
-                                                <input class="form-check-input js-show-scope-option" type="radio" name="show_scope_radio" value="<?= e($scopeKey) ?>" <?= $showScopeValue === $scopeKey ? 'checked' : '' ?>>
-                                                <span class="form-check-label"><?= e($scopeLabel) ?></span>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </details>
-                            </div>
                             <div class="col-md-6"><input class="form-control" name="lead_designer_name" placeholder="LD / SND Designer" value="<?= e((string) $value('lead_designer_name')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_combined_name" placeholder="Assistant LD / Assistant Sound Designer" value="<?= e($assistantCombinedName) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Production Electrician / Production Audio" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="production_contact_name" placeholder="Production Electrician / Production Audio" value="<?= e($productionContactName) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_name" placeholder="Shop Manager" value="<?= e((string) $value('shop_manager_name')) ?>" required></div>
                         </div>
                         <h4 class="mb-2">Required Contacts + Key Dates</h4>
                         <div class="row g-2">
@@ -233,8 +213,10 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
                             <div class="col-md-6"><input class="form-control" name="lead_designer_phone" placeholder="LD/SND Phone" value="<?= e((string) $value('lead_designer_phone')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" type="email" name="assistant_combined_email" placeholder="Assistant LD/Sound Email" value="<?= e($assistantCombinedEmail) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_combined_phone" placeholder="Assistant LD/Sound Phone" value="<?= e($assistantCombinedPhone) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" type="email" name="shop_manager_email" placeholder="Production Electrician/Audio Email" value="<?= e((string) $value('shop_manager_email')) ?>" required></div>
-                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Production Electrician/Audio Phone" value="<?= e((string) $value('shop_manager_phone')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="production_contact_email" placeholder="Production Electrician/Audio Email" value="<?= e($productionContactEmail) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="production_contact_phone" placeholder="Production Electrician/Audio Phone" value="<?= e($productionContactPhone) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" type="email" name="shop_manager_email" placeholder="Shop Manager Email" value="<?= e((string) $value('shop_manager_email')) ?>" required></div>
+                            <div class="col-md-6"><input class="form-control" name="shop_manager_phone" placeholder="Shop Manager Phone" value="<?= e((string) $value('shop_manager_phone')) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_shop_manager_name" placeholder="Assistant Shop Manager" value="<?= e($assistantShopManager['name']) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" type="email" name="assistant_shop_manager_email" placeholder="Assistant Shop Manager Email" value="<?= e($assistantShopManager['email']) ?>" required></div>
                             <div class="col-md-6"><input class="form-control" name="assistant_shop_manager_phone" placeholder="Assistant Shop Manager Phone" value="<?= e($assistantShopManager['phone']) ?>" required></div>
@@ -262,31 +244,24 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
                 <div class="card-header"><h3 class="card-title">Shows</h3></div>
                 <div class="table-responsive">
                     <table class="table table-vcenter">
-                        <thead><tr><th>Show</th><th>Scope</th><th>Owner</th><th class="text-end">Actions</th></tr></thead>
+                        <thead><tr><th>Show</th><th>Owner</th><th class="text-end">Actions</th></tr></thead>
                         <tbody>
                         <?php if (!$shows): ?>
-                            <tr><td colspan="4" class="text-secondary">No shows yet. Add one using the form.</td></tr>
+                            <tr><td colspan="3" class="text-secondary">No shows yet. Add one using the form.</td></tr>
                         <?php else: ?>
                             <?php foreach ($shows as $show): ?>
                                 <tr>
                                     <td>
-                                        <strong><?= e($show['show_name']) ?></strong>
-                                        <div class="small text-secondary"><?= e($show['theatre_name']) ?> · <?= e($show['shop_name']) ?></div>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        $scope = strtolower((string) ($show['show_scope'] ?? 'both'));
-                                        echo e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'SND only' : 'Both'));
-                                        ?>
+                                       <strong><?= e($show['show_name']) ?></strong>
+                                       <div class="small text-secondary"><?= e($show['theatre_name']) ?> · <?= e($show['shop_name']) ?></div>
                                     </td>
                                     <td><?= e($show['owner_email']) ?></td>
                                     <td class="text-end">
-                                       <?php $scope = strtolower((string) ($show['show_scope'] ?? 'both')); ?>
-                                       <?php if ($canLx && in_array($scope, ['lx', 'both'], true)): ?>
-                                           <a class="btn btn-sm btn-primary" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
+                                       <?php if ($canLx): ?>
+                                          <a class="btn btn-sm btn-primary" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
                                        <?php endif; ?>
-                                       <?php if ($canSnd && in_array($scope, ['snd', 'both'], true)): ?>
-                                           <a class="btn btn-sm btn-primary ms-1" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
+                                       <?php if ($canSnd): ?>
+                                          <a class="btn btn-sm btn-primary ms-1" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
                                        <?php endif; ?>
                                        <a class="btn btn-sm btn-outline-primary" href="/dash/shows?edit=<?= (int) $show['id'] ?>">Edit</a>
                                        <?php if ($isAdmin): ?>
@@ -307,20 +282,5 @@ render_page('Shows', function () use ($shows, $editingShow, $isAdmin, $allowedSh
             </div>
         </div>
     </div>
-    <script>
-    (() => {
-      const hiddenInput = document.getElementById('show-scope-value');
-      const summary = document.getElementById('show-scope-summary');
-      if (!hiddenInput || !summary) return;
-      document.querySelectorAll('.js-show-scope-option').forEach((option) => {
-        option.addEventListener('change', () => {
-          if (!(option instanceof HTMLInputElement) || !option.checked) return;
-          hiddenInput.value = option.value;
-          const labelEl = option.closest('label')?.querySelector('.form-check-label');
-          summary.textContent = (labelEl?.textContent || '').trim() || option.value;
-        });
-      });
-    })();
-    </script>
     <?php
 }, $user);

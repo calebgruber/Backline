@@ -24,31 +24,36 @@ if ($firstName === '') {
     $firstName = 'Friend';
 }
 
-$showScopeFilter = [];
-if ($canLx) {
-    $showScopeFilter[] = 'lx';
-}
-if ($canSnd) {
-    $showScopeFilter[] = 'snd';
-}
-$dashboardMetrics = ['users' => 0, 'shows' => 0, 'lx_only' => 0, 'snd_only' => 0, 'both' => 0];
+$dashboardMetrics = ['users' => 0, 'shows' => 0];
 
 if ($canAdmin) {
-    $showRows = db()->query('SELECT id, show_name, theatre_name, show_scope, updated_at FROM shows WHERE deleted_at IS NULL ORDER BY updated_at DESC, id DESC')->fetchAll();
+    $showRows = db()->query('SELECT id, show_name, theatre_name, updated_at FROM shows WHERE deleted_at IS NULL ORDER BY updated_at DESC, id DESC')->fetchAll();
     $dashboardMetrics = [
         'users' => (int) db()->query('SELECT COUNT(*) FROM users WHERE deleted_at IS NULL')->fetchColumn(),
         'shows' => (int) db()->query('SELECT COUNT(*) FROM shows WHERE deleted_at IS NULL')->fetchColumn(),
-        'lx_only' => (int) db()->query('SELECT COUNT(*) FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") = "lx"')->fetchColumn(),
-        'snd_only' => (int) db()->query('SELECT COUNT(*) FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") = "snd"')->fetchColumn(),
-        'both' => (int) db()->query('SELECT COUNT(*) FROM shows WHERE deleted_at IS NULL AND COALESCE(show_scope, "both") = "both"')->fetchColumn(),
     ];
 } else {
-    if (empty($showScopeFilter)) {
+    if (!$canLx && !$canSnd) {
         $showRows = [];
     } else {
-        $placeholders = implode(',', array_fill(0, count($showScopeFilter), '?'));
-        $stmt = db()->prepare('SELECT id, show_name, theatre_name, show_scope, updated_at FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? AND COALESCE(show_scope, "both") IN ("both",' . $placeholders . ') ORDER BY updated_at DESC, id DESC');
-        $stmt->execute([(int) $user['id'], ...$showScopeFilter]);
+        if (show_user_access_table_exists()) {
+            $stmt = db()->prepare('SELECT s.id, s.show_name, s.theatre_name, s.updated_at
+                FROM shows s
+                WHERE s.deleted_at IS NULL
+                  AND (
+                    s.owner_user_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM show_user_access sua
+                        WHERE sua.show_id = s.id AND sua.user_id = ?
+                    )
+                  )
+                ORDER BY s.updated_at DESC, s.id DESC');
+            $stmt->execute([(int) $user['id'], (int) $user['id']]);
+        } else {
+            $stmt = db()->prepare('SELECT id, show_name, theatre_name, updated_at FROM shows WHERE deleted_at IS NULL AND owner_user_id = ? ORDER BY updated_at DESC, id DESC');
+            $stmt->execute([(int) $user['id']]);
+        }
         $showRows = $stmt->fetchAll();
     }
 }
@@ -94,9 +99,9 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
                             <i class="ti ti-adjustments"></i>
                         </div>
                     </div>
-                    <div class="card-header"><h3 class="card-title">LX / SND / Both</h3></div>
+                    <div class="card-header"><h3 class="card-title">Shops</h3></div>
                     <div class="card-body">
-                        <div class="h2 mb-0"><?= (int) $dashboardMetrics['lx_only'] ?> / <?= (int) $dashboardMetrics['snd_only'] ?> / <?= (int) $dashboardMetrics['both'] ?></div>
+                        <div class="h2 mb-0">LX + SND</div>
                     </div>
                 </div>
             </div>
@@ -118,25 +123,23 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
             <div class="card-header"><h3 class="card-title">Shows</h3></div>
             <div class="table-responsive">
                 <table class="table table-vcenter">
-                    <thead><tr><th>Show</th><th>Scope</th><th class="text-end">Open</th></tr></thead>
-                    <tbody>
-                    <?php if (!$showRows): ?>
-                        <tr><td colspan="3" class="text-secondary">No shows available.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($showRows as $show): ?>
-                            <?php $scope = strtolower((string) ($show['show_scope'] ?? 'both')); ?>
-                            <tr>
-                                <td>
-                                    <strong><?= e((string) $show['show_name']) ?></strong>
-                                    <div class="small text-secondary"><?= e((string) ($show['theatre_name'] ?? '')) ?></div>
-                                </td>
-                                <td><?= e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'Sound only' : 'Both')) ?></td>
-                                <td class="text-end">
-                                    <?php if (in_array($scope, ['lx', 'both'], true)): ?><a class="btn btn-sm btn-primary" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a><?php endif; ?>
-                                    <?php if (in_array($scope, ['snd', 'both'], true)): ?><a class="btn btn-sm btn-primary ms-1" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a><?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
+                    <thead><tr><th>Show</th><th class="text-end">Open</th></tr></thead>
+                <tbody>
+                <?php if (!$showRows): ?>
+                    <tr><td colspan="2" class="text-secondary">No shows available.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($showRows as $show): ?>
+                        <tr>
+                            <td>
+                                <strong><?= e((string) $show['show_name']) ?></strong>
+                                <div class="small text-secondary"><?= e((string) ($show['theatre_name'] ?? '')) ?></div>
+                            </td>
+                            <td class="text-end">
+                                <?php if ($canLx): ?><a class="btn btn-sm btn-primary" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a><?php endif; ?>
+                                <?php if ($canSnd): ?><a class="btn btn-sm btn-primary ms-1" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a><?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -146,18 +149,23 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
         <div class="row row-cards">
             <?php if ($showRows): ?>
                 <?php foreach ($showRows as $show): ?>
-                    <?php $scope = strtolower((string) ($show['show_scope'] ?? 'both')); ?>
                     <div class="col-md-6 col-xl-4">
-                        <div class="card h-100 dashboard-show-card dashboard-show-card-<?= e($scope) ?>">
+                        <div class="card h-100 dashboard-show-card card-title-enhanced">
+                            <div class="card-header">
+                                <h3 class="card-title mb-0">
+                                    <span class="card-title-pill">
+                                        <i class="ti ti-circle-dot me-1"></i>
+                                        <?= e((string) $show['show_name']) ?>
+                                    </span>
+                                </h3>
+                            </div>
                             <div class="card-body d-flex flex-column">
-                                <h3 class="card-title mb-1"><span class="dashboard-show-pill"><?= e((string) $show['show_name']) ?></span></h3>
                                 <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
-                                <div class="small mb-3 text-secondary">Scope: <?= e($scope === 'lx' ? 'LX only' : ($scope === 'snd' ? 'Sound only' : 'Both')) ?></div>
                                 <div class="mt-auto d-grid gap-2">
-                                    <?php if ($canLx && in_array($scope, ['lx', 'both'], true)): ?>
+                                    <?php if ($canLx): ?>
                                         <a class="btn btn-primary btn-lg w-100" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
                                     <?php endif; ?>
-                                    <?php if ($canSnd && in_array($scope, ['snd', 'both'], true)): ?>
+                                    <?php if ($canSnd): ?>
                                         <a class="btn btn-primary btn-lg w-100" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
                                     <?php endif; ?>
                                 </div>

@@ -66,3 +66,18 @@ function require_permission(string $permission): array
     }
     return $user;
 }
+
+function show_user_access_table_exists(): bool
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+    try {
+        $stmt = db()->query("SHOW TABLES LIKE 'show_user_access'");
+        $exists = (bool) $stmt->fetchColumn();
+    } catch (Throwable) {
+        $exists = false;
+    }
+    return $exists;
+}

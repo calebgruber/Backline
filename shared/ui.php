@@ -65,13 +65,28 @@ function render_page(string $title, callable $body, ?array $user = null): void
     }
     if ($selectedShopShowId > 0 && $user && $isShopAppContext) {
         if (user_has_permission($user, 'admin.access')) {
-            $shopScope = $isLxAppContext ? 'lx' : 'snd';
-            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) LIMIT 1');
-            $shopShowAccess->execute([$selectedShopShowId, $shopScope]);
+            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+            $shopShowAccess->execute([$selectedShopShowId]);
         } else {
-            $shopScope = $isLxAppContext ? 'lx' : 'snd';
-            $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL AND COALESCE(show_scope, "both") IN ("both", ?) LIMIT 1');
-            $shopShowAccess->execute([$selectedShopShowId, (int) $user['id'], $shopScope]);
+            if (show_user_access_table_exists()) {
+                $shopShowAccess = db()->prepare('SELECT id
+                    FROM shows s
+                    WHERE s.id = ?
+                      AND s.deleted_at IS NULL
+                      AND (
+                        s.owner_user_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM show_user_access sua
+                            WHERE sua.show_id = s.id AND sua.user_id = ?
+                        )
+                      )
+                    LIMIT 1');
+                $shopShowAccess->execute([$selectedShopShowId, (int) $user['id'], (int) $user['id']]);
+            } else {
+                $shopShowAccess = db()->prepare('SELECT id FROM shows WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL LIMIT 1');
+                $shopShowAccess->execute([$selectedShopShowId, (int) $user['id']]);
+            }
         }
         if (!$shopShowAccess->fetchColumn()) {
             $selectedShopShowId = 0;
