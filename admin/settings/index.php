@@ -129,6 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($settingKey === '' || $inputName === '') {
                 continue;
             }
+            if ($inputName === 'cover_footer_logo_url') {
+                $updates[$settingKey] = '';
+                continue;
+            }
             $type = (string) ($option['type'] ?? 'text');
             if ($type === 'checkbox' || in_array($inputName, $checkboxInputs, true)) {
                 $updates[$settingKey] = isset($_POST[$inputName]) ? '1' : '0';
@@ -211,15 +215,22 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                             <?= csrf_input() ?>
                             <input type="hidden" name="action" value="save_paperwork_global">
                             <?php $checkboxInputs = $paperworkSettingsRef['show_checkbox_inputs'] ?? []; ?>
+                            <?php $lastSection = ''; ?>
                             <?php foreach (($paperworkSettingsRef['configurable_options'] ?? []) as $option): ?>
                                 <?php
                                 $settingKey = (string) ($option['setting_key'] ?? '');
                                 $inputName = (string) ($option['input_name'] ?? '');
                                 if ($settingKey === '' || $inputName === '') continue;
+                                if ($inputName === 'cover_footer_logo_url') continue;
                                 $label = (string) ($option['label'] ?? $inputName);
                                 $type = (string) ($option['type'] ?? 'text');
+                                $section = (string) ($option['section'] ?? 'general');
                                 $value = (string) ($paperworkLayout[$settingKey] ?? ($option['default_value'] ?? ''));
                                 ?>
+                                <?php if ($section !== $lastSection): ?>
+                                    <?php $lastSection = $section; ?>
+                                    <div class="col-12"><hr class="my-1"><h4 class="mb-0 mt-2 text-capitalize"><?= e(str_replace('_', ' ', $section)) ?></h4></div>
+                                <?php endif; ?>
                                 <div class="col-md-6">
                                     <label class="form-label"><?= e($label) ?></label>
                                     <?php if ($type === 'textarea'): ?>
@@ -228,10 +239,6 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                                         <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="<?= e($inputName) ?>" value="1" <?= $value === '1' ? 'checked' : '' ?>><span class="form-check-label">Enabled</span></label>
                                     <?php elseif ($type === 'color'): ?>
                                         <input class="form-control form-control-color" type="color" name="<?= e($inputName) ?>" value="<?= e($value !== '' ? $value : '#000000') ?>">
-                                    <?php elseif ($type === 'integer'): ?>
-                                        <input class="form-control" type="number" step="1" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
-                                    <?php elseif ($type === 'decimal'): ?>
-                                        <input class="form-control" type="number" step="0.01" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
                                     <?php else: ?>
                                         <input class="form-control" type="text" name="<?= e($inputName) ?>" value="<?= e($value) ?>">
                                     <?php endif; ?>

@@ -544,6 +544,7 @@ function export_equipment_layout_metrics(array $layout): array
     $minRowsPerPage = (int) ($layout['layout.equipment_min_rows_per_page'] ?? 0);
     $maxRowsPerPage = (int) ($layout['layout.equipment_max_rows_per_page'] ?? 0);
     $rowPadding = (float) ($layout['layout.equipment_row_padding'] ?? 0.016);
+    $lineItemHeight = (float) ($layout['layout.equipment_line_item_height'] ?? 0.0);
     $headerRowPadding = (float) ($layout['layout.equipment_header_row_padding'] ?? 0.22);
     $categoryRowPadding = (float) ($layout['layout.equipment_category_row_padding'] ?? 0.26);
     $categoryGap = (float) ($layout['layout.equipment_category_gap'] ?? 0.08);
@@ -579,6 +580,7 @@ function export_equipment_layout_metrics(array $layout): array
         'min_rows_per_page' => $minRowsPerPage,
         'max_rows_per_page' => $maxRowsPerPage,
         'row_padding' => $rowPadding,
+        'line_item_height' => $lineItemHeight,
         'header_row_padding' => $headerRowPadding,
         'category_row_padding' => $categoryRowPadding,
         'category_gap' => $categoryGap,
@@ -628,9 +630,12 @@ function export_equipment_page_row_height(array $row, array $metrics): float
         (float) ($metrics['column_font_sizes']['spare'] ?? $metrics['font_size']),
         (float) ($metrics['column_font_sizes']['total'] ?? $metrics['font_size'])
     );
-    $baseHeight = (($rowFontSize / 72) * $metrics['line_height']) + ($metrics['row_padding'] * 2) + 0.08;
+    $baseHeight = (float) ($metrics['line_item_height'] ?? 0.0);
+    if ($baseHeight === 0.0) {
+        $baseHeight = (($rowFontSize / 72) * $metrics['line_height']) + ($metrics['row_padding'] * 2) + 0.08;
+    }
 
-    return max(0.18, $baseHeight * $lineCount);
+    return $baseHeight * $lineCount;
 }
 
 function export_summary_page_row_height(array $row, array $metrics): float
@@ -646,9 +651,12 @@ function export_summary_page_row_height(array $row, array $metrics): float
         (float) ($metrics['column_font_sizes']['total'] ?? $metrics['font_size']),
         (float) ($metrics['column_font_sizes']['action'] ?? $metrics['font_size'])
     );
-    $baseHeight = (($rowFontSize / 72) * $metrics['line_height']) + ($metrics['row_padding'] * 2) + 0.08;
+    $baseHeight = (float) ($metrics['line_item_height'] ?? 0.0);
+    if ($baseHeight === 0.0) {
+        $baseHeight = (($rowFontSize / 72) * $metrics['line_height']) + ($metrics['row_padding'] * 2) + 0.08;
+    }
 
-    return max(0.18, $baseHeight * $lineCount);
+    return $baseHeight * $lineCount;
 }
 
 function export_summary_layout_metrics(array $layout): array
@@ -670,12 +678,12 @@ function export_summary_layout_metrics(array $layout): array
 
 function export_equipment_header_row_height(array $metrics): float
 {
-    return max(0.18, (float) ($metrics['header_row_padding'] ?? 0.22));
+    return (float) ($metrics['header_row_padding'] ?? 0.22);
 }
 
 function export_equipment_category_row_height(array $metrics): float
 {
-    return max(0.2, (float) ($metrics['category_row_padding'] ?? 0.26));
+    return (float) ($metrics['category_row_padding'] ?? 0.26);
 }
 
 function export_equipment_category_transition_height(bool $hasPreviousCategory, array $metrics): float
@@ -840,7 +848,8 @@ if (!preg_match('/^#[0-9A-F]{6}$/', $equipmentCategoryFill)) {
 $coverTitleRevisionSpacing = max(0.0, (float) ($layout['layout.cover_title_revision_spacing'] ?? 0.52));
 $coverNotesSpacing = max(0.0, (float) ($layout['layout.cover_notes_spacing'] ?? 0.9));
 $coverFooterLogoPath = sanitize_local_asset_path((string) ($layout['layout.cover_footer_logo_url'] ?? ''));
-$coverFooterLogoUrl = $coverFooterLogoPath ? export_url($coverFooterLogoPath) : '';
+$isShowSpecificFooterLogo = $coverFooterLogoPath !== '' && str_starts_with($coverFooterLogoPath, '/uploads/shows/');
+$coverFooterLogoUrl = $isShowSpecificFooterLogo ? export_url($coverFooterLogoPath) : '';
 $includeBrandingLogo = (string) app_setting('paperwork.include_branding_logo', '1') === '1';
 $brandingLogoUrl = '';
 if ($includeBrandingLogo && function_exists('first_existing_brand_asset')) {
@@ -850,7 +859,10 @@ if ($includeBrandingLogo && function_exists('first_existing_brand_asset')) {
         $brandingLogoUrl = export_url('/uploads/branding/' . basename($brandingFile));
     }
 }
-$renderPairedFooterLogos = $coverFooterLogoUrl !== '' && $brandingLogoUrl !== '' && $coverFooterLogoUrl !== $brandingLogoUrl;
+$renderPairedFooterLogos = $coverFooterLogoUrl !== ''
+    && $brandingLogoUrl !== ''
+    && $coverFooterLogoUrl !== $brandingLogoUrl
+    && basename((string) parse_url($coverFooterLogoUrl, PHP_URL_PATH)) !== basename((string) parse_url($brandingLogoUrl, PHP_URL_PATH));
 $coverPreparedByName = trim((string) ($layout['layout.cover_prepared_by_name'] ?? ''));
 if ($coverPreparedByName === '') {
     $coverPreparedByName = (string) (($user['display_name'] ?? $user['email'] ?? ''));
