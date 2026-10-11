@@ -84,3 +84,38 @@ function app_config_clear_cache(): void
 {
     $GLOBALS['__app_config_cache'] = null;
 }
+
+function desktop_mode_enabled(?array $user = null): bool
+{
+    $requestOverride = $_GET['desktop_mode'] ?? null;
+    if ($requestOverride !== null) {
+        $requestValue = (string) $requestOverride;
+        if ($requestValue === '1' || $requestValue === '0') {
+            setcookie('desktop_mode_override', $requestValue, [
+                'expires' => time() + 86400,
+                'path' => '/',
+                'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+                'httponly' => false,
+                'samesite' => 'Lax',
+            ]);
+            return $requestValue === '1';
+        }
+    }
+
+    $globalEnabled = (string) app_setting('ui.desktop_mode_global', '0') === '1';
+    if (!$globalEnabled) {
+        return false;
+    }
+
+    $enabled = true;
+    if ($user !== null && array_key_exists('desktop_mode_override', $user) && $user['desktop_mode_override'] !== null) {
+        $enabled = (int) $user['desktop_mode_override'] === 1;
+    }
+
+    $cookieOverride = $_COOKIE['desktop_mode_override'] ?? null;
+    if ($cookieOverride === '1' || $cookieOverride === '0') {
+        $enabled = $cookieOverride === '1';
+    }
+
+    return $enabled;
+}

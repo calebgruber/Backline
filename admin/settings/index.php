@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('action') === 'save_branding') {
         $appName = post('app_name', 'Backline');
         $madeIn = post('made_in', 'USA');
+        $desktopModeGlobal = isset($_POST['desktop_mode_global']) ? '1' : '0';
         $loginCardColor = trim(post('login_card_color', ''));
         if (!preg_match('/^#[0-9a-fA-F]{6}$/', $loginCardColor)) {
             $loginCardColor = '';
@@ -78,9 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ("branding.app_name", ?, NOW(), NOW()),
             ("branding.made_in", ?, NOW(), NOW()),
             ("branding.login_card_color", ?, NOW(), NOW()),
-            ("branding.login_card_icon", ?, NOW(), NOW())
+            ("branding.login_card_icon", ?, NOW(), NOW()),
+            ("ui.desktop_mode_global", ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = NOW()');
-        $stmt->execute([json_encode($appName), json_encode($madeIn), json_encode($loginCardColor), json_encode($loginCardIcon)]);
+        $stmt->execute([json_encode($appName), json_encode($madeIn), json_encode($loginCardColor), json_encode($loginCardIcon), json_encode($desktopModeGlobal)]);
 
         $logoMimes = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
         $faviconMimes = ['image/png' => 'png', 'image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico'];
@@ -162,6 +164,7 @@ $loginCardIcon = '';
 $paperworkGlobalOverrides = [];
 $paperworkLayout = $paperworkSettingsRef['current_export_settings'] ?? [];
 $paperworkIncludeBrandingLogo = (string) app_setting('paperwork.include_branding_logo', '1') === '1';
+$desktopModeGlobalEnabled = (string) app_setting('ui.desktop_mode_global', '0') === '1';
 $settings = db()->query('SELECT key_name, value_json FROM app_settings WHERE key_name IN ("branding.app_name", "branding.made_in", "branding.login_card_color", "branding.login_card_icon")')->fetchAll();
 foreach ($settings as $row) {
     if ($row['key_name'] === 'branding.app_name') $appName = (string) json_decode((string) $row['value_json'], true);
@@ -175,7 +178,7 @@ if (is_array($paperworkGlobalOverrides)) {
     $paperworkLayout = array_replace($paperworkLayout, $paperworkGlobalOverrides);
 }
 
-render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon, $paperworkSettingsRef, $paperworkLayout, $paperworkIncludeBrandingLogo): void {
+render_page('System Settings', function () use ($rows, $appName, $madeIn, $loginCardColor, $loginCardIcon, $paperworkSettingsRef, $paperworkLayout, $paperworkIncludeBrandingLogo, $desktopModeGlobalEnabled): void {
     ?>
     <div class="row row-cards">
         <div class="col-lg-6">
@@ -201,6 +204,7 @@ render_page('System Settings', function () use ($rows, $appName, $madeIn, $login
                         <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="clear_login_background" value="1"><span class="form-check-label">Remove login background</span></label>
                         <div class="mb-3"><label class="form-label">Login Card Color</label><input class="form-control" type="text" name="login_card_color" value="<?= e($loginCardColor) ?>" placeholder="#206bc4"></div>
                         <div class="mb-3"><label class="form-label">Login Card Material Icon</label><input class="form-control" type="text" name="login_card_icon" value="<?= e($loginCardIcon) ?>" placeholder="lock"></div>
+                        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="desktop_mode_global" value="1" <?= $desktopModeGlobalEnabled ? 'checked' : '' ?>><span class="form-check-label">Enable Desktop Mode globally</span></label>
                         <div class="mb-3"><label class="form-label">Favicon (.ico or .png)</label><input class="form-control" type="file" name="favicon" accept=".ico,image/png,image/x-icon"></div>
                         <div class="form-hint mb-3">Theme-specific LX/SND logos and login backgrounds will follow light/dark mode automatically.</div>
                         <button class="btn btn-primary">Save branding</button>

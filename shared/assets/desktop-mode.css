@@ -1,0 +1,47 @@
+body.desktop-mode .desktop-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+body.desktop-mode .desktop-sidebar {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  resize: horizontal;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+body.desktop-mode .desktop-sidebar .card,
+body.desktop-mode .desktop-main .card {
+  border-radius: 0.75rem;
+}
+
+body.desktop-mode .desktop-main .desktop-toolbar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 20;
+}
+
+body.desktop-mode .desktop-main .desktop-window {
+  box-shadow: 0 10px 30px rgba(0,0,0,.2);
+}
+
+body.desktop-mode .desktop-main .desktop-window .card-header {
+  border-bottom: 1px solid rgba(148,163,184,.2);
+}
+
+body.desktop-mode .desktop-sidebar-collapsed .desktop-shell {
+  grid-template-columns: 1fr;
+}
+
+body.desktop-mode .desktop-sidebar-collapsed .desktop-sidebar {
+  display: none;
+}
+
+body.desktop-mode .route-dash-home .dashboard-show-card {
+  box-shadow: 0 12px 28px rgba(0,0,0,.25);
+}

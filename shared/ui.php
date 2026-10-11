@@ -25,6 +25,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $hasDarkLogo = $logoDarkFile !== null;
     $hasFavicon = $faviconFile !== null;
     $theme = ($_COOKIE['theme_preference'] ?? 'dark') === 'dark' ? 'dark' : 'light';
+    $desktopMode = desktop_mode_enabled($user);
     $tablerLocalDistDir = __DIR__ . '/assets/Tabler/dist';
     $hasLocalTablerCss = file_exists($tablerLocalDistDir . '/css/tabler.min.css');
     $hasLocalTablerThemesCss = file_exists($tablerLocalDistDir . '/css/tabler-themes.min.css');
@@ -107,7 +108,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $brandAltText = $isLxContext ? 'Backline LX logo' : ($isSndContext ? 'Backline SND logo' : $appName . ' logo');
     ?>
 <!doctype html>
-<html lang="en" data-bs-theme="<?= e($theme) ?>" data-bs-theme-base="slate" data-bs-theme-primary="blue" data-has-dark-logo="<?= $activeHasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $activeHasLightLogo ? '1' : '0' ?>">
+<html lang="en" data-bs-theme="<?= e($theme) ?>" data-bs-theme-base="slate" data-bs-theme-primary="blue" data-has-dark-logo="<?= $activeHasDarkLogo ? '1' : '0' ?>" data-has-light-logo="<?= $activeHasLightLogo ? '1' : '0' ?>" data-desktop-mode="<?= $desktopMode ? '1' : '0' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -128,8 +129,9 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <?php if ($hasFavicon): ?><link rel="icon" href="<?= e($faviconPath) ?>"><?php endif; ?>
     <link href="/shared/assets/style.css" rel="stylesheet">
     <link href="/shared/assets/custom.css" rel="stylesheet">
+    <?php if ($desktopMode): ?><link href="/shared/assets/desktop-mode.css" rel="stylesheet"><?php endif; ?>
 </head>
-<body class="<?= e($bodyRouteClass) ?>">
+<body class="<?= e($bodyRouteClass . ($desktopMode ? ' desktop-mode' : '')) ?>">
 <?php if ($tablerThemeJsSrc !== ''): ?><script src="<?= e($tablerThemeJsSrc) ?>"></script><?php endif; ?>
 <div id="global-preloader" class="preloader-backdrop">
     <div class="preloader-spinner" role="status" aria-label="Loading"></div>
@@ -251,6 +253,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
 <script src="<?= e($tablerJsSrc) ?>"></script>
 <script src="/shared/assets/preloader.js"></script>
 <script src="/shared/assets/password-strength.js"></script>
+<?php if ($desktopMode): ?><script src="/shared/assets/desktop-mode.js"></script><?php endif; ?>
 <script>
 (() => {
   const html = document.documentElement;
