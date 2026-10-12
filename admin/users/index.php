@@ -101,8 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = bin2hex(random_bytes(32));
         $stmt = db()->prepare('INSERT INTO password_tokens (user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, "invite", DATE_ADD(NOW(), INTERVAL 1 DAY), NOW())');
         $stmt->execute([$newUserId, hash('sha256', $token)]);
-        $url = (config('base_url') ?: '') . '/auth/invite?token=' . urlencode($token);
-        send_basic_mail($email, 'Backline invite', 'Open this link within 24 hours to set your password: <a href="' . e($url) . '">' . e($url) . '</a>');
+        send_password_token_mail($email, 'invite', $token);
 
         flash_set('success', 'User invited.');
         audit_log((int) $user['id'], 'user', 'invite', $newUserId, ['email' => $email]);

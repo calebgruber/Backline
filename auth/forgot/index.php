@@ -28,8 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = bin2hex(random_bytes(32));
         $stmt = db()->prepare('INSERT INTO password_tokens (user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, "reset", DATE_ADD(NOW(), INTERVAL 1 DAY), NOW())');
         $stmt->execute([(int) $id, hash('sha256', $token)]);
-        $url = (config('base_url') ?: '') . '/auth/reset?token=' . urlencode($token);
-        send_basic_mail($email, 'Backline password reset', 'Open this link within 24 hours: <a href="' . e($url) . '">' . e($url) . '</a>');
+        send_password_token_mail($email, 'reset', $token);
     }
     flash_set('success', 'If the account exists, a reset link was sent.');
     redirect('/auth/login');
