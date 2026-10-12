@@ -1800,9 +1800,9 @@ if (!function_exists('render_shop_app_page')) {
                                     <button class="btn btn-outline-primary" type="submit">Import</button>
                                 </div>
                             </form>
-                            <form method="post" class="mb-3">
+                            <form method="post" class="mb-3" id="sound-cables-form">
                                 <?= csrf_input() ?>
-                                <input type="hidden" name="action" value="create_loom">
+                                <input type="hidden" name="action" value="save_cables" id="sound-cables-action">
                                 <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
                                 <input type="hidden" name="current_tab" value="cables">
                                 <div class="row g-2 align-items-end">
@@ -1814,8 +1814,9 @@ if (!function_exists('render_shop_app_page')) {
                                         <label class="form-label">loom_id</label>
                                         <input class="form-control" name="new_loom_id_text" placeholder="e.g. L-01">
                                     </div>
-                                    <div class="col-md-4">
-                                        <button class="btn btn-outline-primary w-100" type="submit">Create/Assign Loom from Selected Rows</button>
+                                    <div class="col-md-4 d-grid gap-2">
+                                        <button class="btn btn-outline-primary w-100" type="button" id="create-loom-button">Create/Assign Loom from Selected Rows</button>
+                                        <div class="small text-secondary text-end" id="cable-autosave-status">Autosave ready</div>
                                     </div>
                                 </div>
                                 <div class="table-responsive mt-3">
@@ -1856,55 +1857,6 @@ if (!function_exists('render_shop_app_page')) {
                                                     <td>
                                                         <input class="form-check-input" type="checkbox" name="selected_cable_ids[]" value="<?= (int) ($cable['id'] ?? 0) ?>">
                                                     </td>
-                                                    <td><?= e((string) ($cable['cable_type'] ?? '')) ?></td>
-                                                    <td><?= e((string) ($cable['cable_length'] ?? '')) ?></td>
-                                                    <td><?= e((string) (($cable['overall_label'] ?? '') ?: ($cable['display_name'] ?? ''))) ?></td>
-                                                    <td><?= e((string) ($cable['source_text'] ?? '')) ?></td>
-                                                    <td><?= e((string) ($cable['destination_text'] ?? '')) ?></td>
-                                                    <td><?= e((string) ($cable['adapter_text'] ?? '')) ?></td>
-                                                    <td><?= e((string) (($cable['notes_text'] ?? '') ?: ($cable['description_text'] ?? ''))) ?></td>
-                                                    <td><?= e($loomCurrent) ?></td>
-                                                    <td><?= e((string) ($cable['loom_id_text'] ?? '')) ?></td>
-                                                    <td><span class="d-inline-block align-middle me-1" style="width:12px;height:12px;border:1px solid #c0c0c0;border-radius:2px;background:<?= e($colorHex) ?>;"></span><?= e($colorCurrent !== '' ? $colorCurrent : '—') ?></td>
-                                                    <td><?= e((string) ($cable['category_name'] ?? '')) ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                            <?php if (!$soundCables): ?>
-                                                <tr><td colspan="12" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
-                                            <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </form>
-                            <form method="post">
-                                <?= csrf_input() ?>
-                                <input type="hidden" name="action" value="save_cables">
-                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                <input type="hidden" name="current_tab" value="cables">
-                                <div class="table-responsive">
-                                    <table class="table table-vcenter" id="sound-cables-editor-table">
-                                        <thead>
-                                            <tr>
-                                                <th>cable_type</th>
-                                                <th>Length</th>
-                                                <th>overall_label</th>
-                                                <th>From</th>
-                                                <th>To</th>
-                                                <th>Adapter</th>
-                                                <th>Notes</th>
-                                                <th>Loom</th>
-                                                <th>loom_id</th>
-                                                <th>Color</th>
-                                                <th>category</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($soundCables as $cable): ?>
-                                                <?php
-                                                $loomCurrent = trim((string) ($cable['loom_name'] ?? ''));
-                                                $colorCurrent = trim((string) ($cable['color'] ?? ''));
-                                                ?>
-                                                <tr class="cable-edit-row">
                                                     <td>
                                                         <input type="hidden" name="cable_id[]" value="<?= (int) ($cable['id'] ?? 0) ?>">
                                                         <input class="form-control form-control-sm cable-edit" name="cable_type[]" value="<?= e((string) ($cable['cable_type'] ?? '')) ?>">
@@ -1935,18 +1887,16 @@ if (!function_exists('render_shop_app_page')) {
                                                                 <option value="<?= e($colorCurrent) ?>" selected><?= e($colorCurrent) ?> (custom)</option>
                                                             <?php endif; ?>
                                                         </select>
+                                                        <div class="mt-1"><span class="d-inline-block align-middle me-1" style="width:12px;height:12px;border:1px solid #c0c0c0;border-radius:2px;background:<?= e($colorHex) ?>;"></span><span class="small text-secondary"><?= e($colorCurrent !== '' ? $colorCurrent : '—') ?></span></div>
                                                     </td>
                                                     <td><input class="form-control form-control-sm cable-edit" name="category_name[]" value="<?= e((string) ($cable['category_name'] ?? '')) ?>"></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             <?php if (!$soundCables): ?>
-                                                <tr><td colspan="11" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
+                                                <tr><td colspan="12" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
                                             <?php endif; ?>
                                         </tbody>
                                     </table>
-                                </div>
-                                <div class="mt-3">
-                                    <button class="btn btn-primary" type="submit">Save Cable Spreadsheet</button>
                                 </div>
                             </form>
                         </div>
@@ -2019,7 +1969,48 @@ if (!function_exists('render_shop_app_page')) {
                         (() => {
                             const sortSelect = document.getElementById('cable-sort-select');
                             const table = document.getElementById('sound-cables-table');
-                            if (!sortSelect || !table) return;
+                            const cablesForm = document.getElementById('sound-cables-form');
+                            const actionInput = document.getElementById('sound-cables-action');
+                            const loomButton = document.getElementById('create-loom-button');
+                            const autosaveStatus = document.getElementById('cable-autosave-status');
+                            if (!sortSelect || !table || !cablesForm || !actionInput) return;
+
+                            const saveCables = () => {
+                                actionInput.value = 'save_cables';
+                                if (autosaveStatus) {
+                                    autosaveStatus.textContent = 'Saving…';
+                                }
+                                const body = new URLSearchParams(new FormData(cablesForm));
+                                fetch(window.location.pathname + window.location.search, {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: body.toString(),
+                                }).then((response) => {
+                                    if (!response.ok) {
+                                        throw new Error('save failed');
+                                    }
+                                    if (autosaveStatus) {
+                                        autosaveStatus.textContent = 'All changes saved';
+                                    }
+                                }).catch(() => {
+                                    if (autosaveStatus) {
+                                        autosaveStatus.textContent = 'Autosave failed';
+                                    }
+                                });
+                            };
+
+                            let saveTimer = null;
+                            const queueSave = () => {
+                                if (saveTimer) {
+                                    window.clearTimeout(saveTimer);
+                                }
+                                saveTimer = window.setTimeout(saveCables, 350);
+                            };
+
                             sortSelect.addEventListener('change', () => {
                                 const field = sortSelect.value;
                                 const body = table.querySelector('tbody');
@@ -2037,12 +2028,29 @@ if (!function_exists('render_shop_app_page')) {
                                 };
                                 const cellIndex = keyIndexMap[field] ?? 11;
                                 rows.sort((a, b) => {
-                                    const aText = (a.children[cellIndex]?.textContent || '').trim().toLowerCase();
-                                    const bText = (b.children[cellIndex]?.textContent || '').trim().toLowerCase();
+                                    const aCell = a.children[cellIndex];
+                                    const bCell = b.children[cellIndex];
+                                    const aInput = aCell?.querySelector('input,select');
+                                    const bInput = bCell?.querySelector('input,select');
+                                    const aText = ((aInput instanceof HTMLInputElement || aInput instanceof HTMLSelectElement) ? aInput.value : (aCell?.textContent || '')).trim().toLowerCase();
+                                    const bText = ((bInput instanceof HTMLInputElement || bInput instanceof HTMLSelectElement) ? bInput.value : (bCell?.textContent || '')).trim().toLowerCase();
                                     return aText.localeCompare(bText, undefined, { numeric: true });
                                 });
                                 rows.forEach((row) => body.appendChild(row));
+                                queueSave();
                             });
+
+                            table.querySelectorAll('.cable-edit').forEach((field) => {
+                                field.addEventListener('input', queueSave);
+                                field.addEventListener('change', queueSave);
+                            });
+
+                            if (loomButton) {
+                                loomButton.addEventListener('click', () => {
+                                    actionInput.value = 'create_loom';
+                                    cablesForm.submit();
+                                });
+                            }
                         })();
                     </script>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>

@@ -108,6 +108,18 @@ foreach ($cables as $cable) {
     ];
 }
 
+$labelsPerSheet = 80; // 4 across x 20 down
+$labelPages = array_chunk($labels, $labelsPerSheet);
+if (!$labelPages) {
+    $labelPages = [[]];
+}
+foreach ($labelPages as &$pageLabels) {
+    while (count($pageLabels) < $labelsPerSheet) {
+        $pageLabels[] = null;
+    }
+}
+unset($pageLabels);
+
 header('Content-Type: text/html; charset=UTF-8');
 ?>
 <!doctype html>
@@ -120,7 +132,7 @@ header('Content-Type: text/html; charset=UTF-8');
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .sheet { width: 8.5in; min-height: 11in; margin: 0 auto; padding: .5in .2in .3in .2in; box-sizing: border-box; }
-    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-auto-rows: .5in; column-gap: .125in; row-gap: 0; justify-content: center; grid-auto-flow: column; }
+    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-template-rows: repeat(20, .5in); column-gap: .125in; row-gap: 0; justify-content: center; grid-auto-flow: column; }
     .label {
       border: 1px solid #b6b6b6;
       border-radius: .12in;
@@ -155,9 +167,25 @@ header('Content-Type: text/html; charset=UTF-8');
       font-size: 7pt;
       font-weight: 600;
     }
+    .label-empty { border: 1px dashed transparent; }
+    .sheet-break-indicator {
+      width: 8.5in;
+      margin: .25rem auto;
+      text-align: center;
+      color: #6c757d;
+      font-size: 12px;
+      border-top: 1px dashed #b5b5b5;
+      padding-top: .25rem;
+    }
+    .sheet-page-break {
+      page-break-before: always;
+      break-before: page;
+    }
     @media print {
       .toolbar { display: none; }
       .sheet { margin: 0; width: auto; min-height: auto; padding: .5in .2in .3in .2in; }
+      .sheet-break-indicator { display: none; }
+      .sheet-page-break { page-break-before: always; break-before: page; }
     }
   </style>
 </head>
@@ -166,26 +194,35 @@ header('Content-Type: text/html; charset=UTF-8');
     <button onclick="window.print()">Print</button>
     <span><?= e($showName) ?> · Avery 5167 · <?= count($labels) ?> labels</span>
   </div>
-  <div class="sheet">
-    <div class="labels-grid">
-      <?php foreach ($labels as $label): ?>
-        <?php
-        $stripeColor = trim((string) ($label['color'] ?? ''));
-        $safeStripe = '#1f9ad1';
-        $stripeLookup = $colorMap[strtolower($stripeColor)] ?? null;
-        if (is_string($stripeLookup) && preg_match('/^#[0-9a-fA-F]{6}$/', $stripeLookup)) {
-            $safeStripe = $stripeLookup;
-        } elseif (preg_match('/^#[0-9a-fA-F]{6}$/', $stripeColor)) {
-            $safeStripe = $stripeColor;
-        }
-        ?>
-        <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
-          <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
-          <div class="label-line-main"><?= e($label['overall']) ?></div>
-          <div class="label-line-bottom"><?= e('@' . $label['at_value']) ?></div>
-        </div>
-      <?php endforeach; ?>
+  <?php foreach ($labelPages as $pageIndex => $pageLabels): ?>
+    <?php if ($pageIndex > 0): ?>
+      <div class="sheet-break-indicator">Page break — next label sheet (<?= $pageIndex + 1 ?>)</div>
+    <?php endif; ?>
+    <div class="sheet <?= $pageIndex > 0 ? 'sheet-page-break' : '' ?>">
+      <div class="labels-grid">
+        <?php foreach ($pageLabels as $label): ?>
+          <?php if (!is_array($label)): ?>
+            <div class="label label-empty"></div>
+            <?php continue; ?>
+          <?php endif; ?>
+          <?php
+          $stripeColor = trim((string) ($label['color'] ?? ''));
+          $safeStripe = '#1f9ad1';
+          $stripeLookup = $colorMap[strtolower($stripeColor)] ?? null;
+          if (is_string($stripeLookup) && preg_match('/^#[0-9a-fA-F]{6}$/', $stripeLookup)) {
+              $safeStripe = $stripeLookup;
+          } elseif (preg_match('/^#[0-9a-fA-F]{6}$/', $stripeColor)) {
+              $safeStripe = $stripeColor;
+          }
+          ?>
+          <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
+            <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
+            <div class="label-line-main"><?= e($label['overall']) ?></div>
+            <div class="label-line-bottom"><?= e('@' . $label['at_value']) ?></div>
+          </div>
+        <?php endforeach; ?>
+      </div>
     </div>
-  </div>
+  <?php endforeach; ?>
 </body>
 </html>
