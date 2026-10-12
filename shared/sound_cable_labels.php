@@ -105,7 +105,6 @@ foreach ($cables as $cable) {
         'end_marker' => $fromSuffix !== '' ? $fromSuffix : 'FROM',
         'at_value' => $from !== '' ? $from : 'FROM',
         'color' => $color,
-        'color_text' => strtoupper($color),
     ];
     $labels[] = [
         'overall' => $overall,
@@ -114,7 +113,6 @@ foreach ($cables as $cable) {
         'end_marker' => $toSuffix !== '' ? $toSuffix : 'TO',
         'at_value' => $to !== '' ? $to : 'TO',
         'color' => $color,
-        'color_text' => strtoupper($color),
     ];
 }
 

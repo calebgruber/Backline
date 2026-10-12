@@ -464,6 +464,7 @@ if (!function_exists('render_shop_app_page')) {
     {
         $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
+        $hasPaidExport = user_has_permission($user, 'paid.export');
         $hasShowAccessTable = show_user_access_table_exists();
         $showListStmt = $isAdmin
             ? (function () use ($shopType) {
@@ -517,7 +518,10 @@ if (!function_exists('render_shop_app_page')) {
             : ($hasShowAccessTable
                 ? ' AND (s.owner_user_id = ' . (int) $user['id'] . ' OR EXISTS (SELECT 1 FROM show_user_access sua WHERE sua.show_id = s.id AND sua.user_id = ' . (int) $user['id'] . '))'
                 : ' AND s.owner_user_id = ' . (int) $user['id']);
-        $allowedTabs = ['info', 'initial', 'revisions', 'paperwork', 'exports'];
+        $allowedTabs = ['info', 'initial', 'revisions', 'paperwork'];
+        if ($hasPaidExport) {
+            $allowedTabs[] = 'exports';
+        }
         if ($shopType === 'snd') {
             $allowedTabs[] = 'cables';
         }
@@ -526,6 +530,10 @@ if (!function_exists('render_shop_app_page')) {
         $hasSubcategoryColumn = shop_has_inventory_subcategory_column();
         $selectedRevisionId = (int) ($_GET['revision'] ?? ($_POST['print_revision_id'] ?? 0));
         $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
+        if (!$hasPaidExport && $currentTab === 'exports') {
+            flash_set('warning', 'your license key does not allow expporting');
+            $currentTab = 'info';
+        }
         if (!in_array($currentTab, $allowedTabs, true)) {
             $currentTab = 'info';
         }
@@ -1187,6 +1195,10 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($action === 'export_latest' && $selectedShowId > 0) {
+                if (!$hasPaidExport) {
+                    flash_set('warning', 'your license key does not allow expporting');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
+                }
                 $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
                 $orderStmt->execute([$selectedShowId, $shopType]);
                 $orderId = (int) ($orderStmt->fetchColumn() ?: 0);
@@ -1525,7 +1537,11 @@ if (!function_exists('render_shop_app_page')) {
                             </div>
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">
                                 <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
-                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports">Exports</a>
+                                <?php if ($hasPaidExport): ?>
+                                    <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports">Exports</a>
+                                <?php else: ?>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Exports (Paid role required)</button>
+                                <?php endif; ?>
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
                                         <?= csrf_input() ?>
@@ -1541,7 +1557,10 @@ if (!function_exists('render_shop_app_page')) {
                     </div>
                     <ul class="nav nav-tabs mb-3">
                         <?php
-                        $tabMap = ['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings', 'exports' => 'Exports'];
+                        $tabMap = ['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings'];
+                        if ($hasPaidExport) {
+                            $tabMap['exports'] = 'Exports';
+                        }
                         if ($shopType === 'snd') {
                             $tabMap['cables'] = 'Cables';
                         }
@@ -1550,6 +1569,9 @@ if (!function_exists('render_shop_app_page')) {
                             <li class="nav-item"><a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a></li>
                         <?php endforeach; ?>
                     </ul>
+                    <?php if (!$hasPaidExport): ?>
+                        <div class="alert alert-warning py-2">your license key does not allow expporting</div>
+                    <?php endif; ?>
                 <?php elseif (!$showFirstNav): ?>
                     <form method="get" class="row g-2 align-items-end mb-3">
                         <div class="col-md-12">
@@ -1747,7 +1769,11 @@ if (!function_exists('render_shop_app_page')) {
                                 </div>
                                 <div class="col-12 d-flex justify-content-between">
                                     <button class="btn btn-primary" type="submit">Save Paperwork Options</button>
-                                    <a class="btn btn-outline-primary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports&export_revision=<?= (int) $selectedExportRevisionId ?>">Go to Exports</a>
+                                    <?php if ($hasPaidExport): ?>
+                                        <a class="btn btn-outline-primary" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports&export_revision=<?= (int) $selectedExportRevisionId ?>">Go to Exports</a>
+                                    <?php else: ?>
+                                        <button class="btn btn-outline-secondary" type="button" disabled>Go to Exports (Paid role required)</button>
+                                    <?php endif; ?>
                                 </div>
                             </form>
                         </div>

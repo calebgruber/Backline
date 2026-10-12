@@ -21,6 +21,7 @@ $roleOptions = [
     'snd.access' => ['label' => 'Sound Major', 'class' => 'bg-indigo-lt'],
     'lx.shop' => ['label' => 'Lighting Shop', 'class' => 'bg-cyan-lt'],
     'snd.shop' => ['label' => 'Sound Shop', 'class' => 'bg-purple-lt'],
+    'paid.export' => ['label' => 'Paid', 'class' => 'bg-green-lt'],
 ];
 $roleBadges = [];
 if ((int) ($user['is_super_admin'] ?? 0) === 1) {

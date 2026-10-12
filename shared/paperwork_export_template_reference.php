@@ -25,6 +25,11 @@ if (!function_exists('app_config')) {
     require_once __DIR__ . '/bootstrap.php';
 }
 $user = require_auth();
+if (!user_has_permission($user, 'paid.export')) {
+    http_response_code(403);
+    echo 'your license key does not allow expporting';
+    exit;
+}
 
 if (!function_exists('h')) {
     function h(?string $value): string

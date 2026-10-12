@@ -20,6 +20,7 @@ $roleOptions = [
     'sound_major' => 'Sound Major',
     'lighting_shop' => 'Lighting Shop',
     'sound_shop' => 'Sound Shop',
+    'paid' => 'Paid',
     'admin' => 'Admin',
 ];
 $rolePermissionMap = [
@@ -27,6 +28,7 @@ $rolePermissionMap = [
     'sound_major' => ['snd.access'],
     'lighting_shop' => ['lx.shop'],
     'sound_shop' => ['snd.shop'],
+    'paid' => ['paid.export'],
     'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
 ];
 $permissionDescriptions = [
@@ -40,6 +42,7 @@ $permissionDescriptions = [
     'snd.access' => 'Access sound app',
     'lx.shop' => 'Lighting shop role',
     'snd.shop' => 'Sound shop role',
+    'paid.export' => 'Export shop orders (Paid role)',
 ];
 $allRolePermissions = [];
 foreach ($rolePermissionMap as $permissions) {
