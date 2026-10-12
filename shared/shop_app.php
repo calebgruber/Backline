@@ -464,7 +464,7 @@ if (!function_exists('render_shop_app_page')) {
     {
         $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
-        $hasPaidExport = user_has_permission($user, 'paid.export');
+        $hasPaidExport = user_has_paid_export_access($user);
         $hasShowAccessTable = show_user_access_table_exists();
         $showListStmt = $isAdmin
             ? (function () use ($shopType) {
@@ -531,7 +531,7 @@ if (!function_exists('render_shop_app_page')) {
         $selectedRevisionId = (int) ($_GET['revision'] ?? ($_POST['print_revision_id'] ?? 0));
         $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         if (!$hasPaidExport && $currentTab === 'exports') {
-            flash_set('warning', 'Export is available only for users with the Paid role.');
+            flash_set('warning', 'You need an active subscription to export paperwork.');
             $currentTab = 'info';
         }
         if (!in_array($currentTab, $allowedTabs, true)) {
@@ -1196,7 +1196,7 @@ if (!function_exists('render_shop_app_page')) {
 
             if ($action === 'export_latest' && $selectedShowId > 0) {
                 if (!$hasPaidExport) {
-                    flash_set('warning', 'Export is available only for users with the Paid role.');
+                    flash_set('warning', 'You need an active subscription to export paperwork.');
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
                 }
                 $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
@@ -1571,10 +1571,17 @@ if (!function_exists('render_shop_app_page')) {
                     </ul>
                     <?php if (!$hasPaidExport): ?>
                         <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
-                            <span class="badge bg-warning text-dark">Export Locked</span>
+                            <span class="icon text-warning" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-lock" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                                    <circle cx="12" cy="16" r="1"></circle>
+                                    <path d="M8 11v-3a4 4 0 0 1 8 0v3"></path>
+                                </svg>
+                            </span>
                             <div>
-                                <div class="fw-semibold">Paperwork export requires the Paid role.</div>
-                                <div class="text-secondary small">Ask an admin to assign your account the <strong>Paid</strong> role to enable exporting.</div>
+                                <div class="fw-semibold">Exports are disabled.</div>
+                                <div class="text-secondary">You need an active subscription to export paperwork.</div>
                             </div>
                         </div>
                     <?php endif; ?>

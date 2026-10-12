@@ -67,6 +67,17 @@ function require_permission(string $permission): array
     return $user;
 }
 
+function user_has_paid_export_access(array $user): bool
+{
+    if (($user['is_super_admin'] ?? 0) == 1) {
+        return true;
+    }
+
+    $stmt = db()->prepare('SELECT 1 FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ? AND p.key_name IN ("paid.export", "paid") LIMIT 1');
+    $stmt->execute([(int) $user['id']]);
+    return (bool) $stmt->fetchColumn();
+}
+
 function show_user_access_table_exists(): bool
 {
     static $exists = null;
