@@ -146,7 +146,7 @@ header('Content-Type: text/html; charset=UTF-8');
     .labels-grid { display: grid; grid-template-columns: repeat(4, 1.75in); grid-template-rows: repeat(20, .5in); column-gap: 0; row-gap: 0; grid-auto-flow: column; }
     .label {
       border: 1px solid #b6b6b6;
-      border-radius: .12in;
+      border-radius: .08in;
       box-sizing: border-box;
       overflow: hidden;
       padding: .02in .05in .03in .05in;

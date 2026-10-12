@@ -1841,6 +1841,20 @@ if (!function_exists('render_shop_app_page')) {
                                 $soundCableLoomMembers[$loomNameValue][] = trim((string) (($cableRow['overall_label'] ?? '') ?: ($cableRow['display_name'] ?? '') ?: ($cableRow['cable_type'] ?? '')));
                             }
                             ?>
+                            <div class="card mb-3 border-0 bg-body-tertiary">
+                                <div class="card-body py-2">
+                                    <div class="small text-secondary text-uppercase fw-semibold mb-1">Label format preview</div>
+                                    <div class="rounded-3 border p-2 text-center bg-white">
+                                        <div class="fw-semibold mb-1">
+                                            <?= e('{TYPE} ({LENGTH}) / {END}') ?>
+                                        </div>
+                                        <div class="py-1 mb-1" style="background:#1f9ad1;color:#081015;">
+                                            <?= e('{MAIN LABEL}') ?>
+                                        </div>
+                                        <div class="fw-semibold"><?= e('@{from or to}') ?></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="row g-2 align-items-end mb-3">
                                 <div class="col-md-4">
                                     <label class="form-label">Sort Rows By</label>
@@ -1892,22 +1906,6 @@ if (!function_exists('render_shop_app_page')) {
                                     <div class="col-md-3">
                                         <button class="btn btn-outline-primary w-100" type="submit">Auto-Add Cables from Revision</button>
                                     </div>
-                                </div>
-                            </form>
-                            <form method="post" class="mb-3" enctype="multipart/form-data">
-                                <?= csrf_input() ?>
-                                <input type="hidden" name="action" value="import_cables">
-                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
-                                <input type="hidden" name="current_tab" value="cables">
-                                <label class="form-label">Import cables (paste or upload with exact headers)</label>
-                                <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
-                                <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
-                                <div class="mt-2">
-                                    <input class="form-control" type="file" name="cable_import_file" accept=".csv,.tsv,.txt,text/csv,text/plain">
-                                </div>
-                                <div class="mt-2">
-                                    <button class="btn btn-outline-primary" type="submit">Import</button>
                                 </div>
                             </form>
                             <form method="post" class="mb-3" id="sound-cables-form">
@@ -2001,6 +1999,28 @@ if (!function_exists('render_shop_app_page')) {
                                             <?php endif; ?>
                                         </tbody>
                                     </table>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header"><h3 class="card-title mb-0">Import Cables</h3></div>
+                        <div class="card-body">
+                            <form method="post" enctype="multipart/form-data">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="import_cables">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
+                                <input type="hidden" name="current_tab" value="cables">
+                                <label class="form-label">Import cables (paste or upload with exact headers)</label>
+                                <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
+                                <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
+                                <div class="mt-2">
+                                    <input class="form-control" type="file" name="cable_import_file" accept=".csv,.tsv,.txt,text/csv,text/plain">
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-outline-primary" type="submit">Import</button>
                                 </div>
                             </form>
                         </div>
