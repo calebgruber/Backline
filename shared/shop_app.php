@@ -531,7 +531,7 @@ if (!function_exists('render_shop_app_page')) {
         $selectedRevisionId = (int) ($_GET['revision'] ?? ($_POST['print_revision_id'] ?? 0));
         $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         if (!$hasPaidExport && $currentTab === 'exports') {
-            flash_set('warning', 'your license key does not allow expporting');
+            flash_set('warning', 'Export is available only for users with the Paid role.');
             $currentTab = 'info';
         }
         if (!in_array($currentTab, $allowedTabs, true)) {
@@ -1196,7 +1196,7 @@ if (!function_exists('render_shop_app_page')) {
 
             if ($action === 'export_latest' && $selectedShowId > 0) {
                 if (!$hasPaidExport) {
-                    flash_set('warning', 'your license key does not allow expporting');
+                    flash_set('warning', 'Export is available only for users with the Paid role.');
                     redirect($appPath . '?show=' . $selectedShowId . '&tab=info');
                 }
                 $orderStmt = db()->prepare('SELECT o.id FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
@@ -1570,7 +1570,13 @@ if (!function_exists('render_shop_app_page')) {
                         <?php endforeach; ?>
                     </ul>
                     <?php if (!$hasPaidExport): ?>
-                        <div class="alert alert-warning py-2">your license key does not allow expporting</div>
+                        <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+                            <span class="badge bg-warning text-dark">Export Locked</span>
+                            <div>
+                                <div class="fw-semibold">Paperwork export requires the Paid role.</div>
+                                <div class="text-secondary small">Ask an admin to assign your account the <strong>Paid</strong> role to enable exporting.</div>
+                            </div>
+                        </div>
                     <?php endif; ?>
                 <?php elseif (!$showFirstNav): ?>
                     <form method="get" class="row g-2 align-items-end mb-3">
