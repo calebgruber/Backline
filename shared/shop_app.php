@@ -102,6 +102,44 @@ if (!function_exists('shop_parse_delimited_line')) {
     }
 }
 
+if (!function_exists('shop_resolve_cable_import_text')) {
+    function shop_resolve_cable_import_text(array $postData, array $fileData, ?string &$error = null): string
+    {
+        $error = null;
+        $text = trim((string) ($postData['cable_import_text'] ?? ''));
+        $uploadError = (int) ($fileData['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($uploadError === UPLOAD_ERR_NO_FILE) {
+            return $text;
+        }
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $error = 'Could not read uploaded file. Try again.';
+            return '';
+        }
+        $tmpPath = (string) ($fileData['tmp_name'] ?? '');
+        if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+            $error = 'Uploaded file is invalid.';
+            return '';
+        }
+        $size = (int) ($fileData['size'] ?? 0);
+        if ($size <= 0 || $size > 5 * 1024 * 1024) {
+            $error = 'Upload must be between 1 byte and 5 MB.';
+            return '';
+        }
+        $extension = strtolower(pathinfo((string) ($fileData['name'] ?? ''), PATHINFO_EXTENSION));
+        if ($extension !== '' && !in_array($extension, ['csv', 'tsv', 'txt'], true)) {
+            $error = 'Upload must be a .csv, .tsv, or .txt file.';
+            return '';
+        }
+        $raw = @file_get_contents($tmpPath);
+        if ($raw === false) {
+            $error = 'Could not read uploaded file.';
+            return '';
+        }
+        $raw = preg_replace('/^\xEF\xBB\xBF/', '', (string) $raw) ?? (string) $raw;
+        return trim((string) $raw);
+    }
+}
+
 if (!function_exists('shop_sync_sound_cables_from_revision')) {
     function shop_sync_sound_cables_from_revision(int $showId, int $orderId, int $revisionId): int
     {
@@ -575,11 +613,14 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($shopType === 'snd' && $action === 'import_cables' && $selectedShowId > 0) {
-                $importRaw = trim((string) post('cable_import_text', ''));
+                $importError = null;
+                $importRaw = shop_resolve_cable_import_text($_POST, $_FILES['cable_import_file'] ?? [], $importError);
                 $orderId = (int) post('order_id', '0');
                 $required = ['cable_type', 'length', 'overall_label', 'from', 'to', 'adapter', 'notes', 'loom', 'loom_id', 'color', 'category'];
                 $inserted = 0;
-                if ($importRaw !== '') {
+                if ($importError !== null) {
+                    flash_set('danger', $importError);
+                } elseif ($importRaw !== '') {
                     $lines = preg_split('/\R/u', $importRaw) ?: [];
                     $lines = array_values(array_filter(array_map('trim', $lines), static fn ($line): bool => $line !== ''));
                     if (count($lines) > 1) {
@@ -623,10 +664,10 @@ if (!function_exists('render_shop_app_page')) {
                             flash_set('danger', 'Import headers must exactly be: cable_type, Length, overall_label, From, To, Adapter, Notes, Loom, loom_id, Color, category');
                         }
                     } else {
-                        flash_set('warning', 'Paste header plus at least one cable row.');
+                        flash_set('warning', 'Include header plus at least one cable row.');
                     }
                 } else {
-                    flash_set('warning', 'Paste cable rows to import.');
+                    flash_set('warning', 'Paste cable rows or upload a CSV/TSV file.');
                 }
             }
 
@@ -1404,15 +1445,18 @@ if (!function_exists('render_shop_app_page')) {
                                     </div>
                                 </div>
                             </form>
-                            <form method="post" class="mb-3">
+                            <form method="post" class="mb-3" enctype="multipart/form-data">
                                 <?= csrf_input() ?>
                                 <input type="hidden" name="action" value="import_cables">
                                 <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
                                 <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
                                 <input type="hidden" name="current_tab" value="cables">
-                                <label class="form-label">Import cables (paste text with exact headers)</label>
+                                <label class="form-label">Import cables (paste or upload with exact headers)</label>
                                 <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
                                 <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
+                                <div class="mt-2">
+                                    <input class="form-control" type="file" name="cable_import_file" accept=".csv,.tsv,.txt,text/csv,text/plain">
+                                </div>
                                 <div class="mt-2">
                                     <button class="btn btn-outline-primary" type="submit">Import</button>
                                 </div>
