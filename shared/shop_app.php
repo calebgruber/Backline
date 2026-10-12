@@ -158,11 +158,80 @@ if (!function_exists('shop_resolve_cable_import_text')) {
     }
 }
 
+if (!function_exists('shop_sound_cable_colors_have_hex_column')) {
+    function shop_sound_cable_colors_have_hex_column(): bool
+    {
+        static $hasColumn = null;
+        if ($hasColumn !== null) {
+            return $hasColumn;
+        }
+        try {
+            $stmt = db()->query("SHOW COLUMNS FROM sound_cable_colors LIKE 'hex_code'");
+            $hasColumn = (bool) $stmt->fetch();
+        } catch (Throwable) {
+            $hasColumn = false;
+        }
+        return $hasColumn;
+    }
+}
+
+if (!function_exists('shop_sound_cable_colors_table_exists')) {
+    function shop_sound_cable_colors_table_exists(): bool
+    {
+        static $exists = null;
+        if ($exists !== null) {
+            return $exists;
+        }
+        try {
+            $stmt = db()->query("SHOW TABLES LIKE 'sound_cable_colors'");
+            $exists = (bool) $stmt->fetchColumn();
+        } catch (Throwable) {
+            $exists = false;
+        }
+        return $exists;
+    }
+}
+
+if (!function_exists('shop_sound_cables_columns')) {
+    function shop_sound_cables_columns(): array
+    {
+        static $columns = null;
+        if ($columns !== null) {
+            return $columns;
+        }
+        $columns = [];
+        try {
+            $rows = db()->query('SHOW COLUMNS FROM sound_cables')->fetchAll();
+            foreach ($rows as $row) {
+                $name = strtolower(trim((string) ($row['Field'] ?? '')));
+                if ($name !== '') {
+                    $columns[$name] = true;
+                }
+            }
+        } catch (Throwable) {
+            $columns = [];
+        }
+        return $columns;
+    }
+}
+
+if (!function_exists('shop_sound_cables_has_column')) {
+    function shop_sound_cables_has_column(string $columnName): bool
+    {
+        $columns = shop_sound_cables_columns();
+        return isset($columns[strtolower($columnName)]);
+    }
+}
+
 if (!function_exists('shop_sync_sound_cables_from_revision')) {
     function shop_sync_sound_cables_from_revision(int $showId, int $orderId, int $revisionId): int
     {
-        $deleteStmt = db()->prepare('DELETE FROM sound_cables WHERE show_id = ? AND source_revision_id = ? AND auto_created = 1');
-        $deleteStmt->execute([$showId, $revisionId]);
+        $hasSourceRevision = shop_sound_cables_has_column('source_revision_id');
+        $hasAutoCreated = shop_sound_cables_has_column('auto_created');
+        if ($hasSourceRevision && $hasAutoCreated) {
+            $deleteStmt = db()->prepare('DELETE FROM sound_cables WHERE show_id = ? AND source_revision_id = ? AND auto_created = 1');
+            $deleteStmt->execute([$showId, $revisionId]);
+        }
 
         $lineStmt = db()->prepare('SELECT ol.id, ol.inventory_item_id, ol.qty, ol.spares, ol.line_note, ii.name AS item_name, ic.name AS category_name
             FROM order_lines ol
@@ -172,13 +241,43 @@ if (!function_exists('shop_sync_sound_cables_from_revision')) {
         $lineStmt->execute([$revisionId]);
         $rows = $lineStmt->fetchAll();
 
-        $insertStmt = db()->prepare('INSERT INTO sound_cables (
-            show_id, order_id, inventory_item_id, cable_type, cable_length, overall_label, display_name, color, source_text, destination_text,
-            adapter_text, notes_text, loom_name, loom_id_text, category_name, source_revision_id, source_line_id, source_line_index, auto_created,
-            sort_order, created_at, updated_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, NULL, "", "", "", ?, "", "", ?, ?, ?, ?, 1, ?, NOW(), NOW()
-        )');
+        $insertColumns = ['show_id', 'order_id', 'inventory_item_id', 'cable_type', 'cable_length'];
+        if (shop_sound_cables_has_column('overall_label')) {
+            $insertColumns[] = 'overall_label';
+        }
+        $insertColumns = [...$insertColumns, 'display_name', 'color', 'source_text', 'destination_text'];
+        if (shop_sound_cables_has_column('adapter_text')) {
+            $insertColumns[] = 'adapter_text';
+        }
+        if (shop_sound_cables_has_column('notes_text')) {
+            $insertColumns[] = 'notes_text';
+        } elseif (shop_sound_cables_has_column('description_text')) {
+            $insertColumns[] = 'description_text';
+        }
+        if (shop_sound_cables_has_column('loom_name')) {
+            $insertColumns[] = 'loom_name';
+        }
+        if (shop_sound_cables_has_column('loom_id_text')) {
+            $insertColumns[] = 'loom_id_text';
+        }
+        if (shop_sound_cables_has_column('category_name')) {
+            $insertColumns[] = 'category_name';
+        }
+        if (shop_sound_cables_has_column('source_revision_id')) {
+            $insertColumns[] = 'source_revision_id';
+        }
+        if (shop_sound_cables_has_column('source_line_id')) {
+            $insertColumns[] = 'source_line_id';
+        }
+        if (shop_sound_cables_has_column('source_line_index')) {
+            $insertColumns[] = 'source_line_index';
+        }
+        if (shop_sound_cables_has_column('auto_created')) {
+            $insertColumns[] = 'auto_created';
+        }
+        $insertColumns = [...$insertColumns, 'sort_order', 'created_at', 'updated_at'];
+        $valueSql = implode(', ', array_fill(0, count($insertColumns) - 2, '?')) . ', NOW(), NOW()';
+        $insertStmt = db()->prepare('INSERT INTO sound_cables (' . implode(', ', $insertColumns) . ') VALUES (' . $valueSql . ')');
 
         $created = 0;
         $sortSeed = 0;
@@ -189,22 +288,6 @@ if (!function_exists('shop_sync_sound_cables_from_revision')) {
                 continue;
             }
 
-            if (!function_exists('shop_sound_cable_colors_have_hex_column')) {
-                function shop_sound_cable_colors_have_hex_column(): bool
-                {
-                    static $hasColumn = null;
-                    if ($hasColumn !== null) {
-                        return $hasColumn;
-                    }
-                    try {
-                        $stmt = db()->query("SHOW COLUMNS FROM sound_cable_colors LIKE 'hex_code'");
-                        $hasColumn = (bool) $stmt->fetch();
-                    } catch (Throwable) {
-                        $hasColumn = false;
-                    }
-                    return $hasColumn;
-                }
-            }
             $qty = max(0, (int) ($row['qty'] ?? 0));
             $spares = max(0, (int) ($row['spares'] ?? 0));
             $count = $qty + $spares;
@@ -213,21 +296,49 @@ if (!function_exists('shop_sync_sound_cables_from_revision')) {
             }
             for ($i = 1; $i <= $count; $i++) {
                 $overallLabel = $count > 1 ? ($itemName . ' #' . $i) : $itemName;
-                $insertStmt->execute([
+                $params = [
                     $showId,
                     $orderId,
                     (int) ($row['inventory_item_id'] ?? 0),
                     $itemName,
                     '',
-                    $overallLabel,
-                    $overallLabel,
-                    trim((string) ($row['line_note'] ?? '')),
-                    $categoryName,
-                    $revisionId,
-                    (int) ($row['id'] ?? 0),
-                    $i,
-                    $sortSeed++,
-                ]);
+                ];
+                if (shop_sound_cables_has_column('overall_label')) {
+                    $params[] = $overallLabel;
+                }
+                $params[] = $overallLabel;
+                $params[] = null;
+                $params[] = '';
+                $params[] = '';
+                if (shop_sound_cables_has_column('adapter_text')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('notes_text') || shop_sound_cables_has_column('description_text')) {
+                    $params[] = trim((string) ($row['line_note'] ?? ''));
+                }
+                if (shop_sound_cables_has_column('loom_name')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('loom_id_text')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('category_name')) {
+                    $params[] = $categoryName;
+                }
+                if (shop_sound_cables_has_column('source_revision_id')) {
+                    $params[] = $revisionId;
+                }
+                if (shop_sound_cables_has_column('source_line_id')) {
+                    $params[] = (int) ($row['id'] ?? 0);
+                }
+                if (shop_sound_cables_has_column('source_line_index')) {
+                    $params[] = $i;
+                }
+                if (shop_sound_cables_has_column('auto_created')) {
+                    $params[] = 1;
+                }
+                $params[] = $sortSeed++;
+                $insertStmt->execute($params);
                 $created++;
             }
         }
@@ -348,6 +459,8 @@ if (!function_exists('render_shop_app_page')) {
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         $hasReturnDateColumn = shop_has_order_line_return_date_column();
         $hasSubcategoryColumn = shop_has_inventory_subcategory_column();
+        $selectedRevisionId = (int) ($_GET['revision'] ?? ($_POST['print_revision_id'] ?? 0));
+        $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         if (!in_array($currentTab, $allowedTabs, true)) {
             $currentTab = 'info';
         }
@@ -661,13 +774,43 @@ if (!function_exists('render_shop_app_page')) {
                     if (count($lines) > 1) {
                         $header = array_map(static fn ($v): string => strtolower(trim((string) $v)), shop_parse_delimited_line($lines[0]));
                         if ($header === $required) {
-                            $insertStmt = db()->prepare('INSERT INTO sound_cables (
-                                show_id, order_id, inventory_item_id, cable_type, cable_length, overall_label, display_name, color,
-                                source_text, destination_text, adapter_text, notes_text, loom_name, loom_id_text, category_name,
-                                source_revision_id, source_line_id, source_line_index, auto_created, sort_order, created_at, updated_at
-                            ) VALUES (
-                                ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0, ?, NOW(), NOW()
-                            )');
+                            $insertColumns = ['show_id', 'order_id', 'inventory_item_id', 'cable_type', 'cable_length'];
+                            if (shop_sound_cables_has_column('overall_label')) {
+                                $insertColumns[] = 'overall_label';
+                            }
+                            $insertColumns = [...$insertColumns, 'display_name', 'color', 'source_text', 'destination_text'];
+                            if (shop_sound_cables_has_column('adapter_text')) {
+                                $insertColumns[] = 'adapter_text';
+                            }
+                            if (shop_sound_cables_has_column('notes_text')) {
+                                $insertColumns[] = 'notes_text';
+                            } elseif (shop_sound_cables_has_column('description_text')) {
+                                $insertColumns[] = 'description_text';
+                            }
+                            if (shop_sound_cables_has_column('loom_name')) {
+                                $insertColumns[] = 'loom_name';
+                            }
+                            if (shop_sound_cables_has_column('loom_id_text')) {
+                                $insertColumns[] = 'loom_id_text';
+                            }
+                            if (shop_sound_cables_has_column('category_name')) {
+                                $insertColumns[] = 'category_name';
+                            }
+                            if (shop_sound_cables_has_column('source_revision_id')) {
+                                $insertColumns[] = 'source_revision_id';
+                            }
+                            if (shop_sound_cables_has_column('source_line_id')) {
+                                $insertColumns[] = 'source_line_id';
+                            }
+                            if (shop_sound_cables_has_column('source_line_index')) {
+                                $insertColumns[] = 'source_line_index';
+                            }
+                            if (shop_sound_cables_has_column('auto_created')) {
+                                $insertColumns[] = 'auto_created';
+                            }
+                            $insertColumns = [...$insertColumns, 'sort_order', 'created_at', 'updated_at'];
+                            $valueSql = implode(', ', array_fill(0, count($insertColumns) - 2, '?')) . ', NOW(), NOW()';
+                            $insertStmt = db()->prepare('INSERT INTO sound_cables (' . implode(', ', $insertColumns) . ') VALUES (' . $valueSql . ')');
                             $sortSeed = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) FROM sound_cables WHERE show_id = ' . (int) $selectedShowId)->fetchColumn();
                             foreach (array_slice($lines, 1) as $line) {
                                 $cols = shop_parse_delimited_line($line);
@@ -675,23 +818,49 @@ if (!function_exists('render_shop_app_page')) {
                                     continue;
                                 }
                                 $cols = array_map(static fn ($v): string => trim((string) $v), $cols);
-                                $insertStmt->execute([
+                                $params = [
                                     $selectedShowId,
                                     $orderId > 0 ? $orderId : null,
+                                    null,
                                     $cols[0],
                                     $cols[1],
-                                    $cols[2],
-                                    $cols[2] !== '' ? $cols[2] : $cols[0],
-                                    $cols[9],
-                                    $cols[3],
-                                    $cols[4],
-                                    $cols[5],
-                                    $cols[6],
-                                    $cols[7],
-                                    $cols[8],
-                                    $cols[10],
-                                    ++$sortSeed,
-                                ]);
+                                ];
+                                if (shop_sound_cables_has_column('overall_label')) {
+                                    $params[] = $cols[2];
+                                }
+                                $params[] = $cols[2] !== '' ? $cols[2] : $cols[0];
+                                $params[] = $cols[9];
+                                $params[] = $cols[3];
+                                $params[] = $cols[4];
+                                if (shop_sound_cables_has_column('adapter_text')) {
+                                    $params[] = $cols[5];
+                                }
+                                if (shop_sound_cables_has_column('notes_text') || shop_sound_cables_has_column('description_text')) {
+                                    $params[] = $cols[6];
+                                }
+                                if (shop_sound_cables_has_column('loom_name')) {
+                                    $params[] = $cols[7];
+                                }
+                                if (shop_sound_cables_has_column('loom_id_text')) {
+                                    $params[] = $cols[8];
+                                }
+                                if (shop_sound_cables_has_column('category_name')) {
+                                    $params[] = $cols[10];
+                                }
+                                if (shop_sound_cables_has_column('source_revision_id')) {
+                                    $params[] = null;
+                                }
+                                if (shop_sound_cables_has_column('source_line_id')) {
+                                    $params[] = null;
+                                }
+                                if (shop_sound_cables_has_column('source_line_index')) {
+                                    $params[] = null;
+                                }
+                                if (shop_sound_cables_has_column('auto_created')) {
+                                    $params[] = 0;
+                                }
+                                $params[] = ++$sortSeed;
+                                $insertStmt->execute($params);
                                 $inserted++;
                             }
                             flash_set('success', 'Cable import complete. Added: ' . $inserted);
@@ -719,29 +888,70 @@ if (!function_exists('render_shop_app_page')) {
                 $loomIds = $_POST['loom_id_text'] ?? [];
                 $colors = $_POST['color'] ?? [];
                 $categories = $_POST['category_name'] ?? [];
-                $updateStmt = db()->prepare('UPDATE sound_cables SET
-                    cable_type = ?, cable_length = ?, overall_label = ?, display_name = ?, source_text = ?, destination_text = ?,
-                    adapter_text = ?, notes_text = ?, loom_name = ?, loom_id_text = ?, color = ?, category_name = ?, bundle_key = ?, updated_at = NOW()
-                    WHERE id = ? AND show_id = ?');
+                $setSql = ['cable_type = ?', 'cable_length = ?'];
+                if (shop_sound_cables_has_column('overall_label')) {
+                    $setSql[] = 'overall_label = ?';
+                }
+                $setSql[] = 'display_name = ?';
+                $setSql[] = 'source_text = ?';
+                $setSql[] = 'destination_text = ?';
+                if (shop_sound_cables_has_column('adapter_text')) {
+                    $setSql[] = 'adapter_text = ?';
+                }
+                if (shop_sound_cables_has_column('notes_text')) {
+                    $setSql[] = 'notes_text = ?';
+                } elseif (shop_sound_cables_has_column('description_text')) {
+                    $setSql[] = 'description_text = ?';
+                }
+                if (shop_sound_cables_has_column('loom_name')) {
+                    $setSql[] = 'loom_name = ?';
+                }
+                if (shop_sound_cables_has_column('loom_id_text')) {
+                    $setSql[] = 'loom_id_text = ?';
+                }
+                $setSql[] = 'color = ?';
+                if (shop_sound_cables_has_column('category_name')) {
+                    $setSql[] = 'category_name = ?';
+                }
+                if (shop_sound_cables_has_column('bundle_key')) {
+                    $setSql[] = 'bundle_key = ?';
+                }
+                $setSql[] = 'updated_at = NOW()';
+                $updateStmt = db()->prepare('UPDATE sound_cables SET ' . implode(', ', $setSql) . ' WHERE id = ? AND show_id = ?');
                 foreach ($cableIds as $idx => $cableId) {
                     $loomName = trim((string) ($looms[$idx] ?? ''));
-                    $updateStmt->execute([
+                    $params = [
                         trim((string) ($types[$idx] ?? '')),
                         trim((string) ($lengths[$idx] ?? '')),
-                        trim((string) ($overallLabels[$idx] ?? '')),
-                        trim((string) ($overallLabels[$idx] ?? '')),
-                        trim((string) ($froms[$idx] ?? '')),
-                        trim((string) ($tos[$idx] ?? '')),
-                        trim((string) ($adapters[$idx] ?? '')),
-                        trim((string) ($notes[$idx] ?? '')),
-                        $loomName,
-                        trim((string) ($loomIds[$idx] ?? '')),
-                        trim((string) ($colors[$idx] ?? '')),
-                        trim((string) ($categories[$idx] ?? '')),
-                        $loomName !== '' ? $loomName : null,
-                        (int) $cableId,
-                        $selectedShowId,
-                    ]);
+                    ];
+                    if (shop_sound_cables_has_column('overall_label')) {
+                        $params[] = trim((string) ($overallLabels[$idx] ?? ''));
+                    }
+                    $params[] = trim((string) ($overallLabels[$idx] ?? ''));
+                    $params[] = trim((string) ($froms[$idx] ?? ''));
+                    $params[] = trim((string) ($tos[$idx] ?? ''));
+                    if (shop_sound_cables_has_column('adapter_text')) {
+                        $params[] = trim((string) ($adapters[$idx] ?? ''));
+                    }
+                    if (shop_sound_cables_has_column('notes_text') || shop_sound_cables_has_column('description_text')) {
+                        $params[] = trim((string) ($notes[$idx] ?? ''));
+                    }
+                    if (shop_sound_cables_has_column('loom_name')) {
+                        $params[] = $loomName;
+                    }
+                    if (shop_sound_cables_has_column('loom_id_text')) {
+                        $params[] = trim((string) ($loomIds[$idx] ?? ''));
+                    }
+                    $params[] = trim((string) ($colors[$idx] ?? ''));
+                    if (shop_sound_cables_has_column('category_name')) {
+                        $params[] = trim((string) ($categories[$idx] ?? ''));
+                    }
+                    if (shop_sound_cables_has_column('bundle_key')) {
+                        $params[] = $loomName !== '' ? $loomName : null;
+                    }
+                    $params[] = (int) $cableId;
+                    $params[] = $selectedShowId;
+                    $updateStmt->execute($params);
                 }
                 flash_set('success', 'Cable rows saved.');
             }
@@ -750,15 +960,28 @@ if (!function_exists('render_shop_app_page')) {
                 $selectedCableIds = $_POST['selected_cable_ids'] ?? [];
                 $loomName = trim((string) post('new_loom_name', ''));
                 $loomIdText = trim((string) post('new_loom_id_text', ''));
-                if ($loomName === '' || empty($selectedCableIds) || !is_array($selectedCableIds)) {
+                if (!shop_sound_cables_has_column('loom_name')) {
+                    flash_set('warning', 'Loom fields are unavailable until sound cable migrations are applied.');
+                } elseif ($loomName === '' || empty($selectedCableIds) || !is_array($selectedCableIds)) {
                     flash_set('warning', 'Enter loom name and select cable rows first.');
                 } else {
                     $selectedCableIds = array_values(array_filter(array_map('intval', $selectedCableIds), static fn ($v): bool => $v > 0));
                     if (!empty($selectedCableIds)) {
                         $in = implode(',', array_fill(0, count($selectedCableIds), '?'));
                         $params = [...$selectedCableIds, $selectedShowId];
-                        $loomStmt = db()->prepare('UPDATE sound_cables SET loom_name = ?, loom_id_text = ?, bundle_key = ?, updated_at = NOW() WHERE id IN (' . $in . ') AND show_id = ?');
-                        $loomStmt->execute([$loomName, $loomIdText, $loomName, ...$params]);
+                        $setSql = ['loom_name = ?'];
+                        $execParams = [$loomName];
+                        if (shop_sound_cables_has_column('loom_id_text')) {
+                            $setSql[] = 'loom_id_text = ?';
+                            $execParams[] = $loomIdText;
+                        }
+                        if (shop_sound_cables_has_column('bundle_key')) {
+                            $setSql[] = 'bundle_key = ?';
+                            $execParams[] = $loomName;
+                        }
+                        $setSql[] = 'updated_at = NOW()';
+                        $loomStmt = db()->prepare('UPDATE sound_cables SET ' . implode(', ', $setSql) . ' WHERE id IN (' . $in . ') AND show_id = ?');
+                        $loomStmt->execute([...$execParams, ...$params]);
                         flash_set('success', 'Loom created/assigned.');
                     } else {
                         flash_set('warning', 'No cable rows selected.');
@@ -767,6 +990,10 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($shopType === 'snd' && $action === 'add_cable_color') {
+                if (!shop_sound_cable_colors_table_exists()) {
+                    flash_set('warning', 'Color library is unavailable until sound cable migrations are applied.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+                }
                 $colorName = trim((string) post('color_name', ''));
                 $colorHex = trim((string) post('color_hex', '#1f9ad1'));
                 if (!preg_match('/^#[0-9a-fA-F]{6}$/', $colorHex)) {
@@ -786,6 +1013,10 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($shopType === 'snd' && $action === 'rename_cable_color') {
+                if (!shop_sound_cable_colors_table_exists()) {
+                    flash_set('warning', 'Color library is unavailable until sound cable migrations are applied.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+                }
                 $colorId = (int) post('color_id', '0');
                 $colorName = trim((string) post('color_name', ''));
                 $colorHex = trim((string) post('color_hex', '#1f9ad1'));
@@ -805,6 +1036,10 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($shopType === 'snd' && $action === 'delete_cable_color') {
+                if (!shop_sound_cable_colors_table_exists()) {
+                    flash_set('warning', 'Color library is unavailable until sound cable migrations are applied.');
+                    redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
+                }
                 $colorId = (int) post('color_id', '0');
                 if ($colorId > 0) {
                     $findColor = db()->prepare('SELECT name FROM sound_cable_colors WHERE id = ?');
@@ -886,8 +1121,6 @@ if (!function_exists('render_shop_app_page')) {
         $initialRevision = null;
         $revisionEntries = [];
         $exportableRevisions = [];
-        $selectedRevisionId = (int) ($_GET['revision'] ?? 0);
-        $selectedExportRevisionId = (int) ($_GET['export_revision'] ?? 0);
         $linesByCategory = [];
         $paperworkSettings = file_exists(__DIR__ . '/paperwork_export_settings_reference.php')
             ? require __DIR__ . '/paperwork_export_settings_reference.php'
@@ -1024,52 +1257,55 @@ if (!function_exists('render_shop_app_page')) {
                             // Best-effort auto-sync.
                         }
                     }
-                    if (shop_sound_cable_colors_have_hex_column()) {
-                        $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                    } else {
-                        $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                    }
-                    if (!$colorRows) {
-                        if (shop_sound_cable_colors_have_hex_column()) {
-                            $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
-                            $seedColors = [
-                                ['Black', '#111111'],
-                                ['Red', '#e53935'],
-                                ['Blue', '#1e88e5'],
-                                ['Green', '#43a047'],
-                                ['Yellow', '#fdd835'],
-                                ['White', '#ffffff'],
-                                ['Orange', '#fb8c00'],
-                                ['Purple', '#8e24aa'],
-                                ['Gray', '#9e9e9e'],
-                            ];
-                        } else {
-                            $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
-                            $seedColors = [
-                                ['Black', '#1f9ad1'],
-                                ['Red', '#1f9ad1'],
-                                ['Blue', '#1f9ad1'],
-                                ['Green', '#1f9ad1'],
-                                ['Yellow', '#1f9ad1'],
-                                ['White', '#1f9ad1'],
-                                ['Orange', '#1f9ad1'],
-                                ['Purple', '#1f9ad1'],
-                                ['Gray', '#1f9ad1'],
-                            ];
-                        }
-                        $seedSort = 10;
-                        foreach ($seedColors as $seedColor) {
-                            if (shop_sound_cable_colors_have_hex_column()) {
-                                $seedColorStmt->execute([$seedColor[0], $seedColor[1], $seedSort]);
-                            } else {
-                                $seedColorStmt->execute([$seedColor[0], $seedSort]);
-                            }
-                            $seedSort += 10;
-                        }
+                    $colorRows = [];
+                    if (shop_sound_cable_colors_table_exists()) {
                         if (shop_sound_cable_colors_have_hex_column()) {
                             $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
                         } else {
                             $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                        }
+                        if (!$colorRows) {
+                            if (shop_sound_cable_colors_have_hex_column()) {
+                                $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                                $seedColors = [
+                                    ['Black', '#111111'],
+                                    ['Red', '#e53935'],
+                                    ['Blue', '#1e88e5'],
+                                    ['Green', '#43a047'],
+                                    ['Yellow', '#fdd835'],
+                                    ['White', '#ffffff'],
+                                    ['Orange', '#fb8c00'],
+                                    ['Purple', '#8e24aa'],
+                                    ['Gray', '#9e9e9e'],
+                                ];
+                            } else {
+                                $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                                $seedColors = [
+                                    ['Black', '#1f9ad1'],
+                                    ['Red', '#1f9ad1'],
+                                    ['Blue', '#1f9ad1'],
+                                    ['Green', '#1f9ad1'],
+                                    ['Yellow', '#1f9ad1'],
+                                    ['White', '#1f9ad1'],
+                                    ['Orange', '#1f9ad1'],
+                                    ['Purple', '#1f9ad1'],
+                                    ['Gray', '#1f9ad1'],
+                                ];
+                            }
+                            $seedSort = 10;
+                            foreach ($seedColors as $seedColor) {
+                                if (shop_sound_cable_colors_have_hex_column()) {
+                                    $seedColorStmt->execute([$seedColor[0], $seedColor[1], $seedSort]);
+                                } else {
+                                    $seedColorStmt->execute([$seedColor[0], $seedSort]);
+                                }
+                                $seedSort += 10;
+                            }
+                            if (shop_sound_cable_colors_have_hex_column()) {
+                                $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                            } else {
+                                $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                            }
                         }
                     }
                     $soundCableColors = $colorRows;
