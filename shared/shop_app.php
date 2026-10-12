@@ -98,6 +98,9 @@ if (!function_exists('shop_parse_delimited_line')) {
         if (str_contains($line, "\t")) {
             return str_getcsv($line, "\t");
         }
+        if (str_contains($line, ';') && !str_contains($line, ',')) {
+            return str_getcsv($line, ';');
+        }
         return str_getcsv($line);
     }
 }
@@ -135,8 +138,23 @@ if (!function_exists('shop_resolve_cable_import_text')) {
             $error = 'Could not read uploaded file.';
             return '';
         }
-        $raw = preg_replace('/^\xEF\xBB\xBF/', '', (string) $raw) ?? (string) $raw;
-        return trim((string) $raw);
+        $rawString = (string) $raw;
+        if (function_exists('mb_convert_encoding') && function_exists('mb_check_encoding')) {
+            if (str_contains($rawString, "\0")) {
+                $converted = @mb_convert_encoding($rawString, 'UTF-8', 'UTF-16,UTF-16LE,UTF-16BE');
+                if (is_string($converted) && $converted !== '') {
+                    $rawString = $converted;
+                }
+            } elseif (!mb_check_encoding($rawString, 'UTF-8')) {
+                $converted = @mb_convert_encoding($rawString, 'UTF-8', 'Windows-1252,ISO-8859-1,UTF-8');
+                if (is_string($converted) && $converted !== '') {
+                    $rawString = $converted;
+                }
+            }
+        }
+        $rawString = str_replace("\0", '', $rawString);
+        $rawString = preg_replace('/^\xEF\xBB\xBF/', '', $rawString) ?? $rawString;
+        return trim($rawString);
     }
 }
 

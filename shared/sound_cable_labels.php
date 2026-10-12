@@ -76,27 +76,17 @@ foreach ($cables as $cable) {
         'overall' => $overall,
         'type' => $type,
         'length' => $length,
-        'end_title' => 'FROM',
-        'end_value' => $from . ($fromSuffix !== '' ? (' · ' . $fromSuffix) : ''),
-        'mate_value' => $to,
-        'adapter' => $adapter,
+        'end_marker' => $fromSuffix !== '' ? $fromSuffix : 'FROM',
+        'at_value' => $from !== '' ? $from : 'FROM',
         'color' => $color,
-        'loom' => $loom,
-        'loom_id' => $loomId,
-        'category' => $category,
     ];
     $labels[] = [
         'overall' => $overall,
         'type' => $type,
         'length' => $length,
-        'end_title' => 'TO',
-        'end_value' => $to . ($toSuffix !== '' ? (' · ' . $toSuffix) : ''),
-        'mate_value' => $from,
-        'adapter' => $adapter,
+        'end_marker' => $toSuffix !== '' ? $toSuffix : 'TO',
+        'at_value' => $to !== '' ? $to : 'TO',
         'color' => $color,
-        'loom' => $loom,
-        'loom_id' => $loomId,
-        'category' => $category,
     ];
 }
 
@@ -113,14 +103,43 @@ header('Content-Type: text/html; charset=UTF-8');
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .sheet { width: 8.5in; min-height: 11in; margin: 0 auto; padding: .5in .2in .3in .2in; box-sizing: border-box; }
     .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-auto-rows: .5in; column-gap: .125in; row-gap: 0; justify-content: center; }
-    .label { border: 1px dashed transparent; padding: .04in .06in; box-sizing: border-box; overflow: hidden; font-size: 8pt; line-height: 1.05; }
-    .label-title { font-weight: 700; font-size: 8.2pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .label-meta { font-size: 7pt; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .label-end { font-weight: 700; }
+    .label {
+      border: 1px solid #b6b6b6;
+      border-radius: .12in;
+      box-sizing: border-box;
+      overflow: hidden;
+      padding: .02in .05in .03in .05in;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: .015in;
+    }
+    .label-line-top,
+    .label-line-main,
+    .label-line-bottom {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      color: #060a10;
+      font-weight: 700;
+      line-height: 1.05;
+    }
+    .label-line-top { font-size: 7.2pt; }
+    .label-line-main {
+      font-size: 8pt;
+      padding: .02in .02in;
+      border-radius: .01in;
+      background: var(--stripe-color, #1f9ad1);
+      color: #081015;
+    }
+    .label-line-bottom {
+      font-size: 7pt;
+      font-weight: 600;
+    }
     @media print {
       .toolbar { display: none; }
       .sheet { margin: 0; width: auto; min-height: auto; padding: .5in .2in .3in .2in; }
-      .label { border-color: transparent !important; }
     }
   </style>
 </head>
@@ -132,15 +151,17 @@ header('Content-Type: text/html; charset=UTF-8');
   <div class="sheet">
     <div class="labels-grid">
       <?php foreach ($labels as $label): ?>
-        <div class="label">
-          <div class="label-title"><?= e($label['overall']) ?></div>
-          <div class="label-meta"><?= e(trim($label['type'] . ' ' . $label['length'])) ?></div>
-          <div class="label-meta label-end"><?= e($label['end_title'] . ': ' . $label['end_value']) ?></div>
-          <div class="label-meta"><?= e('MATE: ' . $label['mate_value']) ?></div>
-          <?php if ($label['adapter'] !== ''): ?><div class="label-meta"><?= e('ADAPTER: ' . $label['adapter']) ?></div><?php endif; ?>
-          <?php if ($label['color'] !== '' || $label['loom'] !== '' || $label['loom_id'] !== ''): ?>
-            <div class="label-meta"><?= e(trim(($label['color'] !== '' ? ('COLOR ' . $label['color']) : '') . ($label['loom'] !== '' ? (' · LOOM ' . $label['loom']) : '') . ($label['loom_id'] !== '' ? (' (' . $label['loom_id'] . ')') : ''))) ?></div>
-          <?php endif; ?>
+        <?php
+        $stripeColor = trim((string) ($label['color'] ?? ''));
+        $safeStripe = preg_match('/^#[0-9a-fA-F]{3,8}$/', $stripeColor) === 1
+            || preg_match('/^[a-zA-Z][a-zA-Z0-9\\-\\s]{1,30}$/', $stripeColor) === 1
+            ? $stripeColor
+            : '#1f9ad1';
+        ?>
+        <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
+          <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
+          <div class="label-line-main"><?= e($label['overall']) ?></div>
+          <div class="label-line-bottom"><?= e('@' . $label['at_value']) ?></div>
         </div>
       <?php endforeach; ?>
     </div>
