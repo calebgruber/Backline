@@ -221,6 +221,22 @@ if (!function_exists('shop_sound_cables_has_column')) {
         $columns = shop_sound_cables_columns();
         return isset($columns[strtolower($columnName)]);
     }
+
+    if (!function_exists('shop_hex_to_rgba')) {
+        function shop_hex_to_rgba(string $hex, float $alpha = 0.14): ?string
+        {
+            $value = trim($hex);
+            if (!preg_match('/^#([0-9a-fA-F]{6})$/', $value, $matches)) {
+                return null;
+            }
+            $rgb = $matches[1];
+            $r = hexdec(substr($rgb, 0, 2));
+            $g = hexdec(substr($rgb, 2, 2));
+            $b = hexdec(substr($rgb, 4, 2));
+            $a = max(0.0, min(1.0, $alpha));
+            return sprintf('rgba(%d, %d, %d, %.3f)', $r, $g, $b, $a);
+        }
+    }
 }
 
 if (!function_exists('shop_sync_sound_cables_from_revision')) {
@@ -989,6 +1005,40 @@ if (!function_exists('render_shop_app_page')) {
                 }
             }
 
+            if ($shopType === 'snd' && $action === 'rename_loom' && $selectedShowId > 0) {
+                $oldName = trim((string) post('old_loom_name', ''));
+                $newName = trim((string) post('new_loom_name', ''));
+                if ($oldName !== '' && $newName !== '' && shop_sound_cables_has_column('loom_name')) {
+                    $setSql = ['loom_name = ?'];
+                    $params = [$newName];
+                    if (shop_sound_cables_has_column('bundle_key')) {
+                        $setSql[] = 'bundle_key = ?';
+                        $params[] = $newName;
+                    }
+                    $setSql[] = 'updated_at = NOW()';
+                    $renameStmt = db()->prepare('UPDATE sound_cables SET ' . implode(', ', $setSql) . ' WHERE show_id = ? AND loom_name = ?');
+                    $renameStmt->execute([...$params, $selectedShowId, $oldName]);
+                    flash_set('success', 'Loom renamed.');
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'delete_loom' && $selectedShowId > 0) {
+                $loomName = trim((string) post('loom_name', ''));
+                if ($loomName !== '' && shop_sound_cables_has_column('loom_name')) {
+                    $setSql = ['loom_name = ""'];
+                    if (shop_sound_cables_has_column('loom_id_text')) {
+                        $setSql[] = 'loom_id_text = ""';
+                    }
+                    if (shop_sound_cables_has_column('bundle_key')) {
+                        $setSql[] = 'bundle_key = NULL';
+                    }
+                    $setSql[] = 'updated_at = NOW()';
+                    $deleteStmt = db()->prepare('UPDATE sound_cables SET ' . implode(', ', $setSql) . ' WHERE show_id = ? AND loom_name = ?');
+                    $deleteStmt->execute([$selectedShowId, $loomName]);
+                    flash_set('success', 'Loom removed from all rows.');
+                }
+            }
+
             if ($shopType === 'snd' && $action === 'add_cable_color') {
                 if (!shop_sound_cable_colors_table_exists()) {
                     flash_set('warning', 'Color library is unavailable until sound cable migrations are applied.');
@@ -1725,6 +1775,7 @@ if (!function_exists('render_shop_app_page')) {
                         <div class="card-body">
                             <?php
                             $soundCableColorMap = [];
+                            $soundCableLoomMembers = [];
                             foreach ($soundCableColors as $colorRow) {
                                 $colorNameKey = strtolower(trim((string) ($colorRow['name'] ?? '')));
                                 if ($colorNameKey === '') {
@@ -1734,6 +1785,13 @@ if (!function_exists('render_shop_app_page')) {
                                     'name' => (string) ($colorRow['name'] ?? ''),
                                     'hex_code' => (string) ($colorRow['hex_code'] ?? '#1f9ad1'),
                                 ];
+                            }
+                            foreach ($soundCables as $cableRow) {
+                                $loomNameValue = trim((string) ($cableRow['loom_name'] ?? ''));
+                                if ($loomNameValue === '') {
+                                    continue;
+                                }
+                                $soundCableLoomMembers[$loomNameValue][] = trim((string) (($cableRow['overall_label'] ?? '') ?: ($cableRow['display_name'] ?? '') ?: ($cableRow['cable_type'] ?? '')));
                             }
                             ?>
                             <div class="row g-2 align-items-end mb-3">
@@ -1751,6 +1809,7 @@ if (!function_exists('render_shop_app_page')) {
                                     </select>
                                 </div>
                                 <div class="col-md-8 d-flex justify-content-md-end gap-2">
+                                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cable-looms-modal">Edit Looms</button>
                                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cable-colors-modal">Edit Colors</button>
                                     <form method="post">
                                         <?= csrf_input() ?>
@@ -1806,13 +1865,9 @@ if (!function_exists('render_shop_app_page')) {
                                 <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
                                 <input type="hidden" name="current_tab" value="cables">
                                 <div class="row g-2 align-items-end">
-                                    <div class="col-md-5">
+                                    <div class="col-md-8">
                                         <label class="form-label">New Loom Name</label>
                                         <input class="form-control" name="new_loom_name" placeholder="e.g. DOWNSTAGE LOOM">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">loom_id</label>
-                                        <input class="form-control" name="new_loom_id_text" placeholder="e.g. L-01">
                                     </div>
                                     <div class="col-md-4 d-grid gap-2">
                                         <button class="btn btn-outline-primary w-100" type="button" id="create-loom-button">Create/Assign Loom from Selected Rows</button>
@@ -1832,7 +1887,6 @@ if (!function_exists('render_shop_app_page')) {
                                                 <th>Adapter</th>
                                                 <th>Notes</th>
                                                 <th>Loom</th>
-                                                <th>loom_id</th>
                                                 <th>Color</th>
                                                 <th>category</th>
                                             </tr>
@@ -1852,8 +1906,9 @@ if (!function_exists('render_shop_app_page')) {
                                                 } elseif (preg_match('/^#[0-9a-fA-F]{6}$/', $colorCurrent)) {
                                                     $colorHex = $colorCurrent;
                                                 }
+                                                $colorRowBg = shop_hex_to_rgba($colorHex, 0.16) ?? 'transparent';
                                                 ?>
-                                                <tr class="cable-row">
+                                                <tr class="cable-row" style="background-color: <?= e($colorRowBg) ?>;">
                                                     <td>
                                                         <input class="form-check-input" type="checkbox" name="selected_cable_ids[]" value="<?= (int) ($cable['id'] ?? 0) ?>">
                                                     </td>
@@ -1875,7 +1930,6 @@ if (!function_exists('render_shop_app_page')) {
                                                             <?php endforeach; ?>
                                                         </select>
                                                     </td>
-                                                    <td><input class="form-control form-control-sm cable-edit" name="loom_id_text[]" value="<?= e((string) ($cable['loom_id_text'] ?? '')) ?>"></td>
                                                     <td>
                                                         <select class="form-select form-select-sm cable-edit" name="color[]">
                                                             <option value="">Select Color</option>
@@ -1887,18 +1941,71 @@ if (!function_exists('render_shop_app_page')) {
                                                                 <option value="<?= e($colorCurrent) ?>" selected><?= e($colorCurrent) ?> (custom)</option>
                                                             <?php endif; ?>
                                                         </select>
-                                                        <div class="mt-1"><span class="d-inline-block align-middle me-1" style="width:12px;height:12px;border:1px solid #c0c0c0;border-radius:2px;background:<?= e($colorHex) ?>;"></span><span class="small text-secondary"><?= e($colorCurrent !== '' ? $colorCurrent : '—') ?></span></div>
                                                     </td>
                                                     <td><input class="form-control form-control-sm cable-edit" name="category_name[]" value="<?= e((string) ($cable['category_name'] ?? '')) ?>"></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             <?php if (!$soundCables): ?>
-                                                <tr><td colspan="12" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
+                                                <tr><td colspan="11" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
                                             <?php endif; ?>
                                         </tbody>
                                     </table>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="cable-looms-modal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Cable Looms</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-vcenter">
+                                            <thead><tr><th>Loom Name</th><th>Assigned Cables</th><th class="text-end">Actions</th></tr></thead>
+                                            <tbody>
+                                            <?php if (!$soundCableLoomMembers): ?>
+                                                <tr><td colspan="3" class="text-secondary">No looms yet.</td></tr>
+                                            <?php endif; ?>
+                                            <?php foreach ($soundCableLoomMembers as $loomName => $loomMembers): ?>
+                                                <tr>
+                                                    <td>
+                                                        <form method="post" class="d-flex gap-2">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="action" value="rename_loom">
+                                                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                                            <input type="hidden" name="current_tab" value="cables">
+                                                            <input type="hidden" name="old_loom_name" value="<?= e($loomName) ?>">
+                                                            <input class="form-control form-control-sm" name="new_loom_name" value="<?= e($loomName) ?>">
+                                                            <button class="btn btn-outline-primary btn-sm" type="submit">Save</button>
+                                                        </form>
+                                                    </td>
+                                                    <td>
+                                                        <div class="small text-secondary">
+                                                            <?= e(implode(' • ', array_slice($loomMembers, 0, 6))) ?>
+                                                            <?php if (count($loomMembers) > 6): ?><?= e(' • +' . (count($loomMembers) - 6) . ' more') ?><?php endif; ?>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <form method="post" class="d-inline">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="action" value="delete_loom">
+                                                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                                            <input type="hidden" name="current_tab" value="cables">
+                                                            <input type="hidden" name="loom_name" value="<?= e($loomName) ?>">
+                                                            <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('Remove this loom from all rows?')">Delete</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1973,7 +2080,24 @@ if (!function_exists('render_shop_app_page')) {
                             const actionInput = document.getElementById('sound-cables-action');
                             const loomButton = document.getElementById('create-loom-button');
                             const autosaveStatus = document.getElementById('cable-autosave-status');
+                            const colorHexMap = <?= json_encode(array_map(static fn ($row): string => (string) ($row['hex_code'] ?? '#1f9ad1'), array_column($soundCableColors, null, 'name')), JSON_UNESCAPED_SLASHES) ?>;
                             if (!sortSelect || !table || !cablesForm || !actionInput) return;
+
+                            const hexToRgba = (hex, alpha = 0.16) => {
+                                if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return 'transparent';
+                                const r = Number.parseInt(hex.slice(1, 3), 16);
+                                const g = Number.parseInt(hex.slice(3, 5), 16);
+                                const b = Number.parseInt(hex.slice(5, 7), 16);
+                                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                            };
+
+                            const applyRowColor = (row) => {
+                                const colorSelect = row.querySelector('select[name="color[]"]');
+                                if (!(colorSelect instanceof HTMLSelectElement)) return;
+                                const selected = (colorSelect.value || '').trim();
+                                const hex = colorHexMap[selected] || (/^#[0-9a-fA-F]{6}$/.test(selected) ? selected : '');
+                                row.style.backgroundColor = hex ? hexToRgba(hex) : 'transparent';
+                            };
 
                             const saveCables = () => {
                                 actionInput.value = 'save_cables';
@@ -2023,10 +2147,10 @@ if (!function_exists('render_shop_app_page')) {
                                     source_text: 4,
                                     destination_text: 5,
                                     loom_name: 8,
-                                    color: 10,
-                                    category_name: 11,
+                                    color: 9,
+                                    category_name: 10,
                                 };
-                                const cellIndex = keyIndexMap[field] ?? 11;
+                                const cellIndex = keyIndexMap[field] ?? 10;
                                 rows.sort((a, b) => {
                                     const aCell = a.children[cellIndex];
                                     const bCell = b.children[cellIndex];
@@ -2043,7 +2167,13 @@ if (!function_exists('render_shop_app_page')) {
                             table.querySelectorAll('.cable-edit').forEach((field) => {
                                 field.addEventListener('input', queueSave);
                                 field.addEventListener('change', queueSave);
+                                field.addEventListener('change', () => {
+                                    const row = field.closest('tr.cable-row');
+                                    if (row) applyRowColor(row);
+                                });
                             });
+
+                            table.querySelectorAll('tr.cable-row').forEach((row) => applyRowColor(row));
 
                             if (loomButton) {
                                 loomButton.addEventListener('click', () => {

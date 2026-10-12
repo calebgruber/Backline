@@ -139,10 +139,11 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($showName) ?> Cable Labels</title>
   <style>
+    @page { size: letter portrait; margin: 0; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
-    .sheet { width: 8.5in; min-height: 11in; margin: 0 auto; padding: .5in .2in .3in .2in; box-sizing: border-box; }
-    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-template-rows: repeat(20, .5in); column-gap: .125in; row-gap: 0; justify-content: center; grid-auto-flow: column; }
+    .sheet { width: 8.5in; height: 11in; margin: 0 auto; padding: .5in .75in; box-sizing: border-box; }
+    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.75in); grid-template-rows: repeat(20, .5in); column-gap: 0; row-gap: 0; grid-auto-flow: column; }
     .label {
       border: 1px solid #b6b6b6;
       border-radius: .12in;
@@ -171,6 +172,8 @@ header('Content-Type: text/html; charset=UTF-8');
       padding: .02in .02in;
       border-radius: .01in;
       background: var(--stripe-color, #1f9ad1);
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
       color: #081015;
     }
     .label-line-bottom {
@@ -193,7 +196,8 @@ header('Content-Type: text/html; charset=UTF-8');
     }
     @media print {
       .toolbar { display: none; }
-      .sheet { margin: 0; width: auto; min-height: auto; padding: .5in .2in .3in .2in; }
+      html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      .sheet { margin: 0; width: 8.5in; height: 11in; padding: .5in .75in; }
       .sheet-break-indicator { display: none; }
       .sheet-page-break { page-break-before: always; break-before: page; }
     }
