@@ -67,7 +67,15 @@ $cableStmt->execute([$showId]);
 $cables = $cableStmt->fetchAll();
 
 $labels = [];
+$seenCableIds = [];
 foreach ($cables as $cable) {
+    $cableId = (int) ($cable['id'] ?? 0);
+    if ($cableId > 0) {
+        if (isset($seenCableIds[$cableId])) {
+            continue;
+        }
+        $seenCableIds[$cableId] = true;
+    }
     $type = trim((string) ($cable['cable_type'] ?? ''));
     $typeLower = strtolower($type);
     $from = trim((string) ($cable['source_text'] ?? ''));
@@ -97,6 +105,7 @@ foreach ($cables as $cable) {
         'end_marker' => $fromSuffix !== '' ? $fromSuffix : 'FROM',
         'at_value' => $from !== '' ? $from : 'FROM',
         'color' => $color,
+        'color_text' => strtoupper($color),
     ];
     $labels[] = [
         'overall' => $overall,
@@ -105,6 +114,7 @@ foreach ($cables as $cable) {
         'end_marker' => $toSuffix !== '' ? $toSuffix : 'TO',
         'at_value' => $to !== '' ? $to : 'TO',
         'color' => $color,
+        'color_text' => strtoupper($color),
     ];
 }
 
@@ -218,7 +228,7 @@ header('Content-Type: text/html; charset=UTF-8');
           <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
             <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
             <div class="label-line-main"><?= e($label['overall']) ?></div>
-            <div class="label-line-bottom"><?= e('@' . $label['at_value']) ?></div>
+            <div class="label-line-bottom"><?= e('@' . $label['at_value'] . ($label['color_text'] !== '' ? (' · ' . $label['color_text']) : '')) ?></div>
           </div>
         <?php endforeach; ?>
       </div>
