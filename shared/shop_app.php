@@ -84,6 +84,85 @@ if (!function_exists('shop_store_show_upload')) {
     }
 }
 
+if (!function_exists('shop_sound_cable_is_candidate')) {
+    function shop_sound_cable_is_candidate(string $itemName, string $categoryName): bool
+    {
+        $haystack = strtolower(trim($itemName . ' ' . $categoryName));
+        return str_contains($haystack, 'cable');
+    }
+}
+
+if (!function_exists('shop_parse_delimited_line')) {
+    function shop_parse_delimited_line(string $line): array
+    {
+        if (str_contains($line, "\t")) {
+            return str_getcsv($line, "\t");
+        }
+        return str_getcsv($line);
+    }
+}
+
+if (!function_exists('shop_sync_sound_cables_from_revision')) {
+    function shop_sync_sound_cables_from_revision(int $showId, int $orderId, int $revisionId): int
+    {
+        $deleteStmt = db()->prepare('DELETE FROM sound_cables WHERE show_id = ? AND source_revision_id = ? AND auto_created = 1');
+        $deleteStmt->execute([$showId, $revisionId]);
+
+        $lineStmt = db()->prepare('SELECT ol.id, ol.inventory_item_id, ol.qty, ol.spares, ol.line_note, ii.name AS item_name, ic.name AS category_name
+            FROM order_lines ol
+            JOIN inventory_items ii ON ii.id = ol.inventory_item_id
+            LEFT JOIN inventory_categories ic ON ic.id = ii.category_id
+            WHERE ol.revision_id = ?');
+        $lineStmt->execute([$revisionId]);
+        $rows = $lineStmt->fetchAll();
+
+        $insertStmt = db()->prepare('INSERT INTO sound_cables (
+            show_id, order_id, inventory_item_id, cable_type, cable_length, overall_label, display_name, color, source_text, destination_text,
+            adapter_text, notes_text, loom_name, loom_id_text, category_name, source_revision_id, source_line_id, source_line_index, auto_created,
+            sort_order, created_at, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, NULL, "", "", "", ?, "", "", ?, ?, ?, ?, 1, ?, NOW(), NOW()
+        )');
+
+        $created = 0;
+        $sortSeed = 0;
+        foreach ($rows as $row) {
+            $itemName = trim((string) ($row['item_name'] ?? ''));
+            $categoryName = trim((string) ($row['category_name'] ?? ''));
+            if (!shop_sound_cable_is_candidate($itemName, $categoryName)) {
+                continue;
+            }
+            $qty = max(0, (int) ($row['qty'] ?? 0));
+            $spares = max(0, (int) ($row['spares'] ?? 0));
+            $count = $qty + $spares;
+            if ($count <= 0) {
+                continue;
+            }
+            for ($i = 1; $i <= $count; $i++) {
+                $overallLabel = $count > 1 ? ($itemName . ' #' . $i) : $itemName;
+                $insertStmt->execute([
+                    $showId,
+                    $orderId,
+                    (int) ($row['inventory_item_id'] ?? 0),
+                    $itemName,
+                    '',
+                    $overallLabel,
+                    $overallLabel,
+                    trim((string) ($row['line_note'] ?? '')),
+                    $categoryName,
+                    $revisionId,
+                    (int) ($row['id'] ?? 0),
+                    $i,
+                    $sortSeed++,
+                ]);
+                $created++;
+            }
+        }
+
+        return $created;
+    }
+}
+
 if (!function_exists('shop_sync_initial_line_to_revisions')) {
     function shop_sync_initial_line_to_revisions(int $orderId, int $inventoryItemId, int $qty, int $spares, string $lineNote, ?string $pullDate, ?string $returnDate, int $sortOrder, bool $hasReturnDateColumn): void
     {
@@ -190,6 +269,9 @@ if (!function_exists('render_shop_app_page')) {
                 ? ' AND (s.owner_user_id = ' . (int) $user['id'] . ' OR EXISTS (SELECT 1 FROM show_user_access sua WHERE sua.show_id = s.id AND sua.user_id = ' . (int) $user['id'] . '))'
                 : ' AND s.owner_user_id = ' . (int) $user['id']);
         $allowedTabs = ['info', 'initial', 'revisions', 'paperwork', 'exports'];
+        if ($shopType === 'snd') {
+            $allowedTabs[] = 'cables';
+        }
         $currentTab = (string) ($_GET['tab'] ?? 'info');
         $hasReturnDateColumn = shop_has_order_line_return_date_column();
         $hasSubcategoryColumn = shop_has_inventory_subcategory_column();
@@ -477,6 +559,173 @@ if (!function_exists('render_shop_app_page')) {
                 flash_set('success', 'Paperwork options saved.');
             }
 
+            if ($shopType === 'snd' && $action === 'sync_cables_from_revision' && $selectedShowId > 0) {
+                $revisionId = (int) post('sync_revision_id', '0');
+                $orderId = (int) post('order_id', '0');
+                if ($revisionId > 0 && $orderId > 0) {
+                    try {
+                        $created = shop_sync_sound_cables_from_revision($selectedShowId, $orderId, $revisionId);
+                        flash_set('success', 'Cables synced from revision. Added: ' . $created);
+                    } catch (Throwable) {
+                        flash_set('danger', 'Could not sync cables from revision.');
+                    }
+                } else {
+                    flash_set('warning', 'Select a revision to sync.');
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'import_cables' && $selectedShowId > 0) {
+                $importRaw = trim((string) post('cable_import_text', ''));
+                $orderId = (int) post('order_id', '0');
+                $required = ['cable_type', 'length', 'overall_label', 'from', 'to', 'adapter', 'notes', 'loom', 'loom_id', 'color', 'category'];
+                $inserted = 0;
+                if ($importRaw !== '') {
+                    $lines = preg_split('/\R/u', $importRaw) ?: [];
+                    $lines = array_values(array_filter(array_map('trim', $lines), static fn ($line): bool => $line !== ''));
+                    if (count($lines) > 1) {
+                        $header = array_map(static fn ($v): string => strtolower(trim((string) $v)), shop_parse_delimited_line($lines[0]));
+                        if ($header === $required) {
+                            $insertStmt = db()->prepare('INSERT INTO sound_cables (
+                                show_id, order_id, inventory_item_id, cable_type, cable_length, overall_label, display_name, color,
+                                source_text, destination_text, adapter_text, notes_text, loom_name, loom_id_text, category_name,
+                                source_revision_id, source_line_id, source_line_index, auto_created, sort_order, created_at, updated_at
+                            ) VALUES (
+                                ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0, ?, NOW(), NOW()
+                            )');
+                            $sortSeed = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) FROM sound_cables WHERE show_id = ' . (int) $selectedShowId)->fetchColumn();
+                            foreach (array_slice($lines, 1) as $line) {
+                                $cols = shop_parse_delimited_line($line);
+                                if (count($cols) < 11) {
+                                    continue;
+                                }
+                                $cols = array_map(static fn ($v): string => trim((string) $v), $cols);
+                                $insertStmt->execute([
+                                    $selectedShowId,
+                                    $orderId > 0 ? $orderId : null,
+                                    $cols[0],
+                                    $cols[1],
+                                    $cols[2],
+                                    $cols[2] !== '' ? $cols[2] : $cols[0],
+                                    $cols[9],
+                                    $cols[3],
+                                    $cols[4],
+                                    $cols[5],
+                                    $cols[6],
+                                    $cols[7],
+                                    $cols[8],
+                                    $cols[10],
+                                    ++$sortSeed,
+                                ]);
+                                $inserted++;
+                            }
+                            flash_set('success', 'Cable import complete. Added: ' . $inserted);
+                        } else {
+                            flash_set('danger', 'Import headers must exactly be: cable_type, Length, overall_label, From, To, Adapter, Notes, Loom, loom_id, Color, category');
+                        }
+                    } else {
+                        flash_set('warning', 'Paste header plus at least one cable row.');
+                    }
+                } else {
+                    flash_set('warning', 'Paste cable rows to import.');
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'save_cables' && $selectedShowId > 0) {
+                $cableIds = $_POST['cable_id'] ?? [];
+                $types = $_POST['cable_type'] ?? [];
+                $lengths = $_POST['cable_length'] ?? [];
+                $overallLabels = $_POST['overall_label'] ?? [];
+                $froms = $_POST['source_text'] ?? [];
+                $tos = $_POST['destination_text'] ?? [];
+                $adapters = $_POST['adapter_text'] ?? [];
+                $notes = $_POST['notes_text'] ?? [];
+                $looms = $_POST['loom_name'] ?? [];
+                $loomIds = $_POST['loom_id_text'] ?? [];
+                $colors = $_POST['color'] ?? [];
+                $categories = $_POST['category_name'] ?? [];
+                $updateStmt = db()->prepare('UPDATE sound_cables SET
+                    cable_type = ?, cable_length = ?, overall_label = ?, display_name = ?, source_text = ?, destination_text = ?,
+                    adapter_text = ?, notes_text = ?, loom_name = ?, loom_id_text = ?, color = ?, category_name = ?, bundle_key = ?, updated_at = NOW()
+                    WHERE id = ? AND show_id = ?');
+                foreach ($cableIds as $idx => $cableId) {
+                    $loomName = trim((string) ($looms[$idx] ?? ''));
+                    $updateStmt->execute([
+                        trim((string) ($types[$idx] ?? '')),
+                        trim((string) ($lengths[$idx] ?? '')),
+                        trim((string) ($overallLabels[$idx] ?? '')),
+                        trim((string) ($overallLabels[$idx] ?? '')),
+                        trim((string) ($froms[$idx] ?? '')),
+                        trim((string) ($tos[$idx] ?? '')),
+                        trim((string) ($adapters[$idx] ?? '')),
+                        trim((string) ($notes[$idx] ?? '')),
+                        $loomName,
+                        trim((string) ($loomIds[$idx] ?? '')),
+                        trim((string) ($colors[$idx] ?? '')),
+                        trim((string) ($categories[$idx] ?? '')),
+                        $loomName !== '' ? $loomName : null,
+                        (int) $cableId,
+                        $selectedShowId,
+                    ]);
+                }
+                flash_set('success', 'Cable rows saved.');
+            }
+
+            if ($shopType === 'snd' && $action === 'create_loom' && $selectedShowId > 0) {
+                $selectedCableIds = $_POST['selected_cable_ids'] ?? [];
+                $loomName = trim((string) post('new_loom_name', ''));
+                $loomIdText = trim((string) post('new_loom_id_text', ''));
+                if ($loomName === '' || empty($selectedCableIds) || !is_array($selectedCableIds)) {
+                    flash_set('warning', 'Enter loom name and select cable rows first.');
+                } else {
+                    $selectedCableIds = array_values(array_filter(array_map('intval', $selectedCableIds), static fn ($v): bool => $v > 0));
+                    if (!empty($selectedCableIds)) {
+                        $in = implode(',', array_fill(0, count($selectedCableIds), '?'));
+                        $params = [...$selectedCableIds, $selectedShowId];
+                        $loomStmt = db()->prepare('UPDATE sound_cables SET loom_name = ?, loom_id_text = ?, bundle_key = ?, updated_at = NOW() WHERE id IN (' . $in . ') AND show_id = ?');
+                        $loomStmt->execute([$loomName, $loomIdText, $loomName, ...$params]);
+                        flash_set('success', 'Loom created/assigned.');
+                    } else {
+                        flash_set('warning', 'No cable rows selected.');
+                    }
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'add_cable_color') {
+                $colorName = trim((string) post('color_name', ''));
+                if ($colorName !== '') {
+                    $sortOrder = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) + 10 FROM sound_cable_colors')->fetchColumn();
+                    $insColor = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                    $insColor->execute([$colorName, $sortOrder]);
+                    flash_set('success', 'Color added.');
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'rename_cable_color') {
+                $colorId = (int) post('color_id', '0');
+                $colorName = trim((string) post('color_name', ''));
+                if ($colorId > 0 && $colorName !== '') {
+                    $updColor = db()->prepare('UPDATE sound_cable_colors SET name = ?, updated_at = NOW() WHERE id = ?');
+                    $updColor->execute([$colorName, $colorId]);
+                    flash_set('success', 'Color updated.');
+                }
+            }
+
+            if ($shopType === 'snd' && $action === 'delete_cable_color') {
+                $colorId = (int) post('color_id', '0');
+                if ($colorId > 0) {
+                    $findColor = db()->prepare('SELECT name FROM sound_cable_colors WHERE id = ?');
+                    $findColor->execute([$colorId]);
+                    $colorName = (string) ($findColor->fetchColumn() ?: '');
+                    if ($colorName !== '') {
+                        $delColor = db()->prepare('DELETE FROM sound_cable_colors WHERE id = ?');
+                        $delColor->execute([$colorId]);
+                        $clearColor = db()->prepare('UPDATE sound_cables SET color = NULL WHERE show_id = ? AND color = ?');
+                        $clearColor->execute([$selectedShowId, $colorName]);
+                    }
+                    flash_set('success', 'Color deleted.');
+                }
+            }
+
             if ($action === 'invite_user' && $selectedShowId > 0 && $selectedShow) {
                 if (!$hasShowAccessTable) {
                     flash_set('warning', 'Run pending migrations before inviting users to shows.');
@@ -530,8 +779,9 @@ if (!function_exists('render_shop_app_page')) {
                 $latestRevisionId = (int) ($latestRevision['id'] ?? 0);
                 redirect($appPath . '?show=' . $selectedShowId . '&tab=exports&export_revision=' . $latestRevisionId);
             }
-            if ($action === 'print_labels' && $selectedShowId > 0 && $shopType === 'snd') {
-                flash_set('info', 'Label printing is not wired yet.');
+            if (($action === 'print_labels' || $action === 'print_cable_labels') && $selectedShowId > 0 && $shopType === 'snd') {
+                $printRevisionId = (int) post('print_revision_id', (string) $selectedRevisionId);
+                redirect('/shared/sound_cable_labels.php?show_id=' . (int) $selectedShowId . '&revision_id=' . $printRevisionId);
             }
 
             redirect($appPath . '?show=' . $selectedShowId . '&tab=' . urlencode($postedTab));
@@ -559,6 +809,9 @@ if (!function_exists('render_shop_app_page')) {
         $inviteCandidates = [];
         $showAccessUsers = [];
         $canManageShowAccess = false;
+        $soundCables = [];
+        $soundCableColors = [];
+        $soundCableLoomOptions = [];
 
         if ($selectedShowId > 0) {
             $orderStmt = db()->prepare('SELECT o.* FROM orders o JOIN shows s ON s.id = o.show_id WHERE o.show_id = ? AND o.shop_type = ? AND o.order_kind = "initial" AND s.deleted_at IS NULL' . $showAccessCondition . ' LIMIT 1');
@@ -668,6 +921,38 @@ if (!function_exists('render_shop_app_page')) {
                         $linesByCategory[$cat][$sub][] = $line;
                     }
                 }
+
+                if ($shopType === 'snd') {
+                    if ($currentTab === 'cables' && $order && $selectedRevisionId > 0) {
+                        try {
+                            shop_sync_sound_cables_from_revision($selectedShowId, (int) ($order['id'] ?? 0), $selectedRevisionId);
+                        } catch (Throwable) {
+                            // Best-effort auto-sync.
+                        }
+                    }
+                    $colorRows = db()->query('SELECT id, name FROM sound_cable_colors ORDER BY sort_order, name')->fetchAll();
+                    if (!$colorRows) {
+                        $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                        $seedColors = ['Black', 'Red', 'Blue', 'Green', 'Yellow', 'White', 'Orange', 'Purple', 'Gray'];
+                        $seedSort = 10;
+                        foreach ($seedColors as $seedColor) {
+                            $seedColorStmt->execute([$seedColor, $seedSort]);
+                            $seedSort += 10;
+                        }
+                        $colorRows = db()->query('SELECT id, name FROM sound_cable_colors ORDER BY sort_order, name')->fetchAll();
+                    }
+                    $soundCableColors = $colorRows;
+                    $cableStmt = db()->prepare('SELECT * FROM sound_cables WHERE show_id = ? ORDER BY sort_order, id');
+                    $cableStmt->execute([$selectedShowId]);
+                    $soundCables = $cableStmt->fetchAll();
+                    foreach ($soundCables as $cableRow) {
+                        $loomName = trim((string) ($cableRow['loom_name'] ?? ''));
+                        if ($loomName !== '') {
+                            $soundCableLoomOptions[$loomName] = $loomName;
+                        }
+                    }
+                    ksort($soundCableLoomOptions);
+                }
             }
         }
         if ($selectedShowId > 0) {
@@ -729,7 +1014,7 @@ if (!function_exists('render_shop_app_page')) {
             }
         }
 
-        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $initialRevision, $revisionEntries, $exportableRevisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout, $canManageShowAccess, $showAccessUsers, $inviteSearchTerm, $inviteCandidates, $hasShowAccessTable): void {
+        render_page($pageTitle, function () use ($shows, $selectedShowId, $selectedShow, $order, $revisions, $initialRevision, $revisionEntries, $exportableRevisions, $selectedRevisionId, $selectedExportRevisionId, $linesByCategory, $shopType, $heading, $scaffoldCopy, $currentTab, $showFirstNav, $appPath, $hasSubcategoryColumn, $paperworkSettings, $paperworkLayout, $canManageShowAccess, $showAccessUsers, $inviteSearchTerm, $inviteCandidates, $hasShowAccessTable, $soundCables, $soundCableColors, $soundCableLoomOptions): void {
             ?>
             <?php if ($showFirstNav && !$selectedShow): ?>
                 <div class="card mb-3 paperwork-preview-actions">
@@ -780,8 +1065,9 @@ if (!function_exists('render_shop_app_page')) {
                                 <?php if ($shopType === 'snd'): ?>
                                     <form method="post" class="d-inline-block">
                                         <?= csrf_input() ?>
-                                        <input type="hidden" name="action" value="print_labels">
+                                        <input type="hidden" name="action" value="print_cable_labels">
                                         <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                        <input type="hidden" name="print_revision_id" value="<?= (int) $selectedRevisionId ?>">
                                         <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
                                         <button class="btn btn-outline-primary btn-sm" type="submit">Print Labels</button>
                                     </form>
@@ -790,7 +1076,13 @@ if (!function_exists('render_shop_app_page')) {
                         </div>
                     </div>
                     <ul class="nav nav-tabs mb-3">
-                        <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings', 'exports' => 'Exports'] as $tabKey => $tabLabel): ?>
+                        <?php
+                        $tabMap = ['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings', 'exports' => 'Exports'];
+                        if ($shopType === 'snd') {
+                            $tabMap['cables'] = 'Cables';
+                        }
+                        ?>
+                        <?php foreach ($tabMap as $tabKey => $tabLabel): ?>
                             <li class="nav-item"><a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a></li>
                         <?php endforeach; ?>
                     </ul>
@@ -1060,6 +1352,289 @@ if (!function_exists('render_shop_app_page')) {
                         })();
                     </script>
                     <?php endif; ?>
+                <?php elseif ($selectedShow && $currentTab === 'cables' && $shopType === 'snd'): ?>
+                    <div class="card mb-3">
+                        <div class="card-header"><h3 class="card-title mb-0">Sound Cables Spreadsheet</h3></div>
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Sort Rows By</label>
+                                    <select class="form-select" id="cable-sort-select">
+                                        <option value="category_name">category</option>
+                                        <option value="cable_type">cable_type</option>
+                                        <option value="cable_length">Length</option>
+                                        <option value="overall_label">overall_label</option>
+                                        <option value="source_text">From</option>
+                                        <option value="destination_text">To</option>
+                                        <option value="color">Color</option>
+                                        <option value="loom_name">Loom</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8 d-flex justify-content-md-end gap-2">
+                                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cable-colors-modal">Edit Colors</button>
+                                    <form method="post">
+                                        <?= csrf_input() ?>
+                                        <input type="hidden" name="action" value="print_cable_labels">
+                                        <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                        <input type="hidden" name="print_revision_id" value="<?= (int) $selectedRevisionId ?>">
+                                        <input type="hidden" name="current_tab" value="cables">
+                                        <button class="btn btn-primary" type="submit">Print Labels (Avery 5167)</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <form method="post" class="mb-3">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="sync_cables_from_revision">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
+                                <input type="hidden" name="current_tab" value="cables">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Sync from revision</label>
+                                        <select class="form-select" name="sync_revision_id">
+                                            <?php foreach ($revisions as $rev): ?>
+                                                <option value="<?= (int) ($rev['id'] ?? 0) ?>" <?= (int) ($rev['id'] ?? 0) === (int) $selectedRevisionId ? 'selected' : '' ?>>
+                                                    <?= e('Revision ' . (string) ($rev['revision_label'] ?? '')) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-outline-primary w-100" type="submit">Auto-Add Cables from Revision</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <form method="post" class="mb-3">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="import_cables">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
+                                <input type="hidden" name="current_tab" value="cables">
+                                <label class="form-label">Import cables (paste text with exact headers)</label>
+                                <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
+                                <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
+                                <div class="mt-2">
+                                    <button class="btn btn-outline-primary" type="submit">Import</button>
+                                </div>
+                            </form>
+                            <form method="post" class="mb-3">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="create_loom">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="current_tab" value="cables">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-5">
+                                        <label class="form-label">New Loom Name</label>
+                                        <input class="form-control" name="new_loom_name" placeholder="e.g. DOWNSTAGE LOOM">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">loom_id</label>
+                                        <input class="form-control" name="new_loom_id_text" placeholder="e.g. L-01">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-outline-primary w-100" type="submit">Create/Assign Loom from Selected Rows</button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive mt-3">
+                                    <table class="table table-sm table-vcenter" id="sound-cables-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:44px">#</th>
+                                                <th>cable_type</th>
+                                                <th>Length</th>
+                                                <th>overall_label</th>
+                                                <th>From</th>
+                                                <th>To</th>
+                                                <th>Adapter</th>
+                                                <th>Notes</th>
+                                                <th>Loom</th>
+                                                <th>loom_id</th>
+                                                <th>Color</th>
+                                                <th>category</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($soundCables as $idx => $cable): ?>
+                                                <?php
+                                                $loomCurrent = trim((string) ($cable['loom_name'] ?? ''));
+                                                $colorCurrent = trim((string) ($cable['color'] ?? ''));
+                                                ?>
+                                                <tr class="cable-row">
+                                                    <td>
+                                                        <input class="form-check-input" type="checkbox" name="selected_cable_ids[]" value="<?= (int) ($cable['id'] ?? 0) ?>">
+                                                    </td>
+                                                    <td><?= e((string) ($cable['cable_type'] ?? '')) ?></td>
+                                                    <td><?= e((string) ($cable['cable_length'] ?? '')) ?></td>
+                                                    <td><?= e((string) (($cable['overall_label'] ?? '') ?: ($cable['display_name'] ?? ''))) ?></td>
+                                                    <td><?= e((string) ($cable['source_text'] ?? '')) ?></td>
+                                                    <td><?= e((string) ($cable['destination_text'] ?? '')) ?></td>
+                                                    <td><?= e((string) ($cable['adapter_text'] ?? '')) ?></td>
+                                                    <td><?= e((string) (($cable['notes_text'] ?? '') ?: ($cable['description_text'] ?? ''))) ?></td>
+                                                    <td><?= e($loomCurrent) ?></td>
+                                                    <td><?= e((string) ($cable['loom_id_text'] ?? '')) ?></td>
+                                                    <td><?= e($colorCurrent) ?></td>
+                                                    <td><?= e((string) ($cable['category_name'] ?? '')) ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </form>
+                            <form method="post">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="action" value="save_cables">
+                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="current_tab" value="cables">
+                                <div class="table-responsive">
+                                    <table class="table table-vcenter" id="sound-cables-editor-table">
+                                        <thead>
+                                            <tr>
+                                                <th>cable_type</th>
+                                                <th>Length</th>
+                                                <th>overall_label</th>
+                                                <th>From</th>
+                                                <th>To</th>
+                                                <th>Adapter</th>
+                                                <th>Notes</th>
+                                                <th>Loom</th>
+                                                <th>loom_id</th>
+                                                <th>Color</th>
+                                                <th>category</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($soundCables as $cable): ?>
+                                                <?php
+                                                $loomCurrent = trim((string) ($cable['loom_name'] ?? ''));
+                                                $colorCurrent = trim((string) ($cable['color'] ?? ''));
+                                                ?>
+                                                <tr class="cable-edit-row">
+                                                    <td>
+                                                        <input type="hidden" name="cable_id[]" value="<?= (int) ($cable['id'] ?? 0) ?>">
+                                                        <input class="form-control form-control-sm cable-edit" name="cable_type[]" value="<?= e((string) ($cable['cable_type'] ?? '')) ?>">
+                                                    </td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="cable_length[]" value="<?= e((string) ($cable['cable_length'] ?? '')) ?>"></td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="overall_label[]" value="<?= e((string) (($cable['overall_label'] ?? '') ?: ($cable['display_name'] ?? ''))) ?>"></td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="source_text[]" value="<?= e((string) ($cable['source_text'] ?? '')) ?>"></td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="destination_text[]" value="<?= e((string) ($cable['destination_text'] ?? '')) ?>"></td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="adapter_text[]" value="<?= e((string) ($cable['adapter_text'] ?? '')) ?>"></td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="notes_text[]" value="<?= e((string) (($cable['notes_text'] ?? '') ?: ($cable['description_text'] ?? ''))) ?>"></td>
+                                                    <td>
+                                                        <select class="form-select form-select-sm cable-edit" name="loom_name[]">
+                                                            <option value="">Not Loomed</option>
+                                                            <?php foreach ($soundCableLoomOptions as $loomOption): ?>
+                                                                <option value="<?= e($loomOption) ?>" <?= $loomCurrent === $loomOption ? 'selected' : '' ?>><?= e($loomOption) ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="loom_id_text[]" value="<?= e((string) ($cable['loom_id_text'] ?? '')) ?>"></td>
+                                                    <td>
+                                                        <select class="form-select form-select-sm cable-edit" name="color[]">
+                                                            <option value="">Select Color</option>
+                                                            <?php foreach ($soundCableColors as $colorRow): ?>
+                                                                <?php $colorName = (string) ($colorRow['name'] ?? ''); ?>
+                                                                <option value="<?= e($colorName) ?>" <?= $colorCurrent === $colorName ? 'selected' : '' ?>><?= e($colorName) ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </td>
+                                                    <td><input class="form-control form-control-sm cable-edit" name="category_name[]" value="<?= e((string) ($cable['category_name'] ?? '')) ?>"></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            <?php if (!$soundCables): ?>
+                                                <tr><td colspan="11" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" type="submit">Save Cable Spreadsheet</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="cable-colors-modal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Cable Colors Library</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form method="post" class="row g-2 mb-3">
+                                        <?= csrf_input() ?>
+                                        <input type="hidden" name="action" value="add_cable_color">
+                                        <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                        <input type="hidden" name="current_tab" value="cables">
+                                        <div class="col-md-8"><input class="form-control" name="color_name" placeholder="New color name"></div>
+                                        <div class="col-md-4"><button class="btn btn-primary w-100" type="submit">Add Color</button></div>
+                                    </form>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-vcenter">
+                                            <thead><tr><th>Color</th><th class="text-end">Actions</th></tr></thead>
+                                            <tbody>
+                                            <?php foreach ($soundCableColors as $colorRow): ?>
+                                                <tr>
+                                                    <td>
+                                                        <form method="post" class="d-flex gap-2">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="action" value="rename_cable_color">
+                                                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                                            <input type="hidden" name="current_tab" value="cables">
+                                                            <input type="hidden" name="color_id" value="<?= (int) ($colorRow['id'] ?? 0) ?>">
+                                                            <input class="form-control form-control-sm" name="color_name" value="<?= e((string) ($colorRow['name'] ?? '')) ?>">
+                                                            <button class="btn btn-outline-primary btn-sm" type="submit">Save</button>
+                                                        </form>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <form method="post" class="d-inline">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="action" value="delete_cable_color">
+                                                            <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                                            <input type="hidden" name="current_tab" value="cables">
+                                                            <input type="hidden" name="color_id" value="<?= (int) ($colorRow['id'] ?? 0) ?>">
+                                                            <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('Delete this color?')">Delete</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        (() => {
+                            const sortSelect = document.getElementById('cable-sort-select');
+                            const table = document.getElementById('sound-cables-table');
+                            if (!sortSelect || !table) return;
+                            sortSelect.addEventListener('change', () => {
+                                const field = sortSelect.value;
+                                const body = table.querySelector('tbody');
+                                if (!body) return;
+                                const rows = [...body.querySelectorAll('tr.cable-row')];
+                                const keyIndexMap = {
+                                    cable_type: 1,
+                                    cable_length: 2,
+                                    overall_label: 3,
+                                    source_text: 4,
+                                    destination_text: 5,
+                                    loom_name: 8,
+                                    color: 10,
+                                    category_name: 11,
+                                };
+                                const cellIndex = keyIndexMap[field] ?? 11;
+                                rows.sort((a, b) => {
+                                    const aText = (a.children[cellIndex]?.textContent || '').trim().toLowerCase();
+                                    const bText = (b.children[cellIndex]?.textContent || '').trim().toLowerCase();
+                                    return aText.localeCompare(bText, undefined, { numeric: true });
+                                });
+                                rows.forEach((row) => body.appendChild(row));
+                            });
+                        })();
+                    </script>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title">Revisions</h3></div>

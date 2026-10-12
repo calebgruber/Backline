@@ -61,7 +61,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
     $isShopAppContext = $isLxAppContext || $isSndAppContext;
     $selectedShopShowId = $isShopAppContext ? (int) ($_GET['show'] ?? 0) : 0;
     $selectedShopTab = $isShopAppContext ? (string) ($_GET['tab'] ?? 'info') : 'info';
-    if (!in_array($selectedShopTab, ['info', 'initial', 'revisions', 'paperwork'], true)) {
+    if (!in_array($selectedShopTab, ['info', 'initial', 'revisions', 'paperwork', 'exports', 'cables'], true)) {
         $selectedShopTab = 'info';
     }
     if ($selectedShopShowId > 0 && $user && $isShopAppContext) {
