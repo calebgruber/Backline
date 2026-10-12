@@ -105,6 +105,55 @@ if (!function_exists('shop_parse_delimited_line')) {
     }
 }
 
+if (!function_exists('shop_detect_delimiter')) {
+    function shop_detect_delimiter(string $content): string
+    {
+        $firstLine = '';
+        foreach (preg_split('/\R/u', $content) ?: [] as $line) {
+            $trimmed = trim((string) $line);
+            if ($trimmed !== '') {
+                $firstLine = $trimmed;
+                break;
+            }
+        }
+        if ($firstLine === '') {
+            return ',';
+        }
+        $tabCount = substr_count($firstLine, "\t");
+        $commaCount = substr_count($firstLine, ',');
+        $semiCount = substr_count($firstLine, ';');
+        if ($tabCount >= $commaCount && $tabCount >= $semiCount && $tabCount > 0) {
+            return "\t";
+        }
+        if ($semiCount > $commaCount && $semiCount > 0) {
+            return ';';
+        }
+        return ',';
+    }
+}
+
+if (!function_exists('shop_parse_delimited_rows')) {
+    function shop_parse_delimited_rows(string $content): array
+    {
+        $rows = [];
+        $delimiter = shop_detect_delimiter($content);
+        $stream = fopen('php://temp', 'r+');
+        if ($stream === false) {
+            return $rows;
+        }
+        fwrite($stream, $content);
+        rewind($stream);
+        while (($row = fgetcsv($stream, 0, $delimiter)) !== false) {
+            if ($row === [null]) {
+                continue;
+            }
+            $rows[] = array_map(static fn ($v): string => (string) $v, $row);
+        }
+        fclose($stream);
+        return $rows;
+    }
+}
+
 if (!function_exists('shop_resolve_cable_import_text')) {
     function shop_resolve_cable_import_text(array $postData, array $fileData, ?string &$error = null): string
     {
@@ -785,10 +834,9 @@ if (!function_exists('render_shop_app_page')) {
                 if ($importError !== null) {
                     flash_set('danger', $importError);
                 } elseif ($importRaw !== '') {
-                    $lines = preg_split('/\R/u', $importRaw) ?: [];
-                    $lines = array_values(array_filter(array_map('trim', $lines), static fn ($line): bool => $line !== ''));
-                    if (count($lines) > 1) {
-                        $header = array_map(static fn ($v): string => strtolower(trim((string) $v)), shop_parse_delimited_line($lines[0]));
+                    $rows = shop_parse_delimited_rows($importRaw);
+                    if (count($rows) > 1) {
+                        $header = array_map(static fn ($v): string => strtolower(trim((string) $v)), $rows[0]);
                         if ($header === $required) {
                             $insertColumns = ['show_id', 'order_id', 'inventory_item_id', 'cable_type', 'cable_length'];
                             if (shop_sound_cables_has_column('overall_label')) {
@@ -828,8 +876,7 @@ if (!function_exists('render_shop_app_page')) {
                             $valueSql = implode(', ', array_fill(0, count($insertColumns) - 2, '?')) . ', NOW(), NOW()';
                             $insertStmt = db()->prepare('INSERT INTO sound_cables (' . implode(', ', $insertColumns) . ') VALUES (' . $valueSql . ')');
                             $sortSeed = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) FROM sound_cables WHERE show_id = ' . (int) $selectedShowId)->fetchColumn();
-                            foreach (array_slice($lines, 1) as $line) {
-                                $cols = shop_parse_delimited_line($line);
+                            foreach (array_slice($rows, 1) as $cols) {
                                 if (count($cols) < 11) {
                                     continue;
                                 }
@@ -1808,7 +1855,11 @@ if (!function_exists('render_shop_app_page')) {
                                         <option value="loom_name">Loom</option>
                                     </select>
                                 </div>
-                                <div class="col-md-8 d-flex justify-content-md-end gap-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">Search</label>
+                                    <input type="search" class="form-control" id="cable-search-input" placeholder="Search cables...">
+                                </div>
+                                <div class="col-md-4 d-flex justify-content-md-end gap-2">
                                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cable-looms-modal">Edit Looms</button>
                                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cable-colors-modal">Edit Colors</button>
                                     <form method="post">
@@ -2080,6 +2131,7 @@ if (!function_exists('render_shop_app_page')) {
                             const actionInput = document.getElementById('sound-cables-action');
                             const loomButton = document.getElementById('create-loom-button');
                             const autosaveStatus = document.getElementById('cable-autosave-status');
+                            const searchInput = document.getElementById('cable-search-input');
                             const colorHexMap = <?= json_encode(array_map(static fn ($row): string => (string) ($row['hex_code'] ?? '#1f9ad1'), array_column($soundCableColors, null, 'name')), JSON_UNESCAPED_SLASHES) ?>;
                             if (!sortSelect || !table || !cablesForm || !actionInput) return;
 
@@ -2097,6 +2149,24 @@ if (!function_exists('render_shop_app_page')) {
                                 const selected = (colorSelect.value || '').trim();
                                 const hex = colorHexMap[selected] || (/^#[0-9a-fA-F]{6}$/.test(selected) ? selected : '');
                                 row.style.backgroundColor = hex ? hexToRgba(hex) : 'transparent';
+                            };
+
+                            const applySearch = () => {
+                                const query = (searchInput?.value || '').trim().toLowerCase();
+                                const rows = [...table.querySelectorAll('tr.cable-row')];
+                                rows.forEach((row) => {
+                                    if (query === '') {
+                                        row.style.display = '';
+                                        return;
+                                    }
+                                    const values = [...row.querySelectorAll('input,select')].map((el) => {
+                                        if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+                                            return el.value || '';
+                                        }
+                                        return '';
+                                    }).join(' ').toLowerCase();
+                                    row.style.display = values.includes(query) ? '' : 'none';
+                                });
                             };
 
                             const saveCables = () => {
@@ -2162,6 +2232,7 @@ if (!function_exists('render_shop_app_page')) {
                                 });
                                 rows.forEach((row) => body.appendChild(row));
                                 queueSave();
+                                applySearch();
                             });
 
                             table.querySelectorAll('.cable-edit').forEach((field) => {
@@ -2174,6 +2245,7 @@ if (!function_exists('render_shop_app_page')) {
                             });
 
                             table.querySelectorAll('tr.cable-row').forEach((row) => applyRowColor(row));
+                            searchInput?.addEventListener('input', applySearch);
 
                             if (loomButton) {
                                 loomButton.addEventListener('click', () => {
