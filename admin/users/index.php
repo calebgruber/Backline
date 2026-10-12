@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         foreach (array_keys($selectedPermissions) as $perm) {
-            if (!$canManageAllPerms && $perm !== 'lx.access' && $perm !== 'snd.access' && $perm !== 'lx.shop' && $perm !== 'snd.shop') {
+            if (!$canManageAllPerms && $perm !== 'lx.access' && $perm !== 'snd.access' && $perm !== 'lx.shop' && $perm !== 'snd.shop' && $perm !== 'paid.export') {
                 continue;
             }
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $selectedPerms = array_keys($selectedPermSet);
         if (!$canManageAllPerms) {
-            $selectedPerms = array_values(array_intersect($selectedPerms, ['lx.access', 'snd.access', 'lx.shop', 'snd.shop']));
+            $selectedPerms = array_values(array_intersect($selectedPerms, ['lx.access', 'snd.access', 'lx.shop', 'snd.shop', 'paid.export']));
         }
 
         db()->beginTransaction();
