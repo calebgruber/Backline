@@ -232,7 +232,7 @@ header('Content-Type: text/html; charset=UTF-8');
           <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
             <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
             <div class="label-line-main"><?= e($label['overall']) ?></div>
-            <div class="label-line-bottom"><?= e('@' . $label['at_value'] . ($label['color_text'] !== '' ? (' · ' . $label['color_text']) : '')) ?></div>
+            <div class="label-line-bottom"><?= e('@' . $label['at_value']) ?></div>
           </div>
         <?php endforeach; ?>
       </div>
