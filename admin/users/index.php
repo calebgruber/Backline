@@ -54,6 +54,13 @@ $seedPermissionStmt = db()->prepare('INSERT IGNORE INTO permissions (key_name, d
 foreach (array_keys($allRolePermissions) as $permissionKey) {
     $seedPermissionStmt->execute([$permissionKey, $permissionDescriptions[$permissionKey] ?? null]);
 }
+$paidPermissionIdStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
+$paidPermissionIdStmt->execute(['paid.export']);
+$paidPermissionId = (int) ($paidPermissionIdStmt->fetchColumn() ?: 0);
+if ($paidPermissionId > 0) {
+    $ensureSuperAdminPaidStmt = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) SELECT u.id, ?, NOW() FROM users u WHERE u.is_super_admin = 1 AND u.deleted_at IS NULL');
+    $ensureSuperAdminPaidStmt->execute([$paidPermissionId]);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
@@ -157,6 +164,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($rolePermissionMap[$roleKey] as $permissionKey) {
                 $selectedPermSet[$permissionKey] = true;
             }
+        }
+        if ((int) $targetUser['is_super_admin'] === 1) {
+            $selectedPermSet['paid.export'] = true;
         }
         $selectedPerms = array_keys($selectedPermSet);
         if (!$canManageAllPerms) {
