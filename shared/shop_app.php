@@ -1841,20 +1841,6 @@ if (!function_exists('render_shop_app_page')) {
                                 $soundCableLoomMembers[$loomNameValue][] = trim((string) (($cableRow['overall_label'] ?? '') ?: ($cableRow['display_name'] ?? '') ?: ($cableRow['cable_type'] ?? '')));
                             }
                             ?>
-                            <div class="card mb-3 border-0 bg-body-tertiary">
-                                <div class="card-body py-2">
-                                    <div class="small text-secondary text-uppercase fw-semibold mb-1">Label format preview</div>
-                                    <div class="rounded-3 border p-2 text-center bg-white">
-                                        <div class="fw-semibold mb-1">
-                                            <?= e('{TYPE} ({LENGTH}) / {END}') ?>
-                                        </div>
-                                        <div class="py-1 mb-1" style="background:#1f9ad1;color:#081015;">
-                                            <?= e('{MAIN LABEL}') ?>
-                                        </div>
-                                        <div class="fw-semibold"><?= e('@{from or to}') ?></div>
-                                    </div>
-                                </div>
-                            </div>
                             <div class="row g-2 align-items-end mb-3">
                                 <div class="col-md-4">
                                     <label class="form-label">Sort Rows By</label>
