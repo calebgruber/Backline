@@ -188,6 +188,23 @@ if (!function_exists('shop_sync_sound_cables_from_revision')) {
             if (!shop_sound_cable_is_candidate($itemName, $categoryName)) {
                 continue;
             }
+
+            if (!function_exists('shop_sound_cable_colors_have_hex_column')) {
+                function shop_sound_cable_colors_have_hex_column(): bool
+                {
+                    static $hasColumn = null;
+                    if ($hasColumn !== null) {
+                        return $hasColumn;
+                    }
+                    try {
+                        $stmt = db()->query("SHOW COLUMNS FROM sound_cable_colors LIKE 'hex_code'");
+                        $hasColumn = (bool) $stmt->fetch();
+                    } catch (Throwable) {
+                        $hasColumn = false;
+                    }
+                    return $hasColumn;
+                }
+            }
             $qty = max(0, (int) ($row['qty'] ?? 0));
             $spares = max(0, (int) ($row['spares'] ?? 0));
             $count = $qty + $spares;
@@ -751,10 +768,19 @@ if (!function_exists('render_shop_app_page')) {
 
             if ($shopType === 'snd' && $action === 'add_cable_color') {
                 $colorName = trim((string) post('color_name', ''));
+                $colorHex = trim((string) post('color_hex', '#1f9ad1'));
+                if (!preg_match('/^#[0-9a-fA-F]{6}$/', $colorHex)) {
+                    $colorHex = '#1f9ad1';
+                }
                 if ($colorName !== '') {
                     $sortOrder = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) + 10 FROM sound_cable_colors')->fetchColumn();
-                    $insColor = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
-                    $insColor->execute([$colorName, $sortOrder]);
+                    if (shop_sound_cable_colors_have_hex_column()) {
+                        $insColor = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                        $insColor->execute([$colorName, $colorHex, $sortOrder]);
+                    } else {
+                        $insColor = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                        $insColor->execute([$colorName, $sortOrder]);
+                    }
                     flash_set('success', 'Color added.');
                 }
             }
@@ -762,9 +788,18 @@ if (!function_exists('render_shop_app_page')) {
             if ($shopType === 'snd' && $action === 'rename_cable_color') {
                 $colorId = (int) post('color_id', '0');
                 $colorName = trim((string) post('color_name', ''));
+                $colorHex = trim((string) post('color_hex', '#1f9ad1'));
+                if (!preg_match('/^#[0-9a-fA-F]{6}$/', $colorHex)) {
+                    $colorHex = '#1f9ad1';
+                }
                 if ($colorId > 0 && $colorName !== '') {
-                    $updColor = db()->prepare('UPDATE sound_cable_colors SET name = ?, updated_at = NOW() WHERE id = ?');
-                    $updColor->execute([$colorName, $colorId]);
+                    if (shop_sound_cable_colors_have_hex_column()) {
+                        $updColor = db()->prepare('UPDATE sound_cable_colors SET name = ?, hex_code = ?, updated_at = NOW() WHERE id = ?');
+                        $updColor->execute([$colorName, $colorHex, $colorId]);
+                    } else {
+                        $updColor = db()->prepare('UPDATE sound_cable_colors SET name = ?, updated_at = NOW() WHERE id = ?');
+                        $updColor->execute([$colorName, $colorId]);
+                    }
                     flash_set('success', 'Color updated.');
                 }
             }
@@ -989,16 +1024,53 @@ if (!function_exists('render_shop_app_page')) {
                             // Best-effort auto-sync.
                         }
                     }
-                    $colorRows = db()->query('SELECT id, name FROM sound_cable_colors ORDER BY sort_order, name')->fetchAll();
+                    if (shop_sound_cable_colors_have_hex_column()) {
+                        $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                    } else {
+                        $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                    }
                     if (!$colorRows) {
-                        $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
-                        $seedColors = ['Black', 'Red', 'Blue', 'Green', 'Yellow', 'White', 'Orange', 'Purple', 'Gray'];
+                        if (shop_sound_cable_colors_have_hex_column()) {
+                            $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                            $seedColors = [
+                                ['Black', '#111111'],
+                                ['Red', '#e53935'],
+                                ['Blue', '#1e88e5'],
+                                ['Green', '#43a047'],
+                                ['Yellow', '#fdd835'],
+                                ['White', '#ffffff'],
+                                ['Orange', '#fb8c00'],
+                                ['Purple', '#8e24aa'],
+                                ['Gray', '#9e9e9e'],
+                            ];
+                        } else {
+                            $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                            $seedColors = [
+                                ['Black', '#1f9ad1'],
+                                ['Red', '#1f9ad1'],
+                                ['Blue', '#1f9ad1'],
+                                ['Green', '#1f9ad1'],
+                                ['Yellow', '#1f9ad1'],
+                                ['White', '#1f9ad1'],
+                                ['Orange', '#1f9ad1'],
+                                ['Purple', '#1f9ad1'],
+                                ['Gray', '#1f9ad1'],
+                            ];
+                        }
                         $seedSort = 10;
                         foreach ($seedColors as $seedColor) {
-                            $seedColorStmt->execute([$seedColor, $seedSort]);
+                            if (shop_sound_cable_colors_have_hex_column()) {
+                                $seedColorStmt->execute([$seedColor[0], $seedColor[1], $seedSort]);
+                            } else {
+                                $seedColorStmt->execute([$seedColor[0], $seedSort]);
+                            }
                             $seedSort += 10;
                         }
-                        $colorRows = db()->query('SELECT id, name FROM sound_cable_colors ORDER BY sort_order, name')->fetchAll();
+                        if (shop_sound_cable_colors_have_hex_column()) {
+                            $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                        } else {
+                            $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                        }
                     }
                     $soundCableColors = $colorRows;
                     $cableStmt = db()->prepare('SELECT * FROM sound_cables WHERE show_id = ? ORDER BY sort_order, id');
@@ -1415,6 +1487,19 @@ if (!function_exists('render_shop_app_page')) {
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title mb-0">Sound Cables Spreadsheet</h3></div>
                         <div class="card-body">
+                            <?php
+                            $soundCableColorMap = [];
+                            foreach ($soundCableColors as $colorRow) {
+                                $colorNameKey = strtolower(trim((string) ($colorRow['name'] ?? '')));
+                                if ($colorNameKey === '') {
+                                    continue;
+                                }
+                                $soundCableColorMap[$colorNameKey] = [
+                                    'name' => (string) ($colorRow['name'] ?? ''),
+                                    'hex_code' => (string) ($colorRow['hex_code'] ?? '#1f9ad1'),
+                                ];
+                            }
+                            ?>
                             <div class="row g-2 align-items-end mb-3">
                                 <div class="col-md-4">
                                     <label class="form-label">Sort Rows By</label>
@@ -1520,6 +1605,16 @@ if (!function_exists('render_shop_app_page')) {
                                                 <?php
                                                 $loomCurrent = trim((string) ($cable['loom_name'] ?? ''));
                                                 $colorCurrent = trim((string) ($cable['color'] ?? ''));
+                                                $colorHex = '#1f9ad1';
+                                                $colorLookup = $soundCableColorMap[strtolower($colorCurrent)] ?? null;
+                                                if (is_array($colorLookup)) {
+                                                    $candidateHex = trim((string) ($colorLookup['hex_code'] ?? ''));
+                                                    if (preg_match('/^#[0-9a-fA-F]{6}$/', $candidateHex)) {
+                                                        $colorHex = $candidateHex;
+                                                    }
+                                                } elseif (preg_match('/^#[0-9a-fA-F]{6}$/', $colorCurrent)) {
+                                                    $colorHex = $colorCurrent;
+                                                }
                                                 ?>
                                                 <tr class="cable-row">
                                                     <td>
@@ -1534,10 +1629,13 @@ if (!function_exists('render_shop_app_page')) {
                                                     <td><?= e((string) (($cable['notes_text'] ?? '') ?: ($cable['description_text'] ?? ''))) ?></td>
                                                     <td><?= e($loomCurrent) ?></td>
                                                     <td><?= e((string) ($cable['loom_id_text'] ?? '')) ?></td>
-                                                    <td><?= e($colorCurrent) ?></td>
+                                                    <td><span class="d-inline-block align-middle me-1" style="width:12px;height:12px;border:1px solid #c0c0c0;border-radius:2px;background:<?= e($colorHex) ?>;"></span><?= e($colorCurrent !== '' ? $colorCurrent : '—') ?></td>
                                                     <td><?= e((string) ($cable['category_name'] ?? '')) ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
+                                            <?php if (!$soundCables): ?>
+                                                <tr><td colspan="12" class="text-secondary">No cable rows yet. Sync from a revision or import using the exact headers.</td></tr>
+                                            <?php endif; ?>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1597,6 +1695,9 @@ if (!function_exists('render_shop_app_page')) {
                                                                 <?php $colorName = (string) ($colorRow['name'] ?? ''); ?>
                                                                 <option value="<?= e($colorName) ?>" <?= $colorCurrent === $colorName ? 'selected' : '' ?>><?= e($colorName) ?></option>
                                                             <?php endforeach; ?>
+                                                            <?php if ($colorCurrent !== '' && !isset($soundCableColorMap[strtolower($colorCurrent)])): ?>
+                                                                <option value="<?= e($colorCurrent) ?>" selected><?= e($colorCurrent) ?> (custom)</option>
+                                                            <?php endif; ?>
                                                         </select>
                                                     </td>
                                                     <td><input class="form-control form-control-sm cable-edit" name="category_name[]" value="<?= e((string) ($cable['category_name'] ?? '')) ?>"></td>
@@ -1628,15 +1729,25 @@ if (!function_exists('render_shop_app_page')) {
                                         <input type="hidden" name="action" value="add_cable_color">
                                         <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
                                         <input type="hidden" name="current_tab" value="cables">
-                                        <div class="col-md-8"><input class="form-control" name="color_name" placeholder="New color name"></div>
+                                        <div class="col-md-5"><input class="form-control" name="color_name" placeholder="New color name"></div>
+                                        <div class="col-md-3"><input class="form-control form-control-color w-100" type="color" name="color_hex" value="#1f9ad1" title="Pick color"></div>
                                         <div class="col-md-4"><button class="btn btn-primary w-100" type="submit">Add Color</button></div>
                                     </form>
                                     <div class="table-responsive">
                                         <table class="table table-sm table-vcenter">
-                                            <thead><tr><th>Color</th><th class="text-end">Actions</th></tr></thead>
+                                            <thead><tr><th style="width:90px">Swatch</th><th>Color + Hex</th><th class="text-end">Actions</th></tr></thead>
                                             <tbody>
                                             <?php foreach ($soundCableColors as $colorRow): ?>
+                                                <?php
+                                                $rowHex = trim((string) ($colorRow['hex_code'] ?? '#1f9ad1'));
+                                                if (!preg_match('/^#[0-9a-fA-F]{6}$/', $rowHex)) {
+                                                    $rowHex = '#1f9ad1';
+                                                }
+                                                ?>
                                                 <tr>
+                                                    <td>
+                                                        <span class="d-inline-block" style="width:28px;height:20px;border:1px solid #c0c0c0;border-radius:3px;background:<?= e($rowHex) ?>;"></span>
+                                                    </td>
                                                     <td>
                                                         <form method="post" class="d-flex gap-2">
                                                             <?= csrf_input() ?>
@@ -1645,11 +1756,12 @@ if (!function_exists('render_shop_app_page')) {
                                                             <input type="hidden" name="current_tab" value="cables">
                                                             <input type="hidden" name="color_id" value="<?= (int) ($colorRow['id'] ?? 0) ?>">
                                                             <input class="form-control form-control-sm" name="color_name" value="<?= e((string) ($colorRow['name'] ?? '')) ?>">
+                                                            <input class="form-control form-control-sm form-control-color" type="color" name="color_hex" value="<?= e($rowHex) ?>">
                                                             <button class="btn btn-outline-primary btn-sm" type="submit">Save</button>
                                                         </form>
                                                     </td>
                                                     <td class="text-end">
-                                                        <form method="post" class="d-inline">
+                                                        <form method="post" class="d-inline ms-1">
                                                             <?= csrf_input() ?>
                                                             <input type="hidden" name="action" value="delete_cable_color">
                                                             <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">

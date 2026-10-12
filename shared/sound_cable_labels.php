@@ -44,6 +44,24 @@ $showStmt = db()->prepare('SELECT show_name FROM shows WHERE id = ? LIMIT 1');
 $showStmt->execute([$showId]);
 $showName = (string) ($showStmt->fetchColumn() ?: 'Show');
 
+$colorMap = [];
+try {
+    $hasHexColumnStmt = db()->query("SHOW COLUMNS FROM sound_cable_colors LIKE 'hex_code'");
+    $hasHexColumn = (bool) $hasHexColumnStmt->fetch();
+    if ($hasHexColumn) {
+        $colorRows = db()->query("SELECT name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors")->fetchAll();
+        foreach ($colorRows as $row) {
+            $name = strtolower(trim((string) ($row['name'] ?? '')));
+            $hex = trim((string) ($row['hex_code'] ?? ''));
+            if ($name !== '' && preg_match('/^#[0-9a-fA-F]{6}$/', $hex)) {
+                $colorMap[$name] = $hex;
+            }
+        }
+    }
+} catch (Throwable) {
+    $colorMap = [];
+}
+
 $cableStmt = db()->prepare('SELECT * FROM sound_cables WHERE show_id = ? ORDER BY sort_order, id');
 $cableStmt->execute([$showId]);
 $cables = $cableStmt->fetchAll();
@@ -153,10 +171,13 @@ header('Content-Type: text/html; charset=UTF-8');
       <?php foreach ($labels as $label): ?>
         <?php
         $stripeColor = trim((string) ($label['color'] ?? ''));
-        $safeStripe = preg_match('/^#[0-9a-fA-F]{3,8}$/', $stripeColor) === 1
-            || preg_match('/^[a-zA-Z][a-zA-Z0-9\\-\\s]{1,30}$/', $stripeColor) === 1
-            ? $stripeColor
-            : '#1f9ad1';
+        $safeStripe = '#1f9ad1';
+        $stripeLookup = $colorMap[strtolower($stripeColor)] ?? null;
+        if (is_string($stripeLookup) && preg_match('/^#[0-9a-fA-F]{6}$/', $stripeLookup)) {
+            $safeStripe = $stripeLookup;
+        } elseif (preg_match('/^#[0-9a-fA-F]{6}$/', $stripeColor)) {
+            $safeStripe = $stripeColor;
+        }
         ?>
         <div class="label" style="--stripe-color: <?= e($safeStripe) ?>">
           <div class="label-line-top"><?= e(trim($label['type'] . ($label['length'] !== '' ? (' (' . $label['length'] . ')') : '') . ' / ' . $label['end_marker'])) ?></div>
