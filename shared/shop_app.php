@@ -1249,78 +1249,78 @@ if (!function_exists('render_shop_app_page')) {
                     }
                 }
 
-                if ($shopType === 'snd') {
-                    if ($currentTab === 'cables' && $order && $selectedRevisionId > 0) {
-                        try {
-                            shop_sync_sound_cables_from_revision($selectedShowId, (int) ($order['id'] ?? 0), $selectedRevisionId);
-                        } catch (Throwable) {
-                            // Best-effort auto-sync.
-                        }
-                    }
-                    $colorRows = [];
-                    if (shop_sound_cable_colors_table_exists()) {
-                        if (shop_sound_cable_colors_have_hex_column()) {
-                            $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                        } else {
-                            $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                        }
-                        if (!$colorRows) {
-                            if (shop_sound_cable_colors_have_hex_column()) {
-                                $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
-                                $seedColors = [
-                                    ['Black', '#111111'],
-                                    ['Red', '#e53935'],
-                                    ['Blue', '#1e88e5'],
-                                    ['Green', '#43a047'],
-                                    ['Yellow', '#fdd835'],
-                                    ['White', '#ffffff'],
-                                    ['Orange', '#fb8c00'],
-                                    ['Purple', '#8e24aa'],
-                                    ['Gray', '#9e9e9e'],
-                                ];
-                            } else {
-                                $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
-                                $seedColors = [
-                                    ['Black', '#1f9ad1'],
-                                    ['Red', '#1f9ad1'],
-                                    ['Blue', '#1f9ad1'],
-                                    ['Green', '#1f9ad1'],
-                                    ['Yellow', '#1f9ad1'],
-                                    ['White', '#1f9ad1'],
-                                    ['Orange', '#1f9ad1'],
-                                    ['Purple', '#1f9ad1'],
-                                    ['Gray', '#1f9ad1'],
-                                ];
-                            }
-                            $seedSort = 10;
-                            foreach ($seedColors as $seedColor) {
-                                if (shop_sound_cable_colors_have_hex_column()) {
-                                    $seedColorStmt->execute([$seedColor[0], $seedColor[1], $seedSort]);
-                                } else {
-                                    $seedColorStmt->execute([$seedColor[0], $seedSort]);
-                                }
-                                $seedSort += 10;
-                            }
-                            if (shop_sound_cable_colors_have_hex_column()) {
-                                $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                            } else {
-                                $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
-                            }
-                        }
-                    }
-                    $soundCableColors = $colorRows;
-                    $cableStmt = db()->prepare('SELECT * FROM sound_cables WHERE show_id = ? ORDER BY sort_order, id');
-                    $cableStmt->execute([$selectedShowId]);
-                    $soundCables = $cableStmt->fetchAll();
-                    foreach ($soundCables as $cableRow) {
-                        $loomName = trim((string) ($cableRow['loom_name'] ?? ''));
-                        if ($loomName !== '') {
-                            $soundCableLoomOptions[$loomName] = $loomName;
-                        }
-                    }
-                    ksort($soundCableLoomOptions);
+            }
+        }
+        if ($selectedShowId > 0 && $shopType === 'snd') {
+            if ($currentTab === 'cables' && $order && $selectedRevisionId > 0) {
+                try {
+                    shop_sync_sound_cables_from_revision($selectedShowId, (int) ($order['id'] ?? 0), $selectedRevisionId);
+                } catch (Throwable) {
+                    // Best-effort auto-sync.
                 }
             }
+            $colorRows = [];
+            if (shop_sound_cable_colors_table_exists()) {
+                if (shop_sound_cable_colors_have_hex_column()) {
+                    $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                } else {
+                    $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                }
+                if (!$colorRows) {
+                    if (shop_sound_cable_colors_have_hex_column()) {
+                        $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, hex_code, sort_order, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                        $seedColors = [
+                            ['Black', '#111111'],
+                            ['Red', '#e53935'],
+                            ['Blue', '#1e88e5'],
+                            ['Green', '#43a047'],
+                            ['Yellow', '#fdd835'],
+                            ['White', '#ffffff'],
+                            ['Orange', '#fb8c00'],
+                            ['Purple', '#8e24aa'],
+                            ['Gray', '#9e9e9e'],
+                        ];
+                    } else {
+                        $seedColorStmt = db()->prepare('INSERT IGNORE INTO sound_cable_colors (name, sort_order, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                        $seedColors = [
+                            ['Black', '#1f9ad1'],
+                            ['Red', '#1f9ad1'],
+                            ['Blue', '#1f9ad1'],
+                            ['Green', '#1f9ad1'],
+                            ['Yellow', '#1f9ad1'],
+                            ['White', '#1f9ad1'],
+                            ['Orange', '#1f9ad1'],
+                            ['Purple', '#1f9ad1'],
+                            ['Gray', '#1f9ad1'],
+                        ];
+                    }
+                    $seedSort = 10;
+                    foreach ($seedColors as $seedColor) {
+                        if (shop_sound_cable_colors_have_hex_column()) {
+                            $seedColorStmt->execute([$seedColor[0], $seedColor[1], $seedSort]);
+                        } else {
+                            $seedColorStmt->execute([$seedColor[0], $seedSort]);
+                        }
+                        $seedSort += 10;
+                    }
+                    if (shop_sound_cable_colors_have_hex_column()) {
+                        $colorRows = db()->query("SELECT id, name, COALESCE(hex_code, '#1f9ad1') AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                    } else {
+                        $colorRows = db()->query("SELECT id, name, '#1f9ad1' AS hex_code FROM sound_cable_colors ORDER BY sort_order, name")->fetchAll();
+                    }
+                }
+            }
+            $soundCableColors = $colorRows;
+            $cableStmt = db()->prepare('SELECT * FROM sound_cables WHERE show_id = ? ORDER BY sort_order, id');
+            $cableStmt->execute([$selectedShowId]);
+            $soundCables = $cableStmt->fetchAll();
+            foreach ($soundCables as $cableRow) {
+                $loomName = trim((string) ($cableRow['loom_name'] ?? ''));
+                if ($loomName !== '') {
+                    $soundCableLoomOptions[$loomName] = $loomName;
+                }
+            }
+            ksort($soundCableLoomOptions);
         }
         if ($selectedShowId > 0) {
             $showSettingStmt = db()->prepare('SELECT value_json FROM show_settings WHERE show_id = ? AND key_name = ? LIMIT 1');

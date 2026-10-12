@@ -120,7 +120,7 @@ header('Content-Type: text/html; charset=UTF-8');
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .sheet { width: 8.5in; min-height: 11in; margin: 0 auto; padding: .5in .2in .3in .2in; box-sizing: border-box; }
-    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-auto-rows: .5in; column-gap: .125in; row-gap: 0; justify-content: center; }
+    .labels-grid { display: grid; grid-template-columns: repeat(4, 1.875in); grid-auto-rows: .5in; column-gap: .125in; row-gap: 0; justify-content: center; grid-auto-flow: column; }
     .label {
       border: 1px solid #b6b6b6;
       border-radius: .12in;
