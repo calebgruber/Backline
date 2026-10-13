@@ -20,7 +20,7 @@ $roleOptions = [
     'sound_major' => 'Sound Major',
     'lighting_shop' => 'Lighting Shop',
     'sound_shop' => 'Sound Shop',
-    'sound_cables_manager' => 'Sound Cables Manager',
+    'cable_spreadsheet_editor' => 'Cable Spreadsheet Editor',
     'paid' => 'Paid',
     'admin' => 'Admin',
 ];
@@ -29,6 +29,7 @@ $rolePermissionMap = [
     'sound_major' => ['snd.access'],
     'lighting_shop' => ['lx.shop'],
     'sound_shop' => ['snd.shop'],
+    'cable_spreadsheet_editor' => ['snd.cables.manage'],
     'sound_cables_manager' => ['snd.cables.manage'],
     'paid' => ['paid.export'],
     'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
@@ -100,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $selectedRoles = [];
         }
         $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedRoles = array_map(static fn (string $roleKey): string => $roleKey === 'sound_cables_manager' ? 'cable_spreadsheet_editor' : $roleKey, $selectedRoles);
+        $selectedRoles = array_values(array_unique($selectedRoles));
         $selectedPermissions = [];
         foreach ($selectedRoles as $roleKey) {
             foreach ($rolePermissionMap[$roleKey] as $permissionKey) {
@@ -113,6 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
             $pidStmt->execute([$perm]);
             $pid = $pidStmt->fetchColumn();
+            if (!$pid) {
+                $seedPermissionStmt->execute([$perm, $permissionDescriptions[$perm] ?? null]);
+                $pidStmt->execute([$perm]);
+                $pid = $pidStmt->fetchColumn();
+            }
             if ($pid) {
                 $link = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) VALUES (?, ?, NOW())');
                 $link->execute([$newUserId, (int) $pid]);
@@ -173,6 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $selectedRoles = [];
         }
         $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedRoles = array_map(static fn (string $roleKey): string => $roleKey === 'sound_cables_manager' ? 'cable_spreadsheet_editor' : $roleKey, $selectedRoles);
+        $selectedRoles = array_values(array_unique($selectedRoles));
         $selectedPermSet = [];
         foreach ($selectedRoles as $roleKey) {
             foreach ($rolePermissionMap[$roleKey] as $permissionKey) {
@@ -193,6 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$target]);
 
             if (!empty($selectedPerms)) {
+                foreach ($selectedPerms as $permKey) {
+                    $seedPermissionStmt->execute([$permKey, $permissionDescriptions[$permKey] ?? null]);
+                }
                 $placeholders = implode(',', array_fill(0, count($selectedPerms), '?'));
                 $permStmt = db()->prepare('SELECT id, key_name FROM permissions WHERE key_name IN (' . $placeholders . ')');
                 $permStmt->execute($selectedPerms);
