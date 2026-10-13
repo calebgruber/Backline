@@ -30,7 +30,6 @@ $rolePermissionMap = [
     'lighting_shop' => ['lx.shop'],
     'sound_shop' => ['snd.shop'],
     'cable_spreadsheet_editor' => ['snd.cables.manage'],
-    'sound_cables_manager' => ['snd.cables.manage'],
     'paid' => ['paid.export'],
     'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
 ];
@@ -81,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
     $isSuperAdmin = (int) ($user['is_super_admin'] ?? 0) === 1;
-    $canManageAllPerms = $isSuperAdmin || user_has_permission($user, 'admin.access');
+    $canManageAllPerms = $isSuperAdmin || user_has_permission($user, 'admin.access') || user_has_permission($user, 'users.manage');
     if ($action === 'invite') {
         $name = post('name');
         $email = mb_strtolower(post('email'));
@@ -100,8 +99,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($selectedRoles)) {
             $selectedRoles = [];
         }
-        $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedRoles = array_map('strval', $selectedRoles);
         $selectedRoles = array_map(static fn (string $roleKey): string => $roleKey === 'sound_cables_manager' ? 'cable_spreadsheet_editor' : $roleKey, $selectedRoles);
+        $selectedRoles = array_values(array_intersect($selectedRoles, array_keys($rolePermissionMap)));
         $selectedRoles = array_values(array_unique($selectedRoles));
         $selectedPermissions = [];
         foreach ($selectedRoles as $roleKey) {
@@ -176,8 +176,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($selectedRoles)) {
             $selectedRoles = [];
         }
-        $selectedRoles = array_values(array_intersect(array_map('strval', $selectedRoles), array_keys($rolePermissionMap)));
+        $selectedRoles = array_map('strval', $selectedRoles);
         $selectedRoles = array_map(static fn (string $roleKey): string => $roleKey === 'sound_cables_manager' ? 'cable_spreadsheet_editor' : $roleKey, $selectedRoles);
+        $selectedRoles = array_values(array_intersect($selectedRoles, array_keys($rolePermissionMap)));
         $selectedRoles = array_values(array_unique($selectedRoles));
         $selectedPermSet = [];
         foreach ($selectedRoles as $roleKey) {
@@ -270,25 +271,19 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
         $userRoleMap[$uid] = $assignedRoles;
     }
     $renderRoleDropdown = static function (array $roleOptions, array $selectedRoles): void {
-        $selectedLabels = [];
-        foreach ($selectedRoles as $roleKey) {
-            if (isset($roleOptions[$roleKey])) {
-                $selectedLabels[] = $roleOptions[$roleKey];
-            }
-        }
-        $summary = empty($selectedLabels) ? 'Select roles' : implode(', ', $selectedLabels);
         ?>
-        <details class="role-dropdown">
-            <summary class="form-select role-dropdown-summary"><?= e($summary) ?></summary>
-            <div class="role-dropdown-menu">
+        <div class="role-dropdown-menu">
+            <div class="row g-1">
                 <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
-                    <label class="form-check mb-1">
-                        <input class="form-check-input" type="checkbox" name="roles[]" value="<?= e($roleKey) ?>" <?= in_array($roleKey, $selectedRoles, true) ? 'checked' : '' ?>>
-                        <span class="form-check-label"><?= e($roleLabel) ?></span>
-                    </label>
+                    <div class="col-md-6">
+                        <label class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" name="roles[]" value="<?= e($roleKey) ?>" <?= in_array($roleKey, $selectedRoles, true) ? 'checked' : '' ?>>
+                            <span class="form-check-label"><?= e($roleLabel) ?></span>
+                        </label>
+                    </div>
                 <?php endforeach; ?>
             </div>
-        </details>
+        </div>
         <?php
     };
     ?>
@@ -303,7 +298,7 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
                     <div class="mb-3">
                         <label class="form-label">Roles</label>
                         <?php $renderRoleDropdown($roleOptions, []); ?>
-                        <div class="form-hint">Open the dropdown and check all roles that apply.</div>
+                        <div class="form-hint">Check every role that should apply, then save.</div>
                     </div>
                     <button class="btn btn-primary">Send invite</button>
                 </form>
@@ -329,7 +324,7 @@ render_page('Users', function () use ($users, $userPermMap, $roleOptions, $roleP
                             <div class="col-12">
                                 <label class="form-label">Roles</label>
                                 <?php $renderRoleDropdown($roleOptions, $userRoleMap[(int) $u['id']] ?? []); ?>
-                                <div class="form-hint">Open the dropdown and check all roles that apply.</div>
+                                <div class="form-hint">Check every role that should apply, then save.</div>
                             </div>
                             <div class="col-12">
                                 <button class="btn btn-primary btn-sm">Save Roles</button>

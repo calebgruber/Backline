@@ -2010,9 +2010,13 @@ if (!function_exists('render_shop_app_page')) {
                     </script>
                     <?php endif; ?>
                 <?php elseif ($selectedShow && $currentTab === 'cables' && $shopType === 'snd'): ?>
+                    <div class="sound-cables-workspace">
                     <div class="card mb-3">
                         <div class="card-header"><h3 class="card-title mb-0">Sound Cables Spreadsheet</h3></div>
                         <div class="card-body">
+                            <div class="alert alert-info mb-3">
+                                <strong>How this works:</strong> select rows to bulk edit, then autosave keeps changes. Import/Add/Delete are available only to users with Spreadsheet Editor role.
+                            </div>
                             <?php
                             $soundCableColorMap = [];
                             $soundCableLoomMembers = [];
@@ -2242,6 +2246,7 @@ if (!function_exists('render_shop_app_page')) {
                             </div>
                         </div>
                     <?php endif; ?>
+                    </div>
 
                     <div class="modal fade" id="cable-looms-modal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg modal-dialog-scrollable">

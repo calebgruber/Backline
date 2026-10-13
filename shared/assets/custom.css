@@ -302,6 +302,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 .card-tab-top-left {
   position: relative;
   overflow: hidden;
+  border-top-left-radius: 0;
 }
 
 .card-tab-top-left::before {
@@ -309,14 +310,27 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   position: absolute;
   top: 0;
   left: 0;
-  width: 68px;
+  width: 76px;
   height: 6px;
   background: #206bc4;
-  border-bottom-right-radius: 10px;
+  border-bottom-right-radius: 8px;
+  border-top-left-radius: 0;
+  z-index: 2;
 }
 
 .dashboard-show-card .btn.btn-lg {
   border-radius: .8rem;
   padding-top: .72rem;
   padding-bottom: .72rem;
+}
+
+.sound-cables-workspace {
+  width: calc(100vw - 2rem);
+  max-width: 1800px;
+  margin-left: calc(50% - 50vw + 1rem);
+  margin-right: calc(50% - 50vw + 1rem);
+}
+
+.sound-cables-workspace .card {
+  border-radius: .9rem;
 }
