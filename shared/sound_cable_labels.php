@@ -156,6 +156,25 @@ header('Content-Type: text/html; charset=UTF-8');
     @page { size: letter portrait; margin: .5in .25in; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
+    .toolbar-btn {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      text-decoration: none;
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+      font: inherit;
+      line-height: 1.2;
+    }
+    .toolbar-btn:hover { background: #f8fafc; }
+    .toolbar-btn-primary {
+      background: #206bc4;
+      border-color: #206bc4;
+      color: #ffffff;
+    }
+    .toolbar-btn-primary:hover { background: #1a5aa6; border-color: #1a5aa6; color: #ffffff; }
     .sheet {
       width: 8in;
       height: 10in;
@@ -246,8 +265,8 @@ header('Content-Type: text/html; charset=UTF-8');
 </head>
 <body>
   <div class="toolbar">
-    <a href="<?= e($backUrl) ?>" style="display:inline-block;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#0f172a;">← Back</a>
-    <button onclick="window.print()">Print</button>
+    <a href="<?= e($backUrl) ?>" class="toolbar-btn">← Back</a>
+    <button class="toolbar-btn toolbar-btn-primary" type="button" onclick="window.print()">Print</button>
     <span><?= e($showName) ?> · Avery 5167 · <?= count($labels) ?> labels</span>
   </div>
   <?php foreach ($labelPages as $pageIndex => $pageLabels): ?>

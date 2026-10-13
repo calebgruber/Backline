@@ -72,10 +72,46 @@ function user_has_paid_export_access(array $user): bool
     if (($user['is_super_admin'] ?? 0) == 1) {
         return true;
     }
+    $userId = (int) ($user['id'] ?? 0);
+    if ($userId <= 0) {
+        return false;
+    }
 
-    $stmt = db()->prepare('SELECT 1 FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ? AND p.key_name IN ("paid.export", "paid") LIMIT 1');
-    $stmt->execute([(int) $user['id']]);
-    return (bool) $stmt->fetchColumn();
+    $keyStmt = db()->prepare('SELECT p.key_name FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ?');
+    $keyStmt->execute([$userId]);
+    $keys = array_map(static fn ($v): string => strtolower(trim((string) $v)), $keyStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    $keySet = [];
+    foreach ($keys as $key) {
+        if ($key !== '') {
+            $keySet[$key] = true;
+        }
+    }
+
+    if (isset($keySet['paid.export'])) {
+        return true;
+    }
+
+    $legacyPaidKeys = ['paid', 'paid_export', 'export.paid'];
+    $hasLegacyPaid = false;
+    foreach ($legacyPaidKeys as $legacyKey) {
+        if (isset($keySet[$legacyKey])) {
+            $hasLegacyPaid = true;
+            break;
+        }
+    }
+    if (!$hasLegacyPaid) {
+        return false;
+    }
+
+    $paidPermissionIdStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
+    $paidPermissionIdStmt->execute(['paid.export']);
+    $paidPermissionId = (int) ($paidPermissionIdStmt->fetchColumn() ?: 0);
+    if ($paidPermissionId > 0) {
+        $linkStmt = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) VALUES (?, ?, NOW())');
+        $linkStmt->execute([$userId, $paidPermissionId]);
+    }
+
+    return true;
 }
 
 function user_can_manage_sound_cables(array $user): bool

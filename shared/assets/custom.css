@@ -293,8 +293,8 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 }
 
 .dashboard-show-card {
-  --card-accent-color: #24c35a;
-  --card-accent-rgb: 36, 195, 90;
+  --card-accent-color: #206bc4;
+  --card-accent-rgb: 32, 107, 196;
   border-left: 5px solid var(--card-accent-color);
   border-radius: 1rem;
 }
@@ -311,7 +311,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   left: 0;
   width: 68px;
   height: 6px;
-  background: var(--card-accent-color, #206bc4);
+  background: #206bc4;
   border-bottom-right-radius: 10px;
 }
 
