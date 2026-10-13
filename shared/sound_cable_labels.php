@@ -137,26 +137,29 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($showName) ?> Cable Labels</title>
   <style>
-    @page { size: letter portrait; margin: .5in .281in; }
+    @page { size: letter portrait; margin: .5in .25in; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .sheet {
-      width: 7.938in;
+      width: 8in;
       height: 10in;
       margin: 0 auto;
       padding: 0;
       box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
     }
     .labels-grid {
       display: grid;
       grid-template-columns: repeat(4, 1.75in);
       grid-template-rows: repeat(20, .5in);
-      column-gap: calc(2.063in - 1.75in);
+      column-gap: .3125in;
       row-gap: 0;
       grid-auto-flow: column;
-      width: 7.938in;
+      width: 7.9375in;
       height: 10in;
-      margin: 0 auto;
+      margin: 0;
     }
     .label {
       border: 1px solid #b6b6b6;
@@ -213,9 +216,12 @@ header('Content-Type: text/html; charset=UTF-8');
       html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .sheet {
         margin: 0 auto;
-        width: 7.938in;
+        width: 8in;
         height: 10in;
         padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
       }
       .sheet-break-indicator { display: none; }
       .sheet-page-break { page-break-before: always; break-before: page; }
