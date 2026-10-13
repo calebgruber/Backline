@@ -161,10 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_permissions') {
         $target = (int) post('user_id');
-        if ($target === (int) $user['id']) {
-            flash_set('danger', 'You cannot change your own permissions.');
-            redirect('/admin/users');
-        }
         $targetStmt = db()->prepare('SELECT id, is_super_admin FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
         $targetStmt->execute([$target]);
         $targetUser = $targetStmt->fetch();
@@ -199,8 +195,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         db()->beginTransaction();
         try {
-            $stmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ?');
-            $stmt->execute([$target]);
+            if ($canManageAllPerms) {
+                $stmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ?');
+                $stmt->execute([$target]);
+            } else {
+                $manageablePermKeys = ['lx.access', 'snd.access', 'lx.shop', 'snd.shop', 'snd.cables.manage', 'paid.export'];
+                foreach ($manageablePermKeys as $permKey) {
+                    $seedPermissionStmt->execute([$permKey, $permissionDescriptions[$permKey] ?? null]);
+                }
+                $manageablePlaceholders = implode(',', array_fill(0, count($manageablePermKeys), '?'));
+                $manageablePermStmt = db()->prepare('SELECT id FROM permissions WHERE key_name IN (' . $manageablePlaceholders . ')');
+                $manageablePermStmt->execute($manageablePermKeys);
+                $manageablePermIds = array_values(array_filter(array_map('intval', $manageablePermStmt->fetchAll(PDO::FETCH_COLUMN) ?: []), static fn (int $id): bool => $id > 0));
+                if (!empty($manageablePermIds)) {
+                    $idPlaceholders = implode(',', array_fill(0, count($manageablePermIds), '?'));
+                    $deleteSubsetStmt = db()->prepare('DELETE FROM user_permissions WHERE user_id = ? AND permission_id IN (' . $idPlaceholders . ')');
+                    $deleteSubsetStmt->execute([$target, ...$manageablePermIds]);
+                }
+            }
 
             if (!empty($selectedPerms)) {
                 foreach ($selectedPerms as $permKey) {
