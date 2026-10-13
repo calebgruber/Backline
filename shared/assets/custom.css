@@ -299,6 +299,22 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   border-radius: 1rem;
 }
 
+.card-tab-top-left {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-tab-top-left::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 68px;
+  height: 6px;
+  background: var(--card-accent-color, #206bc4);
+  border-bottom-right-radius: 10px;
+}
+
 .dashboard-show-card .btn.btn-lg {
   border-radius: .8rem;
   padding-top: .72rem;

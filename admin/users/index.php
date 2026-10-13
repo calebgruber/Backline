@@ -20,6 +20,7 @@ $roleOptions = [
     'sound_major' => 'Sound Major',
     'lighting_shop' => 'Lighting Shop',
     'sound_shop' => 'Sound Shop',
+    'sound_cables_manager' => 'Sound Cables Manager',
     'paid' => 'Paid',
     'admin' => 'Admin',
 ];
@@ -28,6 +29,7 @@ $rolePermissionMap = [
     'sound_major' => ['snd.access'],
     'lighting_shop' => ['lx.shop'],
     'sound_shop' => ['snd.shop'],
+    'sound_cables_manager' => ['snd.cables.manage'],
     'paid' => ['paid.export'],
     'admin' => ['admin.access', 'inventory.manage', 'categories.manage', 'users.manage', 'shows.delete', 'resources.manage', 'lx.access', 'snd.access'],
 ];
@@ -42,6 +44,7 @@ $permissionDescriptions = [
     'snd.access' => 'Access sound app',
     'lx.shop' => 'Lighting shop role',
     'snd.shop' => 'Sound shop role',
+    'snd.cables.manage' => 'Manage sound cables spreadsheet add/import/delete actions',
     'paid.export' => 'Export shop orders (Paid role)',
 ];
 $allRolePermissions = [];
@@ -60,6 +63,17 @@ $paidPermissionId = (int) ($paidPermissionIdStmt->fetchColumn() ?: 0);
 if ($paidPermissionId > 0) {
     $ensureSuperAdminPaidStmt = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at) SELECT u.id, ?, NOW() FROM users u WHERE u.is_super_admin = 1 AND u.deleted_at IS NULL');
     $ensureSuperAdminPaidStmt->execute([$paidPermissionId]);
+    $legacyPaidPermissionIdStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
+    $legacyPaidPermissionIdStmt->execute(['paid']);
+    $legacyPaidPermissionId = (int) ($legacyPaidPermissionIdStmt->fetchColumn() ?: 0);
+    if ($legacyPaidPermissionId > 0) {
+        $backfillPaidExportStmt = db()->prepare('INSERT IGNORE INTO user_permissions (user_id, permission_id, created_at)
+            SELECT up.user_id, ?, NOW()
+            FROM user_permissions up
+            JOIN users u ON u.id = up.user_id
+            WHERE up.permission_id = ? AND u.deleted_at IS NULL');
+        $backfillPaidExportStmt->execute([$paidPermissionId, $legacyPaidPermissionId]);
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -93,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         foreach (array_keys($selectedPermissions) as $perm) {
-            if (!$canManageAllPerms && $perm !== 'lx.access' && $perm !== 'snd.access' && $perm !== 'lx.shop' && $perm !== 'snd.shop' && $perm !== 'paid.export') {
+            if (!$canManageAllPerms && $perm !== 'lx.access' && $perm !== 'snd.access' && $perm !== 'lx.shop' && $perm !== 'snd.shop' && $perm !== 'snd.cables.manage' && $perm !== 'paid.export') {
                 continue;
             }
             $pidStmt = db()->prepare('SELECT id FROM permissions WHERE key_name = ? LIMIT 1');
@@ -170,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $selectedPerms = array_keys($selectedPermSet);
         if (!$canManageAllPerms) {
-            $selectedPerms = array_values(array_intersect($selectedPerms, ['lx.access', 'snd.access', 'lx.shop', 'snd.shop', 'paid.export']));
+            $selectedPerms = array_values(array_intersect($selectedPerms, ['lx.access', 'snd.access', 'lx.shop', 'snd.shop', 'snd.cables.manage', 'paid.export']));
         }
 
         db()->beginTransaction();

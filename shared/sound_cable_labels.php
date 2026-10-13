@@ -43,6 +43,22 @@ if (!user_has_permission($user, 'admin.access')) {
 $showStmt = db()->prepare('SELECT show_name FROM shows WHERE id = ? LIMIT 1');
 $showStmt->execute([$showId]);
 $showName = (string) ($showStmt->fetchColumn() ?: 'Show');
+$backUrl = '/dash/sound?show=' . $showId . '&tab=cables';
+$referrer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
+if ($referrer !== '') {
+    $parsedReferrer = parse_url($referrer);
+    if (is_array($parsedReferrer)) {
+        $refHost = strtolower((string) ($parsedReferrer['host'] ?? ''));
+        $curHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($refHost === '' || $curHost === '' || $refHost === $curHost) {
+            $candidatePath = (string) ($parsedReferrer['path'] ?? '');
+            if ($candidatePath !== '' && str_starts_with($candidatePath, '/')) {
+                $candidateQuery = (string) ($parsedReferrer['query'] ?? '');
+                $backUrl = $candidatePath . ($candidateQuery !== '' ? ('?' . $candidateQuery) : '');
+            }
+        }
+    }
+}
 
 $colorMap = [];
 try {
@@ -230,6 +246,7 @@ header('Content-Type: text/html; charset=UTF-8');
 </head>
 <body>
   <div class="toolbar">
+    <a href="<?= e($backUrl) ?>" style="display:inline-block;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#0f172a;">← Back</a>
     <button onclick="window.print()">Print</button>
     <span><?= e($showName) ?> · Avery 5167 · <?= count($labels) ?> labels</span>
   </div>

@@ -78,6 +78,17 @@ function user_has_paid_export_access(array $user): bool
     return (bool) $stmt->fetchColumn();
 }
 
+function user_can_manage_sound_cables(array $user): bool
+{
+    if (($user['is_super_admin'] ?? 0) == 1) {
+        return true;
+    }
+    if (user_has_permission($user, 'admin.access')) {
+        return true;
+    }
+    return user_has_permission($user, 'snd.cables.manage');
+}
+
 function show_user_access_table_exists(): bool
 {
     static $exists = null;

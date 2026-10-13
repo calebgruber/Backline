@@ -465,6 +465,7 @@ if (!function_exists('render_shop_app_page')) {
         $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
         $hasPaidExport = user_has_paid_export_access($user);
+        $canManageSoundCables = $shopType === 'snd' ? user_can_manage_sound_cables($user) : false;
         $hasShowAccessTable = show_user_access_table_exists();
         $showListStmt = $isAdmin
             ? (function () use ($shopType) {
@@ -549,6 +550,12 @@ if (!function_exists('render_shop_app_page')) {
             if ($selectedShowId <= 0) {
                 flash_set('warning', 'Select a show first.');
                 redirect($appPath);
+            }
+
+            $cableSpreadsheetRestrictedActions = ['import_cables', 'add_cable_row', 'delete_selected_cables'];
+            if ($shopType === 'snd' && in_array($action, $cableSpreadsheetRestrictedActions, true) && !$canManageSoundCables) {
+                flash_set('danger', 'You do not have permission to add/import/delete cable rows from the spreadsheet.');
+                redirect($appPath . '?show=' . $selectedShowId . '&tab=cables');
             }
 
             if ($action === 'create_initial') {
@@ -833,6 +840,108 @@ if (!function_exists('render_shop_app_page')) {
                 }
             }
 
+            if ($shopType === 'snd' && $action === 'add_cable_row' && $selectedShowId > 0) {
+                $orderId = (int) post('order_id', '0');
+                $nextSort = (int) db()->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM sound_cables WHERE show_id = ' . (int) $selectedShowId)->fetchColumn();
+                $insertColumns = ['show_id', 'order_id', 'inventory_item_id', 'cable_type', 'cable_length'];
+                if (shop_sound_cables_has_column('overall_label')) {
+                    $insertColumns[] = 'overall_label';
+                }
+                $insertColumns = [...$insertColumns, 'display_name', 'color', 'source_text', 'destination_text'];
+                if (shop_sound_cables_has_column('adapter_text')) {
+                    $insertColumns[] = 'adapter_text';
+                }
+                if (shop_sound_cables_has_column('notes_text')) {
+                    $insertColumns[] = 'notes_text';
+                } elseif (shop_sound_cables_has_column('description_text')) {
+                    $insertColumns[] = 'description_text';
+                }
+                if (shop_sound_cables_has_column('loom_name')) {
+                    $insertColumns[] = 'loom_name';
+                }
+                if (shop_sound_cables_has_column('loom_id_text')) {
+                    $insertColumns[] = 'loom_id_text';
+                }
+                if (shop_sound_cables_has_column('category_name')) {
+                    $insertColumns[] = 'category_name';
+                }
+                if (shop_sound_cables_has_column('source_revision_id')) {
+                    $insertColumns[] = 'source_revision_id';
+                }
+                if (shop_sound_cables_has_column('source_line_id')) {
+                    $insertColumns[] = 'source_line_id';
+                }
+                if (shop_sound_cables_has_column('source_line_index')) {
+                    $insertColumns[] = 'source_line_index';
+                }
+                if (shop_sound_cables_has_column('auto_created')) {
+                    $insertColumns[] = 'auto_created';
+                }
+                $insertColumns = [...$insertColumns, 'sort_order', 'created_at', 'updated_at'];
+                $valueSql = implode(', ', array_fill(0, count($insertColumns) - 2, '?')) . ', NOW(), NOW()';
+                $insertStmt = db()->prepare('INSERT INTO sound_cables (' . implode(', ', $insertColumns) . ') VALUES (' . $valueSql . ')');
+                $params = [
+                    $selectedShowId,
+                    $orderId > 0 ? $orderId : null,
+                    null,
+                    '',
+                    '',
+                ];
+                if (shop_sound_cables_has_column('overall_label')) {
+                    $params[] = '';
+                }
+                $params[] = '';
+                $params[] = '';
+                $params[] = '';
+                $params[] = '';
+                if (shop_sound_cables_has_column('adapter_text')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('notes_text') || shop_sound_cables_has_column('description_text')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('loom_name')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('loom_id_text')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('category_name')) {
+                    $params[] = '';
+                }
+                if (shop_sound_cables_has_column('source_revision_id')) {
+                    $params[] = null;
+                }
+                if (shop_sound_cables_has_column('source_line_id')) {
+                    $params[] = null;
+                }
+                if (shop_sound_cables_has_column('source_line_index')) {
+                    $params[] = null;
+                }
+                if (shop_sound_cables_has_column('auto_created')) {
+                    $params[] = 0;
+                }
+                $params[] = $nextSort;
+                $insertStmt->execute($params);
+                flash_set('success', 'Blank cable row added.');
+            }
+
+            if ($shopType === 'snd' && $action === 'delete_selected_cables' && $selectedShowId > 0) {
+                $selectedCableIds = $_POST['selected_cable_ids'] ?? [];
+                if (!is_array($selectedCableIds)) {
+                    $selectedCableIds = [];
+                }
+                $selectedCableIds = array_values(array_filter(array_map('intval', $selectedCableIds), static fn ($v): bool => $v > 0));
+                if (empty($selectedCableIds)) {
+                    flash_set('warning', 'Select cable rows first.');
+                } else {
+                    $in = implode(',', array_fill(0, count($selectedCableIds), '?'));
+                    $deleteStmt = db()->prepare('DELETE FROM sound_cables WHERE id IN (' . $in . ') AND show_id = ?');
+                    $deleteStmt->execute([...$selectedCableIds, $selectedShowId]);
+                    flash_set('success', 'Selected cable rows deleted.');
+                }
+            }
+
             if ($shopType === 'snd' && $action === 'import_cables' && $selectedShowId > 0) {
                 $importError = null;
                 $importRaw = shop_resolve_cable_import_text($_POST, $_FILES['cable_import_file'] ?? [], $importError);
@@ -947,6 +1056,7 @@ if (!function_exists('render_shop_app_page')) {
             }
 
             if ($shopType === 'snd' && $action === 'save_cables' && $selectedShowId > 0) {
+                $isAjaxSave = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
                 $cableIds = $_POST['cable_id'] ?? [];
                 $types = $_POST['cable_type'] ?? [];
                 $lengths = $_POST['cable_length'] ?? [];
@@ -959,6 +1069,41 @@ if (!function_exists('render_shop_app_page')) {
                 $loomIds = $_POST['loom_id_text'] ?? [];
                 $colors = $_POST['color'] ?? [];
                 $categories = $_POST['category_name'] ?? [];
+                $cableRowsJson = trim((string) post('cable_rows_json', ''));
+                if ($cableRowsJson !== '') {
+                    $decodedRows = json_decode($cableRowsJson, true);
+                    if (is_array($decodedRows)) {
+                        $cableIds = [];
+                        $types = [];
+                        $lengths = [];
+                        $overallLabels = [];
+                        $froms = [];
+                        $tos = [];
+                        $adapters = [];
+                        $notes = [];
+                        $looms = [];
+                        $loomIds = [];
+                        $colors = [];
+                        $categories = [];
+                        foreach ($decodedRows as $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $cableIds[] = (int) ($row['id'] ?? 0);
+                            $types[] = (string) ($row['cable_type'] ?? '');
+                            $lengths[] = (string) ($row['cable_length'] ?? '');
+                            $overallLabels[] = (string) ($row['overall_label'] ?? '');
+                            $froms[] = (string) ($row['source_text'] ?? '');
+                            $tos[] = (string) ($row['destination_text'] ?? '');
+                            $adapters[] = (string) ($row['adapter_text'] ?? '');
+                            $notes[] = (string) ($row['notes_text'] ?? '');
+                            $looms[] = (string) ($row['loom_name'] ?? '');
+                            $loomIds[] = (string) ($row['loom_id_text'] ?? '');
+                            $colors[] = (string) ($row['color'] ?? '');
+                            $categories[] = (string) ($row['category_name'] ?? '');
+                        }
+                    }
+                }
                 $setSql = ['cable_type = ?', 'cable_length = ?'];
                 if (shop_sound_cables_has_column('overall_label')) {
                     $setSql[] = 'overall_label = ?';
@@ -990,6 +1135,10 @@ if (!function_exists('render_shop_app_page')) {
                 $setSql[] = 'updated_at = NOW()';
                 $updateStmt = db()->prepare('UPDATE sound_cables SET ' . implode(', ', $setSql) . ' WHERE id = ? AND show_id = ?');
                 foreach ($cableIds as $idx => $cableId) {
+                    $cableId = (int) $cableId;
+                    if ($cableId <= 0) {
+                        continue;
+                    }
                     $loomName = trim((string) ($looms[$idx] ?? ''));
                     $params = [
                         trim((string) ($types[$idx] ?? '')),
@@ -1020,9 +1169,14 @@ if (!function_exists('render_shop_app_page')) {
                     if (shop_sound_cables_has_column('bundle_key')) {
                         $params[] = $loomName !== '' ? $loomName : null;
                     }
-                    $params[] = (int) $cableId;
+                    $params[] = $cableId;
                     $params[] = $selectedShowId;
                     $updateStmt->execute($params);
+                }
+                if ($isAjaxSave) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['ok' => true]);
+                    exit;
                 }
                 flash_set('success', 'Cable rows saved.');
             }
@@ -1937,7 +2091,9 @@ if (!function_exists('render_shop_app_page')) {
                                 <?= csrf_input() ?>
                                 <input type="hidden" name="action" value="save_cables" id="sound-cables-action">
                                 <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
                                 <input type="hidden" name="current_tab" value="cables">
+                                <input type="hidden" name="cable_rows_json" id="sound-cables-json" value="">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-md-8">
                                         <label class="form-label">New Loom Name</label>
@@ -1945,7 +2101,41 @@ if (!function_exists('render_shop_app_page')) {
                                     </div>
                                     <div class="col-md-4 d-grid gap-2">
                                         <button class="btn btn-outline-primary w-100" type="button" id="create-loom-button">Create/Assign Loom from Selected Rows</button>
+                                        <?php if ($canManageSoundCables): ?>
+                                            <button class="btn btn-outline-primary w-100" type="button" id="add-cable-row-button">Add Cable Row</button>
+                                            <button class="btn btn-outline-danger w-100" type="button" id="delete-selected-cables-button">Delete Selected Rows</button>
+                                        <?php endif; ?>
                                         <div class="small text-secondary text-end" id="cable-autosave-status">Autosave ready</div>
+                                    </div>
+                                </div>
+                                <div class="row g-2 align-items-end mt-1">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Bulk Color (selected rows)</label>
+                                        <select class="form-select form-select-sm" id="bulk-color-select">
+                                            <option value="">Select Color</option>
+                                            <?php foreach ($soundCableColors as $colorRow): ?>
+                                                <?php $bulkColorName = (string) ($colorRow['name'] ?? ''); ?>
+                                                <option value="<?= e($bulkColorName) ?>"><?= e($bulkColorName) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Bulk Category (selected rows)</label>
+                                        <input class="form-control form-control-sm" id="bulk-category-input" placeholder="Category">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Bulk Loom (selected rows)</label>
+                                        <select class="form-select form-select-sm" id="bulk-loom-select">
+                                            <option value="">Not Loomed</option>
+                                            <?php foreach ($soundCableLoomOptions as $loomOption): ?>
+                                                <option value="<?= e($loomOption) ?>"><?= e($loomOption) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end gap-2">
+                                        <button class="btn btn-outline-primary btn-sm" type="button" id="bulk-apply-color-button">Apply Color to Selected</button>
+                                        <button class="btn btn-outline-primary btn-sm" type="button" id="bulk-apply-category-button">Apply Category to Selected</button>
+                                        <button class="btn btn-outline-primary btn-sm" type="button" id="bulk-apply-loom-button">Apply Loom to Selected</button>
                                     </div>
                                 </div>
                                 <div class="table-responsive mt-3">
@@ -2029,27 +2219,29 @@ if (!function_exists('render_shop_app_page')) {
                         </div>
                     </div>
 
-                    <div class="card mb-3">
-                        <div class="card-header"><h3 class="card-title mb-0">Import Cables</h3></div>
-                        <div class="card-body">
-                            <form method="post" enctype="multipart/form-data">
-                                <?= csrf_input() ?>
-                                <input type="hidden" name="action" value="import_cables">
-                                <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
-                                <input type="hidden" name="current_tab" value="cables">
-                                <label class="form-label">Import cables (paste or upload with exact headers)</label>
-                                <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
-                                <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
-                                <div class="mt-2">
-                                    <input class="form-control" type="file" name="cable_import_file" accept=".csv,.tsv,.txt,text/csv,text/plain">
-                                </div>
-                                <div class="mt-2">
-                                    <button class="btn btn-outline-primary" type="submit">Import</button>
-                                </div>
-                            </form>
+                    <?php if ($canManageSoundCables): ?>
+                        <div class="card mb-3">
+                            <div class="card-header"><h3 class="card-title mb-0">Import Cables</h3></div>
+                            <div class="card-body">
+                                <form method="post" enctype="multipart/form-data">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="import_cables">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="order_id" value="<?= (int) ($order['id'] ?? 0) ?>">
+                                    <input type="hidden" name="current_tab" value="cables">
+                                    <label class="form-label">Import cables (paste or upload with exact headers)</label>
+                                    <div class="form-hint mb-2">cable_type	Length	overall_label	From	To	Adapter	Notes	Loom	loom_id	Color	category</div>
+                                    <textarea class="form-control" name="cable_import_text" rows="5" placeholder="Paste header + rows here"></textarea>
+                                    <div class="mt-2">
+                                        <input class="form-control" type="file" name="cable_import_file" accept=".csv,.tsv,.txt,text/csv,text/plain">
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-primary" type="submit">Import</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
 
                     <div class="modal fade" id="cable-looms-modal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -2174,11 +2366,20 @@ if (!function_exists('render_shop_app_page')) {
                             const table = document.getElementById('sound-cables-table');
                             const cablesForm = document.getElementById('sound-cables-form');
                             const actionInput = document.getElementById('sound-cables-action');
+                            const jsonInput = document.getElementById('sound-cables-json');
                             const loomButton = document.getElementById('create-loom-button');
+                            const addCableRowButton = document.getElementById('add-cable-row-button');
+                            const deleteSelectedCablesButton = document.getElementById('delete-selected-cables-button');
                             const autosaveStatus = document.getElementById('cable-autosave-status');
                             const searchInput = document.getElementById('cable-search-input');
+                            const bulkColorSelect = document.getElementById('bulk-color-select');
+                            const bulkCategoryInput = document.getElementById('bulk-category-input');
+                            const bulkLoomSelect = document.getElementById('bulk-loom-select');
+                            const bulkApplyColorButton = document.getElementById('bulk-apply-color-button');
+                            const bulkApplyCategoryButton = document.getElementById('bulk-apply-category-button');
+                            const bulkApplyLoomButton = document.getElementById('bulk-apply-loom-button');
                             const colorHexMap = <?= json_encode(array_map(static fn ($row): string => (string) ($row['hex_code'] ?? '#1f9ad1'), array_column($soundCableColors, null, 'name')), JSON_UNESCAPED_SLASHES) ?>;
-                            if (!sortSelect || !table || !cablesForm || !actionInput) return;
+                            if (!sortSelect || !table || !cablesForm || !actionInput || !jsonInput) return;
 
                             const hexToRgba = (hex, alpha = 0.16) => {
                                 if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return 'transparent';
@@ -2214,12 +2415,55 @@ if (!function_exists('render_shop_app_page')) {
                                 });
                             };
 
+                            const collectCableRows = () => {
+                                const rows = [];
+                                table.querySelectorAll('tr.cable-row').forEach((row) => {
+                                    const read = (selector) => {
+                                        const input = row.querySelector(selector);
+                                        if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+                                            return input.value || '';
+                                        }
+                                        return '';
+                                    };
+                                    const id = Number.parseInt(read('input[name="cable_id[]"]') || '0', 10);
+                                    if (!Number.isFinite(id) || id <= 0) return;
+                                    rows.push({
+                                        id,
+                                        cable_type: read('input[name="cable_type[]"]'),
+                                        cable_length: read('input[name="cable_length[]"]'),
+                                        overall_label: read('input[name="overall_label[]"]'),
+                                        source_text: read('input[name="source_text[]"]'),
+                                        destination_text: read('input[name="destination_text[]"]'),
+                                        adapter_text: read('input[name="adapter_text[]"]'),
+                                        notes_text: read('input[name="notes_text[]"]'),
+                                        loom_name: read('select[name="loom_name[]"]'),
+                                        loom_id_text: read('input[name="loom_id_text[]"]'),
+                                        color: read('select[name="color[]"]'),
+                                        category_name: read('input[name="category_name[]"]'),
+                                    });
+                                });
+                                return rows;
+                            };
+
+                            const selectedRows = () => [...table.querySelectorAll('tr.cable-row')]
+                                .filter((row) => {
+                                    const box = row.querySelector('input[name="selected_cable_ids[]"]');
+                                    return box instanceof HTMLInputElement && box.checked;
+                                });
+
                             const saveCables = () => {
                                 actionInput.value = 'save_cables';
                                 if (autosaveStatus) {
                                     autosaveStatus.textContent = 'Saving…';
                                 }
-                                const body = new URLSearchParams(new FormData(cablesForm));
+                                const body = new URLSearchParams();
+                                body.set('_token', (cablesForm.querySelector('input[name="_token"]')?.value || ''));
+                                body.set('action', 'save_cables');
+                                body.set('show_id', (cablesForm.querySelector('input[name="show_id"]')?.value || '0'));
+                                body.set('current_tab', (cablesForm.querySelector('input[name="current_tab"]')?.value || 'cables'));
+                                const rowsJson = JSON.stringify(collectCableRows());
+                                jsonInput.value = rowsJson;
+                                body.set('cable_rows_json', rowsJson);
                                 fetch(window.location.pathname + window.location.search, {
                                     method: 'POST',
                                     credentials: 'same-origin',
@@ -2292,12 +2536,73 @@ if (!function_exists('render_shop_app_page')) {
                             table.querySelectorAll('tr.cable-row').forEach((row) => applyRowColor(row));
                             searchInput?.addEventListener('input', applySearch);
 
+                            const applyBulkUpdate = (applyFn) => {
+                                const rows = selectedRows();
+                                if (rows.length === 0) {
+                                    if (autosaveStatus) autosaveStatus.textContent = 'Select rows first';
+                                    return;
+                                }
+                                rows.forEach((row) => applyFn(row));
+                                queueSave();
+                            };
+
+                            const submitLightweightAction = (nextAction) => {
+                                actionInput.value = nextAction;
+                                table.querySelectorAll('input[name="cable_id[]"], .cable-edit').forEach((field) => {
+                                    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+                                        field.dataset.prevName = field.name;
+                                        field.removeAttribute('name');
+                                    }
+                                });
+                                cablesForm.submit();
+                            };
+
+                            bulkApplyColorButton?.addEventListener('click', () => {
+                                const nextColor = (bulkColorSelect?.value || '').trim();
+                                if (nextColor === '') return;
+                                applyBulkUpdate((row) => {
+                                    const select = row.querySelector('select[name="color[]"]');
+                                    if (select instanceof HTMLSelectElement) {
+                                        select.value = nextColor;
+                                        applyRowColor(row);
+                                    }
+                                });
+                            });
+
+                            bulkApplyCategoryButton?.addEventListener('click', () => {
+                                const nextCategory = (bulkCategoryInput?.value || '').trim();
+                                applyBulkUpdate((row) => {
+                                    const input = row.querySelector('input[name="category_name[]"]');
+                                    if (input instanceof HTMLInputElement) {
+                                        input.value = nextCategory;
+                                    }
+                                });
+                            });
+
+                            bulkApplyLoomButton?.addEventListener('click', () => {
+                                const nextLoom = (bulkLoomSelect?.value || '').trim();
+                                applyBulkUpdate((row) => {
+                                    const select = row.querySelector('select[name="loom_name[]"]');
+                                    if (select instanceof HTMLSelectElement) {
+                                        select.value = nextLoom;
+                                    }
+                                });
+                            });
+
                             if (loomButton) {
                                 loomButton.addEventListener('click', () => {
-                                    actionInput.value = 'create_loom';
-                                    cablesForm.submit();
+                                    submitLightweightAction('create_loom');
                                 });
                             }
+
+                            addCableRowButton?.addEventListener('click', () => {
+                                submitLightweightAction('add_cable_row');
+                            });
+
+                            deleteSelectedCablesButton?.addEventListener('click', () => {
+                                if (!window.confirm('Delete selected cable rows?')) return;
+                                submitLightweightAction('delete_selected_cables');
+                            });
                         })();
                     </script>
                 <?php elseif ($selectedShow && $currentTab === 'revisions' && $order): ?>
