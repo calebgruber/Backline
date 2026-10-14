@@ -194,7 +194,7 @@ header('Content-Type: text/html; charset=UTF-8');
       grid-auto-flow: column;
       width: 7.9375in;
       height: 10in;
-      margin: -0.0625in 0 0 0;
+      margin: 0 0 0 0;
     }
     .label {
       border: 1px solid #d0d0d0;
