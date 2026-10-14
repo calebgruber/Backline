@@ -153,7 +153,7 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($showName) ?> Cable Labels</title>
   <style>
-    @page { size: letter portrait; margin: .5in .3in; }
+    @page { size: 8.5in 11in; margin: .5in .3in; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .toolbar-btn {
@@ -247,8 +247,16 @@ header('Content-Type: text/html; charset=UTF-8');
       break-before: page;
     }
     @media print {
+      @page { size: 8.5in 11in; margin: .5in .3in; }
       .toolbar { display: none; }
-      html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      html, body {
+        width: 8.5in;
+        min-height: 11in;
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       .sheet {
         margin: 0 auto;
         width: 7.9in;
