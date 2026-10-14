@@ -226,11 +226,20 @@ render_page('Login', function (): void {
         const body = new URLSearchParams(payload);
         const response = await fetch('/auth/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
           body: body.toString(),
           credentials: 'same-origin',
         });
-        return response.json();
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          throw new Error(text && text.trim() !== '' ? text : 'Unexpected server response.');
+        }
       };
       button.addEventListener('click', async () => {
         const email = (emailInput?.value || '').trim();

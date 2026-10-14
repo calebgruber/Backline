@@ -423,11 +423,20 @@ render_page('Profile', function () use ($user, $roleBadges, $passkeysAvailable, 
         const body = new URLSearchParams(payload);
         const response = await fetch('/profile', {
           method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
           body: body.toString(),
           credentials: 'same-origin',
         });
-        return response.json();
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          throw new Error(text && text.trim() !== '' ? text : 'Unexpected server response.');
+        }
       };
       button.addEventListener('click', async () => {
         button.disabled = true;
