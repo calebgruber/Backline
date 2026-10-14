@@ -331,6 +331,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
   };
 
   document.querySelectorAll('.card').forEach((card) => {
+    if (card.classList.contains('dashboard-show-card') || card.classList.contains('card-tab-top-left')) return;
     const title = card.querySelector('.card-title');
     if (!title) return;
     const titleText = (title.textContent || '').trim();

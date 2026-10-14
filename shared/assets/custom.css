@@ -308,8 +308,8 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 .card-tab-top-left::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 0;
+  top: -1px;
+  left: -1px;
   width: 76px;
   height: 6px;
   background: #206bc4;

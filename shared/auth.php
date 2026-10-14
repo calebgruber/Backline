@@ -122,7 +122,16 @@ function user_can_manage_sound_cables(array $user): bool
     if (user_has_permission($user, 'admin.access')) {
         return true;
     }
-    return user_has_permission($user, 'snd.cables.manage');
+    if (user_has_permission($user, 'snd.cables.manage')) {
+        return true;
+    }
+    $userId = (int) ($user['id'] ?? 0);
+    if ($userId <= 0) {
+        return false;
+    }
+    $stmt = db()->prepare('SELECT 1 FROM user_permissions up JOIN permissions p ON p.id = up.permission_id WHERE up.user_id = ? AND LOWER(TRIM(p.key_name)) IN ("sound_cables_manager","snd.cable.manage","snd.cables.editor") LIMIT 1');
+    $stmt->execute([$userId]);
+    return (bool) $stmt->fetchColumn();
 }
 
 function show_user_access_table_exists(): bool

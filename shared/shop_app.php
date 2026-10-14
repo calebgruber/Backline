@@ -2462,7 +2462,7 @@ if (!function_exists('render_shop_app_page')) {
                                     autosaveStatus.textContent = 'Saving…';
                                 }
                                 const body = new URLSearchParams();
-                                body.set('_token', (cablesForm.querySelector('input[name="_token"]')?.value || ''));
+                                body.set('_csrf', (cablesForm.querySelector('input[name="_csrf"]')?.value || ''));
                                 body.set('action', 'save_cables');
                                 body.set('show_id', (cablesForm.querySelector('input[name="show_id"]')?.value || '0'));
                                 body.set('current_tab', (cablesForm.querySelector('input[name="current_tab"]')?.value || 'cables'));
