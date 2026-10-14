@@ -153,7 +153,7 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($showName) ?> Cable Labels</title>
   <style>
-    @page { size: 8.5in 11in; margin: .5in .3in; }
+    @page { size: letter portrait; margin: .5in .25in; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .toolbar-btn {
@@ -176,7 +176,7 @@ header('Content-Type: text/html; charset=UTF-8');
     }
     .toolbar-btn-primary:hover { background: #1a5aa6; border-color: #1a5aa6; color: #ffffff; }
     .sheet {
-      width: 7.9in;
+      width: 8in;
       height: 10in;
       margin: 0 auto;
       padding: 0;
@@ -189,15 +189,15 @@ header('Content-Type: text/html; charset=UTF-8');
       display: grid;
       grid-template-columns: repeat(4, 1.75in);
       grid-template-rows: repeat(20, .5in);
-      column-gap: .3in;
+      column-gap: .3125in;
       row-gap: 0;
       grid-auto-flow: column;
-      width: 7.9in;
+      width: 7.9375in;
       height: 10in;
-      margin: 0;
+      margin: -0.0625in 0 0 0;
     }
     .label {
-      border: 1px solid #e0e0e0;
+      border: 1px solid #d0d0d0;
       border-radius: .04in;
       box-sizing: border-box;
       overflow: hidden;
@@ -247,19 +247,11 @@ header('Content-Type: text/html; charset=UTF-8');
       break-before: page;
     }
     @media print {
-      @page { size: 8.5in 11in; margin: .5in .3in; }
       .toolbar { display: none; }
-      html, body {
-        width: 8.5in;
-        min-height: 11in;
-        margin: 0;
-        padding: 0;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
+      html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .sheet {
         margin: 0 auto;
-        width: 7.9in;
+        width: 8in;
         height: 10in;
         padding: 0;
         display: flex;
