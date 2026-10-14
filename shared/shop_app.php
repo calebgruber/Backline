@@ -1719,8 +1719,23 @@ if (!function_exists('render_shop_app_page')) {
                             $tabMap['cables'] = 'Cables';
                         }
                         ?>
+                        <?php
+                        $tabIcons = [
+                            'info' => 'clipboard-list',
+                            'initial' => 'file-plus',
+                            'revisions' => 'git-branch',
+                            'paperwork' => 'file-description',
+                            'exports' => 'file-export',
+                            'cables' => 'cable',
+                        ];
+                        ?>
                         <?php foreach ($tabMap as $tabKey => $tabLabel): ?>
-                            <li class="nav-item"><a class="nav-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>"><?= e($tabLabel) ?></a></li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-tab-link <?= $currentTab === $tabKey ? 'active' : '' ?>" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=<?= e($tabKey) ?>">
+                                    <i class="ti ti-<?= e((string) ($tabIcons[$tabKey] ?? 'chevron-right')) ?> nav-tab-icon" aria-hidden="true"></i>
+                                    <span class="nav-link-title"><?= e($tabLabel) ?></span>
+                                </a>
+                            </li>
                         <?php endforeach; ?>
                     </ul>
                     <?php if (!$hasPaidExport): ?>

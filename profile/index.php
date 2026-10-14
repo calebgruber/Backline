@@ -256,10 +256,6 @@ if ($passkeysAvailable) {
 }
 
 render_page('Profile', function () use ($user, $roleBadges, $passkeysAvailable, $passkeys): void {
-    $desktopModeChoice = 'system';
-    if (array_key_exists('desktop_mode_override', $user) && $user['desktop_mode_override'] !== null) {
-        $desktopModeChoice = ((int) $user['desktop_mode_override'] === 1) ? 'on' : 'off';
-    }
     ?>
     <div class="row row-cards">
         <div class="col-lg-4">
@@ -296,27 +292,6 @@ render_page('Profile', function () use ($user, $roleBadges, $passkeysAvailable, 
                                     <input class="form-control" name="name" value="<?= e($user['name']) ?>" required>
                                 </div>
                                 <button class="btn btn-primary">Save Profile</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header"><h3 class="card-title">Desktop Mode</h3></div>
-                        <div class="card-body">
-                            <form method="post">
-                                <?= csrf_input() ?>
-                                <input type="hidden" name="action" value="update_desktop_mode">
-                                <div class="mb-3">
-                                    <label class="form-label">Desktop Mode Preference</label>
-                                    <select class="form-select" name="desktop_mode_override">
-                                        <option value="system" <?= $desktopModeChoice === 'system' ? 'selected' : '' ?>>Use global setting</option>
-                                        <option value="on" <?= $desktopModeChoice === 'on' ? 'selected' : '' ?>>Always on for my account</option>
-                                        <option value="off" <?= $desktopModeChoice === 'off' ? 'selected' : '' ?>>Always off for my account</option>
-                                    </select>
-                                </div>
-                                <div class="form-hint mb-3">Quick override: append <code>?desktop_mode=1</code> or <code>?desktop_mode=0</code> to any URL.</div>
-                                <button class="btn btn-primary">Save Desktop Preference</button>
                             </form>
                         </div>
                     </div>

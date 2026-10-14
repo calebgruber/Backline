@@ -62,7 +62,7 @@ render_page('Set Password', function () use ($token, $error): void {
         echo '<div class="alert alert-danger">' . e($error) . '</div>';
     }
     ?>
-    <form class="card card-md card-tab-top-left" method="post">
+    <form class="card card-md" method="post">
         <?= csrf_input() ?>
         <input type="hidden" name="token" value="<?= e($token) ?>">
         <div class="card-body">

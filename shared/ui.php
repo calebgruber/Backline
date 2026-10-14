@@ -205,7 +205,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
                         <?php if ($isLxAppContext): ?>
                             <?php if ($selectedShopShowId > 0): ?>
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
-                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/lx?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                    <?php nav_item('/dash/lx?show=' . $selectedShopShowId . '&tab=' . $tabKey, $tabLabel, '/dash/lx?show=' . $selectedShopShowId . '&tab=' . $selectedShopTab, nav_icon_for_tab($tabKey, $tabLabel)); ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php nav_item('/dash/lx', 'LX Home', $path); ?>
@@ -214,7 +214,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
                         <?php elseif ($isSndAppContext): ?>
                             <?php if ($selectedShopShowId > 0): ?>
                                 <?php foreach (['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork'] as $tabKey => $tabLabel): ?>
-                                    <li class="nav-item"><a class="nav-link <?= $selectedShopTab === $tabKey ? 'active' : '' ?>" href="/dash/sound?show=<?= $selectedShopShowId ?>&tab=<?= e($tabKey) ?>"><span class="nav-link-title"><?= e($tabLabel) ?></span></a></li>
+                                    <?php nav_item('/dash/sound?show=' . $selectedShopShowId . '&tab=' . $tabKey, $tabLabel, '/dash/sound?show=' . $selectedShopShowId . '&tab=' . $selectedShopTab, nav_icon_for_tab($tabKey, $tabLabel)); ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php nav_item('/dash/sound', 'SND Home', $path); ?>
@@ -373,8 +373,55 @@ function first_existing_brand_asset(string $dir, array $patterns): ?string
     return null;
 }
 
-function nav_item(string $href, string $label, string $current): void
+function nav_item(string $href, string $label, string $current, ?string $icon = null): void
 {
     $active = $current === $href || path_starts_with($current, $href . '/');
-    echo '<li class="nav-item"><a class="nav-link ' . ($active ? 'active' : '') . '" href="' . e($href) . '"><span class="nav-link-title">' . e($label) . '</span></a></li>';
+    $iconName = trim((string) ($icon ?? nav_icon_for_tab($href, $label)));
+    echo '<li class="nav-item"><a class="nav-link nav-tab-link ' . ($active ? 'active' : '') . '" href="' . e($href) . '">';
+    if ($iconName !== '') {
+        echo '<i class="ti ti-' . e($iconName) . ' nav-tab-icon" aria-hidden="true"></i>';
+    }
+    echo '<span class="nav-link-title">' . e($label) . '</span></a></li>';
+}
+
+function nav_icon_for_tab(string $key, string $label): string
+{
+    $normalized = strtolower(trim($key . ' ' . $label));
+    if (str_contains($normalized, 'dash') || str_contains($normalized, 'home')) {
+        return 'layout-dashboard';
+    }
+    if (str_contains($normalized, 'show information') || str_contains($normalized, 'show')) {
+        return 'clipboard-list';
+    }
+    if (str_contains($normalized, 'initial')) {
+        return 'file-plus';
+    }
+    if (str_contains($normalized, 'revision')) {
+        return 'git-branch';
+    }
+    if (str_contains($normalized, 'paperwork')) {
+        return 'file-description';
+    }
+    if (str_contains($normalized, 'setting')) {
+        return 'settings';
+    }
+    if (str_contains($normalized, 'inventory')) {
+        return 'package';
+    }
+    if (str_contains($normalized, 'categor')) {
+        return 'category';
+    }
+    if (str_contains($normalized, 'user')) {
+        return 'users';
+    }
+    if (str_contains($normalized, 'resource')) {
+        return 'folder';
+    }
+    if (str_contains($normalized, 'lx')) {
+        return 'bulb';
+    }
+    if (str_contains($normalized, 'snd') || str_contains($normalized, 'sound')) {
+        return 'wave-sine';
+    }
+    return 'chevron-right';
 }

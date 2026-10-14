@@ -70,6 +70,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'passkey_begin')
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'passkey_probe') {
+    csrf_verify_or_fail();
+    header('Content-Type: application/json; charset=UTF-8');
+    $email = mb_strtolower(trim(post('email')));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['ok' => true, 'has_passkey' => false, 'email_valid' => false]);
+        exit;
+    }
+    if (!passkeys_table_exists()) {
+        echo json_encode(['ok' => true, 'has_passkey' => false, 'email_valid' => true, 'passkeys_available' => false]);
+        exit;
+    }
+    $stmt = db()->prepare('SELECT id FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1');
+    $stmt->execute([$email]);
+    $userId = (int) ($stmt->fetchColumn() ?: 0);
+    if ($userId <= 0) {
+        echo json_encode(['ok' => true, 'has_passkey' => false, 'email_valid' => true, 'passkeys_available' => true]);
+        exit;
+    }
+    $passkeyStmt = db()->prepare('SELECT 1 FROM user_passkeys WHERE user_id = ? AND revoked_at IS NULL LIMIT 1');
+    $passkeyStmt->execute([$userId]);
+    $hasPasskey = (bool) $passkeyStmt->fetchColumn();
+    echo json_encode(['ok' => true, 'has_passkey' => $hasPasskey, 'email_valid' => true, 'passkeys_available' => true]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'passkey_finish') {
     csrf_verify_or_fail();
     header('Content-Type: application/json; charset=UTF-8');
@@ -180,36 +206,82 @@ render_page('Login', function (): void {
             <h2 class="h2 text-center mb-4">Sign in to your account</h2>
             <div class="mb-3">
                 <label class="form-label">Email address</label>
-                <input class="form-control" type="email" name="email" required autocomplete="email">
+                <input class="form-control" type="email" name="email" required autocomplete="email" id="login-email-input">
             </div>
-            <div class="mb-2">
+            <div class="mb-2" id="password-panel" style="display:none;">
                 <label class="form-label">
                     Password
                     <span class="form-label-description"><a href="/auth/forgot">Forgot password?</a></span>
                 </label>
-                <input class="form-control" type="password" name="password" required autocomplete="current-password">
+                <input class="form-control" type="password" name="password" required autocomplete="current-password" id="login-password-input" disabled>
             </div>
-            <div class="form-footer">
+            <div class="form-footer" id="password-submit-panel" style="display:none;">
                 <button class="btn btn-primary w-100">Sign in</button>
             </div>
-            <div class="text-center text-secondary my-2">or</div>
-            <div class="form-footer">
+            <div class="text-center text-secondary my-2" id="login-method-separator" style="display:none;">or</div>
+            <div class="form-footer" id="passkey-panel" style="display:none;">
                 <button class="btn btn-outline-primary w-100" type="button" id="passkey-login-button">Sign in with passkey</button>
             </div>
+            <div class="form-hint mt-2 text-center" id="login-method-hint">Enter your email to continue.</div>
         </div>
     </form>
     <script>
     (() => {
       const button = document.getElementById('passkey-login-button');
       if (!button) return;
-      if (!window.PublicKeyCredential || !window.isSecureContext) {
+      const supportsPasskeys = !!window.PublicKeyCredential && !!window.isSecureContext;
+      if (!supportsPasskeys) {
         button.disabled = true;
         button.title = 'Passkeys require HTTPS and a supported browser.';
-        return;
       }
       const form = button.closest('form');
-      const emailInput = form?.querySelector('input[name="email"]');
+      const emailInput = document.getElementById('login-email-input');
+      const passwordInput = document.getElementById('login-password-input');
+      const passwordPanel = document.getElementById('password-panel');
+      const passwordSubmitPanel = document.getElementById('password-submit-panel');
+      const passkeyPanel = document.getElementById('passkey-panel');
+      const separator = document.getElementById('login-method-separator');
+      const loginHint = document.getElementById('login-method-hint');
       const csrfInput = form?.querySelector('input[name="_csrf"]');
+      let probeTimer = null;
+      let lastProbeEmail = '';
+      const animateIn = (el) => {
+        if (!el) return;
+        el.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'translateY(0)' }], {
+          duration: 180,
+          easing: 'ease-out'
+        });
+      };
+      const setMode = (mode) => {
+        if (!passwordPanel || !passwordSubmitPanel || !passkeyPanel || !separator || !passwordInput || !loginHint) return;
+        if (mode === 'passkey') {
+          passkeyPanel.style.display = '';
+          separator.style.display = '';
+          passwordPanel.style.display = 'none';
+          passwordSubmitPanel.style.display = 'none';
+          passwordInput.disabled = true;
+          loginHint.textContent = 'Passkey found for this email. Continue with passkey.';
+          animateIn(passkeyPanel);
+          return;
+        }
+        if (mode === 'password') {
+          passkeyPanel.style.display = 'none';
+          separator.style.display = 'none';
+          passwordPanel.style.display = '';
+          passwordSubmitPanel.style.display = '';
+          passwordInput.disabled = false;
+          loginHint.textContent = 'No passkey found. Sign in with password.';
+          animateIn(passwordPanel);
+          animateIn(passwordSubmitPanel);
+          return;
+        }
+        passkeyPanel.style.display = 'none';
+        separator.style.display = 'none';
+        passwordPanel.style.display = 'none';
+        passwordSubmitPanel.style.display = 'none';
+        passwordInput.disabled = true;
+        loginHint.textContent = 'Enter your email to continue.';
+      };
       const toBytes = (b64url) => {
         const base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
         const padded = base64 + '==='.slice((base64.length + 3) % 4);
@@ -247,7 +319,38 @@ render_page('Login', function (): void {
           throw new Error(trimmed !== '' ? trimmed : 'Unexpected server response.');
         }
       };
+      const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      const probeEmail = async () => {
+        const email = (emailInput?.value || '').trim().toLowerCase();
+        if (!isValidEmail(email)) {
+          setMode('email');
+          return;
+        }
+        if (email === lastProbeEmail) return;
+        lastProbeEmail = email;
+        try {
+          const probe = await postForm({
+            action: 'passkey_probe',
+            _csrf: csrfInput?.value || '',
+            email,
+          });
+          if (!probe?.ok || probe.email_valid === false) {
+            setMode('email');
+            return;
+          }
+          setMode((supportsPasskeys && probe.has_passkey) ? 'passkey' : 'password');
+        } catch (_) {
+          setMode('password');
+          loginHint.textContent = 'Could not check passkeys right now. Use password.';
+        }
+      };
+      emailInput?.addEventListener('input', () => {
+        if (probeTimer) window.clearTimeout(probeTimer);
+        probeTimer = window.setTimeout(probeEmail, 260);
+      });
+      emailInput?.addEventListener('blur', probeEmail);
       button.addEventListener('click', async () => {
+        if (!supportsPasskeys) return;
         const email = (emailInput?.value || '').trim();
         if (!email) {
           alert('Enter your email, then try passkey sign-in.');
@@ -293,6 +396,7 @@ render_page('Login', function (): void {
           button.disabled = false;
         }
       });
+      setMode('email');
     })();
     </script>
     <?php

@@ -193,8 +193,8 @@ render_page('Categories', function () use ($categoriesByShop, $subcategoriesBySh
     ];
     ?>
     <ul class="nav nav-tabs mb-3" data-bs-toggle="tabs" role="tablist">
-        <li class="nav-item" role="presentation"><a href="#cat-lx" class="nav-link active" data-bs-toggle="tab" aria-selected="true" role="tab">LX</a></li>
-        <li class="nav-item" role="presentation"><a href="#cat-snd" class="nav-link" data-bs-toggle="tab" aria-selected="false" role="tab">Sound</a></li>
+        <li class="nav-item" role="presentation"><a href="#cat-lx" class="nav-link nav-tab-link active" data-bs-toggle="tab" aria-selected="true" role="tab"><i class="ti ti-bulb nav-tab-icon" aria-hidden="true"></i><span class="nav-link-title">LX</span></a></li>
+        <li class="nav-item" role="presentation"><a href="#cat-snd" class="nav-link nav-tab-link" data-bs-toggle="tab" aria-selected="false" role="tab"><i class="ti ti-wave-sine nav-tab-icon" aria-hidden="true"></i><span class="nav-link-title">Sound</span></a></li>
     </ul>
 
     <div class="tab-content">

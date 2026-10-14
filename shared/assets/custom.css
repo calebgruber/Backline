@@ -297,23 +297,23 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   --card-accent-rgb: 36, 195, 90;
   border-left: 5px solid var(--card-accent-color);
   border-radius: 1rem;
-}
-
-.card-tab-top-left {
   position: relative;
   overflow: hidden;
 }
 
-.card-tab-top-left::before {
-  content: "";
+.dashboard-show-card::before {
+  content: "EXISTING";
   position: absolute;
   top: 0;
   left: 0;
-  width: 76px;
-  height: 6px;
+  padding: .28rem .62rem;
+  font-size: .67rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1;
+  color: #ffffff;
   background: var(--card-accent-color, #206bc4);
-  border-bottom-right-radius: 8px;
-  border-top-left-radius: inherit;
+  border-bottom-right-radius: 10px;
   z-index: 2;
 }
 
@@ -332,4 +332,31 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 .sound-cables-workspace .card {
   border-radius: .9rem;
+}
+
+.navbar .nav-link.nav-tab-link,
+.nav.nav-tabs .nav-link.nav-tab-link {
+  border-radius: 0 !important;
+  border-bottom: 2px solid transparent;
+  padding-inline: .75rem;
+  margin-right: .25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.navbar .nav-link.nav-tab-link .nav-tab-icon,
+.nav.nav-tabs .nav-link.nav-tab-link .nav-tab-icon {
+  font-size: 1rem;
+}
+
+.navbar .nav-link.nav-tab-link.active,
+.nav.nav-tabs .nav-link.nav-tab-link.active {
+  border-bottom-color: var(--tblr-primary);
+  color: var(--tblr-primary);
+}
+
+.navbar .nav-link.nav-tab-link:hover,
+.nav.nav-tabs .nav-link.nav-tab-link:hover {
+  border-bottom-color: rgba(var(--tblr-primary-rgb), .45);
 }
