@@ -153,7 +153,7 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($showName) ?> Cable Labels</title>
   <style>
-    @page { size: 8.5in 11in; margin: .5in .3in; }
+    @page { size: 8.5in 11in; margin: .5in .4375in; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }
     .toolbar { padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
     .toolbar-btn {
@@ -189,14 +189,15 @@ header('Content-Type: text/html; charset=UTF-8');
       display: grid;
       grid-template-columns: repeat(4, 1.75in);
       grid-template-rows: repeat(20, .5in);
-      column-gap: .3in;
+      column-gap: .3125in;
       row-gap: 0;
       grid-auto-flow: column;
       width: 7.9in;
       height: 10in;
-      margin: 0.09375in 0 0 0;
+      margin: 0;
     }
     .label {
+      height: .5in;
       border: 1px solid #d0d0d0;
       border-radius: .04in;
       box-sizing: border-box;
@@ -247,7 +248,7 @@ header('Content-Type: text/html; charset=UTF-8');
       break-before: page;
     }
     @media print {
-      @page { size: 8.5in 11in; margin: .5in .3in; }
+      @page { size: 8.5in 11in; margin: .5in .4375in; }
       .toolbar { display: none; }
       html, body {
         width: 8.5in;
