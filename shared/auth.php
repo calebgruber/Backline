@@ -23,8 +23,22 @@ function auth_login(string $email, string $password): bool
         return false;
     }
 
+    return auth_login_user_id((int) $user['id']);
+}
+
+function auth_login_user_id(int $userId): bool
+{
+    if ($userId <= 0) {
+        return false;
+    }
+    $stmt = db()->prepare('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+    $stmt->execute([$userId]);
+    $id = (int) ($stmt->fetchColumn() ?: 0);
+    if ($id <= 0) {
+        return false;
+    }
     session_regenerate_id(true);
-    $_SESSION['user_id'] = (int) $user['id'];
+    $_SESSION['user_id'] = $id;
     return true;
 }
 

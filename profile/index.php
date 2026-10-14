@@ -36,10 +36,130 @@ foreach ($roleOptions as $permissionKey => $meta) {
         $roleBadges[] = $meta;
     }
 }
+$passkeysAvailable = passkeys_table_exists();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_or_fail();
     $action = post('action');
+
+    if ($action === 'passkey_begin_register') {
+        header('Content-Type: application/json; charset=UTF-8');
+        if (!$passkeysAvailable) {
+            echo json_encode(['ok' => false, 'message' => 'Passkeys are unavailable until migrations are run.']);
+            exit;
+        }
+        $excludeStmt = db()->prepare('SELECT credential_id_b64, transports_json FROM user_passkeys WHERE user_id = ? AND revoked_at IS NULL ORDER BY id ASC');
+        $excludeStmt->execute([(int) $user['id']]);
+        $excludeRows = $excludeStmt->fetchAll();
+        $challengeState = passkey_begin_challenge('passkey_register', (int) $user['id']);
+        $excludeCredentials = [];
+        foreach ($excludeRows as $row) {
+            $excludeCredentials[] = [
+                'id' => (string) $row['credential_id_b64'],
+                'type' => 'public-key',
+                'transports' => json_decode((string) ($row['transports_json'] ?? '[]'), true) ?: [],
+            ];
+        }
+        echo json_encode([
+            'ok' => true,
+            'options' => [
+                'challenge' => $challengeState['challenge'],
+                'rp' => [
+                    'name' => (string) app_setting('branding.app_name', config('app_name', 'Backline')),
+                    'id' => passkey_rp_id(),
+                ],
+                'user' => [
+                    'id' => passkey_base64url_encode('user-' . (string) $user['id']),
+                    'name' => (string) $user['email'],
+                    'displayName' => (string) $user['name'],
+                ],
+                'pubKeyCredParams' => [
+                    ['type' => 'public-key', 'alg' => -7],
+                    ['type' => 'public-key', 'alg' => -257],
+                ],
+                'timeout' => 60000,
+                'attestation' => 'none',
+                'authenticatorSelection' => [
+                    'residentKey' => 'preferred',
+                    'userVerification' => 'preferred',
+                ],
+                'excludeCredentials' => $excludeCredentials,
+            ],
+        ]);
+        exit;
+    }
+
+    if ($action === 'passkey_finish_register') {
+        header('Content-Type: application/json; charset=UTF-8');
+        if (!$passkeysAvailable) {
+            echo json_encode(['ok' => false, 'message' => 'Passkeys are unavailable until migrations are run.']);
+            exit;
+        }
+        $challengeState = passkey_take_challenge('passkey_register');
+        if (!$challengeState || (int) $challengeState['user_id'] !== (int) $user['id']) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey registration timed out. Please try again.']);
+            exit;
+        }
+        $credentialId = trim((string) post('credential_id'));
+        $clientDataJsonB64 = trim((string) post('client_data_json'));
+        $authenticatorDataB64 = trim((string) post('authenticator_data'));
+        $publicKeyB64 = trim((string) post('public_key'));
+        $displayName = trim((string) post('display_name'));
+        $transportsRaw = trim((string) post('transports_json'));
+        if ($credentialId === '' || $clientDataJsonB64 === '' || $authenticatorDataB64 === '' || $publicKeyB64 === '') {
+            echo json_encode(['ok' => false, 'message' => 'Invalid passkey registration payload.']);
+            exit;
+        }
+        $clientData = passkey_parse_client_data($clientDataJsonB64);
+        $authenticatorData = passkey_parse_authenticator_data($authenticatorDataB64);
+        $publicKeyPem = passkey_spki_pem_from_b64url($publicKeyB64);
+        if (!$clientData || !$authenticatorData || !$publicKeyPem) {
+            echo json_encode(['ok' => false, 'message' => 'Could not decode passkey registration data.']);
+            exit;
+        }
+        $clientJson = $clientData['json'];
+        $clientType = (string) ($clientJson['type'] ?? '');
+        $clientChallenge = (string) ($clientJson['challenge'] ?? '');
+        $clientOrigin = (string) ($clientJson['origin'] ?? '');
+        if ($clientType !== 'webauthn.create' || !hash_equals((string) $challengeState['challenge'], $clientChallenge) || !hash_equals(passkey_origin(), $clientOrigin)) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey registration validation failed.']);
+            exit;
+        }
+        $expectedRpHash = hash('sha256', passkey_rp_id(), true);
+        if (!hash_equals($expectedRpHash, (string) $authenticatorData['rp_id_hash'])) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey RP validation failed.']);
+            exit;
+        }
+        if (((int) $authenticatorData['flags'] & 0x01) !== 0x01 || ((int) $authenticatorData['flags'] & 0x40) !== 0x40) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey attestation flags were invalid.']);
+            exit;
+        }
+        $credentialIdRaw = passkey_base64url_decode($credentialId);
+        if ($credentialIdRaw === null) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey credential ID was invalid.']);
+            exit;
+        }
+        $authDataCredentialId = $authenticatorData['credential_id'];
+        if (!is_string($authDataCredentialId) || !hash_equals($authDataCredentialId, $credentialIdRaw)) {
+            echo json_encode(['ok' => false, 'message' => 'Passkey credential mismatch.']);
+            exit;
+        }
+        $name = $displayName !== '' ? mb_substr($displayName, 0, 190) : ('Passkey ' . date('Y-m-d H:i'));
+        $transports = json_decode($transportsRaw, true);
+        if (!is_array($transports)) {
+            $transports = [];
+        }
+        $transports = array_values(array_filter(array_map(static fn ($v): string => trim((string) $v), $transports), static fn ($v): bool => $v !== ''));
+        try {
+            $insertStmt = db()->prepare('INSERT INTO user_passkeys (user_id, credential_id_b64, display_name, public_key_pem, sign_count, transports_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())');
+            $insertStmt->execute([(int) $user['id'], $credentialId, $name, $publicKeyPem, (int) $authenticatorData['sign_count'], json_encode($transports)]);
+        } catch (Throwable) {
+            echo json_encode(['ok' => false, 'message' => 'That passkey already exists on your account.']);
+            exit;
+        }
+        echo json_encode(['ok' => true]);
+        exit;
+    }
 
     if ($action === 'update_name') {
         $name = post('name');
@@ -50,6 +170,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$name, (int) $user['id']]);
             flash_set('success', 'Profile updated.');
         }
+        redirect('/profile');
+    }
+
+    if ($action === 'rename_passkey') {
+        if (!$passkeysAvailable) {
+            flash_set('warning', 'Passkeys are unavailable until migrations are run.');
+            redirect('/profile');
+        }
+        $passkeyId = (int) post('passkey_id');
+        $displayName = mb_substr(trim((string) post('display_name')), 0, 190);
+        if ($passkeyId <= 0 || $displayName === '') {
+            flash_set('danger', 'Passkey name is required.');
+            redirect('/profile');
+        }
+        $stmt = db()->prepare('UPDATE user_passkeys SET display_name = ?, updated_at = NOW() WHERE id = ? AND user_id = ? AND revoked_at IS NULL');
+        $stmt->execute([$displayName, $passkeyId, (int) $user['id']]);
+        flash_set('success', 'Passkey updated.');
+        redirect('/profile');
+    }
+
+    if ($action === 'delete_passkey') {
+        if (!$passkeysAvailable) {
+            flash_set('warning', 'Passkeys are unavailable until migrations are run.');
+            redirect('/profile');
+        }
+        $passkeyId = (int) post('passkey_id');
+        if ($passkeyId > 0) {
+            $stmt = db()->prepare('UPDATE user_passkeys SET revoked_at = NOW(), updated_at = NOW() WHERE id = ? AND user_id = ? AND revoked_at IS NULL');
+            $stmt->execute([$passkeyId, (int) $user['id']]);
+        }
+        flash_set('success', 'Passkey removed.');
         redirect('/profile');
     }
 
@@ -96,7 +247,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-render_page('Profile', function () use ($user, $roleBadges): void {
+if ($passkeysAvailable) {
+    $passkeysStmt = db()->prepare('SELECT id, display_name, created_at, last_used_at FROM user_passkeys WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC');
+    $passkeysStmt->execute([(int) $user['id']]);
+    $passkeys = $passkeysStmt->fetchAll();
+} else {
+    $passkeys = [];
+}
+
+render_page('Profile', function () use ($user, $roleBadges, $passkeysAvailable, $passkeys): void {
     $desktopModeChoice = 'system';
     if (array_key_exists('desktop_mode_override', $user) && $user['desktop_mode_override'] !== null) {
         $desktopModeChoice = ((int) $user['desktop_mode_override'] === 1) ? 'on' : 'off';
@@ -164,6 +323,55 @@ render_page('Profile', function () use ($user, $roleBadges): void {
                 </div>
                 <div class="col-12">
                     <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0">Passkeys</h3>
+                            <button class="btn btn-outline-primary btn-sm" id="add-passkey-button" type="button" <?= $passkeysAvailable ? '' : 'disabled' ?>>Add Passkey</button>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!$passkeysAvailable): ?>
+                                <div class="alert alert-warning mb-0">Passkeys are unavailable until migrations are run from the admin setup tools.</div>
+                            <?php elseif (!$passkeys): ?>
+                                <p class="text-secondary mb-0">No passkeys added yet.</p>
+                            <?php else: ?>
+                                <div class="d-flex flex-column gap-3">
+                                    <?php foreach ($passkeys as $passkey): ?>
+                                        <div class="border rounded p-3">
+                                            <form method="post" class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="action" value="rename_passkey">
+                                                <input type="hidden" name="passkey_id" value="<?= (int) $passkey['id'] ?>">
+                                                <div class="flex-fill" style="min-width: 220px;">
+                                                    <label class="form-label mb-1">Passkey Name</label>
+                                                    <input class="form-control form-control-sm" name="display_name" value="<?= e((string) $passkey['display_name']) ?>" required>
+                                                </div>
+                                                <button class="btn btn-sm btn-primary">Save</button>
+                                            </form>
+                                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                <div class="text-secondary small">
+                                                    Added <?= e((string) $passkey['created_at']) ?>
+                                                    <?php if (!empty($passkey['last_used_at'])): ?>
+                                                        · Last used <?= e((string) $passkey['last_used_at']) ?>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <form method="post" onsubmit="return confirm('Remove this passkey?')">
+                                                    <?= csrf_input() ?>
+                                                    <input type="hidden" name="action" value="delete_passkey">
+                                                    <input type="hidden" name="passkey_id" value="<?= (int) $passkey['id'] ?>">
+                                                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($passkeysAvailable): ?>
+                                <div class="form-hint mt-3">Passkeys require HTTPS and a browser/device that supports WebAuthn.</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
                         <div class="card-header"><h3 class="card-title">Change Password</h3></div>
                         <div class="card-body">
                             <form method="post" autocomplete="off">
@@ -189,5 +397,88 @@ render_page('Profile', function () use ($user, $roleBadges): void {
             </div>
         </div>
     </div>
+    <script>
+    (() => {
+      const button = document.getElementById('add-passkey-button');
+      if (!button) return;
+      if (!window.PublicKeyCredential || !window.isSecureContext) {
+        button.disabled = true;
+        button.title = 'Passkeys require HTTPS and a supported browser.';
+        return;
+      }
+      const csrfInput = document.querySelector('input[name="_csrf"]');
+      const toBytes = (b64url) => {
+        const base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64 + '==='.slice((base64.length + 3) % 4);
+        const str = atob(padded);
+        return Uint8Array.from(str, (c) => c.charCodeAt(0));
+      };
+      const toB64url = (buffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        bytes.forEach((b) => { binary += String.fromCharCode(b); });
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+      };
+      const postForm = async (payload) => {
+        const body = new URLSearchParams(payload);
+        const response = await fetch('/profile', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: body.toString(),
+          credentials: 'same-origin',
+        });
+        return response.json();
+      };
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const begin = await postForm({
+            action: 'passkey_begin_register',
+            _csrf: csrfInput?.value || '',
+          });
+          if (!begin?.ok || !begin.options) {
+            throw new Error(begin?.message || 'Could not start passkey registration.');
+          }
+          const options = begin.options;
+          options.challenge = toBytes(options.challenge);
+          options.user.id = toBytes(options.user.id);
+          options.excludeCredentials = (options.excludeCredentials || []).map((item) => ({
+            ...item,
+            id: toBytes(item.id),
+          }));
+          const credential = await navigator.credentials.create({ publicKey: options });
+          if (!credential || !credential.response || typeof credential.response.getPublicKey !== 'function') {
+            throw new Error('This browser cannot export passkey public keys yet.');
+          }
+          const passkeyName = window.prompt('Name this passkey', 'My Passkey') || '';
+          const transports = (typeof credential.response.getTransports === 'function')
+            ? credential.response.getTransports()
+            : [];
+          const publicKey = credential.response.getPublicKey();
+          if (!publicKey) {
+            throw new Error('Could not read public key from this passkey.');
+          }
+          const finish = await postForm({
+            action: 'passkey_finish_register',
+            _csrf: csrfInput?.value || '',
+            credential_id: credential.id,
+            client_data_json: toB64url(credential.response.clientDataJSON),
+            authenticator_data: toB64url(credential.response.getAuthenticatorData()),
+            public_key: toB64url(publicKey),
+            transports_json: JSON.stringify(transports || []),
+            display_name: passkeyName.trim(),
+          });
+          if (!finish?.ok) {
+            throw new Error(finish?.message || 'Passkey registration failed.');
+          }
+          window.location.reload();
+        } catch (error) {
+          alert(error?.message || 'Passkey registration failed.');
+        } finally {
+          button.disabled = false;
+        }
+      });
+    })();
+    </script>
     <?php
 }, $user);
