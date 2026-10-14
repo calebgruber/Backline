@@ -224,7 +224,8 @@ render_page('Login', function (): void {
       };
       const postForm = async (payload) => {
         const body = new URLSearchParams(payload);
-        const response = await fetch('/auth/login', {
+        const endpoint = (form?.getAttribute('action') || window.location.pathname || '/auth/login');
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -238,7 +239,12 @@ render_page('Login', function (): void {
         try {
           return JSON.parse(text);
         } catch (_) {
-          throw new Error(text && text.trim() !== '' ? text : 'Unexpected server response.');
+          const trimmed = (text || '').trim();
+          const lower = trimmed.toLowerCase();
+          if (lower.startsWith('<!doctype') || lower.startsWith('<html')) {
+            throw new Error('Server returned HTML instead of JSON. Please refresh and try again.');
+          }
+          throw new Error(trimmed !== '' ? trimmed : 'Unexpected server response.');
         }
       };
       button.addEventListener('click', async () => {
