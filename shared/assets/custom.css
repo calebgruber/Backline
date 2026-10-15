@@ -335,28 +335,52 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 }
 
 .navbar .nav-link.nav-tab-link,
-.nav.nav-tabs .nav-link.nav-tab-link {
+.nav.nav-tabs .nav-link {
+  --tab-accent: #206bc4;
   border-radius: 0 !important;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid var(--tab-accent);
   padding-inline: .75rem;
   margin-right: .25rem;
   display: inline-flex;
   align-items: center;
   gap: .4rem;
+  color: var(--tblr-body-color);
+  padding-top: .5rem;
+  padding-bottom: .5rem;
+  min-height: 2.35rem;
+  transition: all .15s ease-in-out;
 }
 
 .navbar .nav-link.nav-tab-link .nav-tab-icon,
-.nav.nav-tabs .nav-link.nav-tab-link .nav-tab-icon {
+.nav.nav-tabs .nav-link .nav-tab-icon {
   font-size: 1rem;
+  color: var(--tab-accent);
 }
 
 .navbar .nav-link.nav-tab-link.active,
-.nav.nav-tabs .nav-link.nav-tab-link.active {
-  border-bottom-color: var(--tblr-primary);
-  color: var(--tblr-primary);
+.nav.nav-tabs .nav-link.active {
+  border-bottom-color: var(--tab-accent);
+  color: var(--tab-accent);
+  padding-top: .7rem;
+  padding-bottom: .7rem;
+  min-height: 2.75rem;
 }
 
 .navbar .nav-link.nav-tab-link:hover,
-.nav.nav-tabs .nav-link.nav-tab-link:hover {
-  border-bottom-color: rgba(var(--tblr-primary-rgb), .45);
+.nav.nav-tabs .nav-link:hover {
+  color: var(--tab-accent);
+  border-bottom-color: var(--tab-accent);
 }
+
+.navbar .nav-item:nth-child(6n + 1) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n + 1) > .nav-link { --tab-accent: #206bc4; }
+.navbar .nav-item:nth-child(6n + 2) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n + 2) > .nav-link { --tab-accent: #2fb344; }
+.navbar .nav-item:nth-child(6n + 3) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n + 3) > .nav-link { --tab-accent: #f76707; }
+.navbar .nav-item:nth-child(6n + 4) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n + 4) > .nav-link { --tab-accent: #7950f2; }
+.navbar .nav-item:nth-child(6n + 5) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n + 5) > .nav-link { --tab-accent: #0ca678; }
+.navbar .nav-item:nth-child(6n) > .nav-link,
+.nav.nav-tabs .nav-item:nth-child(6n) > .nav-link { --tab-accent: #d63384; }

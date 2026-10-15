@@ -301,6 +301,48 @@ function render_page(string $title, callable $body, ?array $user = null): void
 })();
 
 (() => {
+  const pickTabIcon = (label) => {
+    const text = (label || '').toLowerCase();
+    if (text.includes('dash') || text.includes('home')) return 'layout-dashboard';
+    if (text.includes('show')) return 'clipboard-list';
+    if (text.includes('initial')) return 'file-plus';
+    if (text.includes('revision')) return 'git-branch';
+    if (text.includes('paperwork')) return 'file-description';
+    if (text.includes('export')) return 'file-export';
+    if (text.includes('cable')) return 'cable';
+    if (text.includes('inventory')) return 'package';
+    if (text.includes('categor')) return 'category';
+    if (text.includes('user')) return 'users';
+    if (text.includes('setting')) return 'settings';
+    if (text.includes('resource')) return 'folder';
+    if (text.includes('sound') || text.includes('snd')) return 'wave-sine';
+    if (text.includes('light') || text.includes('lx')) return 'bulb';
+    return 'chevron-right';
+  };
+  document.querySelectorAll('.nav.nav-tabs .nav-link').forEach((link) => {
+    if (link.querySelector('.nav-tab-icon')) return;
+    const labelEl = link.querySelector('.nav-link-title');
+    const label = (labelEl?.textContent || link.textContent || '').trim();
+    const icon = document.createElement('i');
+    icon.className = 'ti ti-' + pickTabIcon(label) + ' nav-tab-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    if (labelEl) {
+      link.insertBefore(icon, labelEl);
+    } else {
+      link.prepend(icon);
+      const textNode = document.createElement('span');
+      textNode.className = 'nav-link-title';
+      textNode.textContent = label;
+      link.append(textNode);
+      link.childNodes.forEach((node) => {
+        if (node !== icon && node !== textNode) link.removeChild(node);
+      });
+    }
+    link.classList.add('nav-tab-link');
+  });
+})();
+
+(() => {
   const hexToRgb = (hex) => {
     const normalized = hex.replace('#', '');
     if (normalized.length !== 6) return null;

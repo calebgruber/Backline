@@ -218,9 +218,11 @@ render_page('Login', function (): void {
             <div class="form-footer" id="password-submit-panel" style="display:none;">
                 <button class="btn btn-primary w-100">Sign in</button>
             </div>
-            <div class="text-center text-secondary my-2" id="login-method-separator" style="display:none;">or</div>
             <div class="form-footer" id="passkey-panel" style="display:none;">
                 <button class="btn btn-outline-primary w-100" type="button" id="passkey-login-button">Sign in with passkey</button>
+            </div>
+            <div class="form-footer mt-2" id="password-fallback-panel" style="display:none;">
+                <button class="btn btn-link w-100 p-0" type="button" id="password-fallback-button">Log in with password instead</button>
             </div>
             <div class="form-hint mt-2 text-center" id="login-method-hint">Enter your email to continue.</div>
         </div>
@@ -240,7 +242,8 @@ render_page('Login', function (): void {
       const passwordPanel = document.getElementById('password-panel');
       const passwordSubmitPanel = document.getElementById('password-submit-panel');
       const passkeyPanel = document.getElementById('passkey-panel');
-      const separator = document.getElementById('login-method-separator');
+      const passwordFallbackPanel = document.getElementById('password-fallback-panel');
+      const passwordFallbackButton = document.getElementById('password-fallback-button');
       const loginHint = document.getElementById('login-method-hint');
       const csrfInput = form?.querySelector('input[name="_csrf"]');
       let probeTimer = null;
@@ -253,20 +256,21 @@ render_page('Login', function (): void {
         });
       };
       const setMode = (mode) => {
-        if (!passwordPanel || !passwordSubmitPanel || !passkeyPanel || !separator || !passwordInput || !loginHint) return;
+        if (!passwordPanel || !passwordSubmitPanel || !passkeyPanel || !passwordFallbackPanel || !passwordInput || !loginHint) return;
         if (mode === 'passkey') {
           passkeyPanel.style.display = '';
-          separator.style.display = '';
+          passwordFallbackPanel.style.display = '';
           passwordPanel.style.display = 'none';
           passwordSubmitPanel.style.display = 'none';
           passwordInput.disabled = true;
           loginHint.textContent = 'Passkey found for this email. Continue with passkey.';
           animateIn(passkeyPanel);
+          animateIn(passwordFallbackPanel);
           return;
         }
         if (mode === 'password') {
           passkeyPanel.style.display = 'none';
-          separator.style.display = 'none';
+          passwordFallbackPanel.style.display = 'none';
           passwordPanel.style.display = '';
           passwordSubmitPanel.style.display = '';
           passwordInput.disabled = false;
@@ -276,7 +280,7 @@ render_page('Login', function (): void {
           return;
         }
         passkeyPanel.style.display = 'none';
-        separator.style.display = 'none';
+        passwordFallbackPanel.style.display = 'none';
         passwordPanel.style.display = 'none';
         passwordSubmitPanel.style.display = 'none';
         passwordInput.disabled = true;
@@ -349,6 +353,10 @@ render_page('Login', function (): void {
         probeTimer = window.setTimeout(probeEmail, 260);
       });
       emailInput?.addEventListener('blur', probeEmail);
+      passwordFallbackButton?.addEventListener('click', () => {
+        setMode('password');
+        window.setTimeout(() => passwordInput?.focus(), 0);
+      });
       button.addEventListener('click', async () => {
         if (!supportsPasskeys) return;
         const email = (emailInput?.value || '').trim();

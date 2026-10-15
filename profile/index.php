@@ -80,8 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'timeout' => 60000,
                 'attestation' => 'none',
                 'authenticatorSelection' => [
-                    'residentKey' => 'preferred',
-                    'userVerification' => 'preferred',
+                    'residentKey' => 'required',
+                    'authenticatorAttachment' => 'platform',
+                    'userVerification' => 'required',
                 ],
                 'excludeCredentials' => $excludeCredentials,
             ],
