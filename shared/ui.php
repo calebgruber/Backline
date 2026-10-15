@@ -237,6 +237,14 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <?php endif; ?>
     <?php endif; ?>
 
+    <?php if ($user): ?>
+    <div class="workspace-tabs-wrap d-print-none" id="workspace-tabs-wrap" style="display:none;">
+        <div class="container-xl">
+            <div class="workspace-tabs" id="workspace-tabs"></div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="page-wrapper">
         <div class="page-body">
             <div class="container-xl">
@@ -340,6 +348,119 @@ function render_page(string $title, callable $body, ?array $user = null): void
     }
     link.classList.add('nav-tab-link');
   });
+})();
+
+(() => {
+  const userIsSignedIn = <?= $user ? 'true' : 'false' ?>;
+  if (!userIsSignedIn) return;
+  const tabsWrap = document.getElementById('workspace-tabs-wrap');
+  const tabsEl = document.getElementById('workspace-tabs');
+  if (!tabsWrap || !tabsEl) return;
+  const STORAGE_KEY = 'backline.workspace_tabs.v1';
+  const currentPath = window.location.pathname + window.location.search;
+
+  const readTabs = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((tab) => tab && typeof tab.url === 'string' && typeof tab.label === 'string') : [];
+    } catch (_) {
+      return [];
+    }
+  };
+
+  const writeTabs = (tabs) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs.slice(0, 12)));
+  };
+
+  const uniqueTabs = (tabs) => {
+    const seen = new Set();
+    return tabs.filter((tab) => {
+      const key = tab.url.trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const addWorkspaceTab = (url, label) => {
+    const cleanUrl = (url || '').trim();
+    const cleanLabel = (label || '').trim();
+    if (!cleanUrl || !cleanLabel) return;
+    const tabs = uniqueTabs([{ url: cleanUrl, label: cleanLabel }, ...readTabs()]);
+    writeTabs(tabs);
+    renderTabs();
+  };
+
+  const removeWorkspaceTab = (url) => {
+    const next = readTabs().filter((tab) => tab.url !== url);
+    writeTabs(next);
+    renderTabs();
+  };
+
+  const renderTabs = () => {
+    const tabs = readTabs();
+    tabsEl.innerHTML = '';
+    if (!tabs.length) {
+      tabsWrap.style.display = 'none';
+      return;
+    }
+    tabsWrap.style.display = '';
+    tabs.forEach((tab) => {
+      const item = document.createElement('div');
+      item.className = 'workspace-tab-item' + (tab.url === currentPath ? ' active' : '');
+
+      const link = document.createElement('a');
+      link.className = 'workspace-tab-link';
+      link.href = tab.url;
+      link.textContent = tab.label;
+      item.appendChild(link);
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'workspace-tab-close';
+      closeButton.type = 'button';
+      closeButton.setAttribute('aria-label', 'Close workspace tab');
+      closeButton.textContent = '×';
+      closeButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const wasActive = tab.url === currentPath;
+        removeWorkspaceTab(tab.url);
+        if (wasActive) {
+          window.location.href = '/dash/home';
+        }
+      });
+      item.appendChild(closeButton);
+      tabsEl.appendChild(item);
+    });
+  };
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[data-workspace-open="1"]');
+    if (!link) return;
+    const shopType = ((link.getAttribute('data-shop-type') || '').toUpperCase() === 'SND') ? 'SND' : 'LX';
+    const showName = (link.getAttribute('data-show-name') || 'Show').trim() || 'Show';
+    addWorkspaceTab(link.getAttribute('href') || '', `${showName} - ${shopType}`);
+  });
+
+  const isWorkspaceRoute = window.location.pathname === '/dash/lx' || window.location.pathname === '/dash/sound' || window.location.pathname === '/lx/app' || window.location.pathname === '/snd/app';
+  if (isWorkspaceRoute) {
+    const type = (window.location.pathname.includes('sound') || window.location.pathname.includes('/snd')) ? 'SND' : 'LX';
+    let showName = '';
+    const banner = document.querySelector('.shop-workspace-banner .h1');
+    if (banner) {
+      const raw = (banner.textContent || '').trim();
+      showName = raw.replace(/\s*-\s*(LX|SND)\s*$/i, '').trim();
+    }
+    if (!showName) {
+      const params = new URLSearchParams(window.location.search);
+      const showId = (params.get('show') || '').trim();
+      showName = showId ? `Show ${showId}` : 'Show';
+    }
+    addWorkspaceTab(currentPath, `${showName} - ${type}`);
+  } else {
+    renderTabs();
+  }
 })();
 
 (() => {
