@@ -150,13 +150,9 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
             <?php if ($showRows): ?>
                 <?php foreach ($showRows as $show): ?>
                     <div class="col-md-6 col-xl-4">
-                        <div class="card h-100 dashboard-show-card">
+                        <div class="card h-100 dashboard-show-card" data-card-icon="widgets">
                             <div class="card-body d-flex flex-column">
-                                <div class="show-card-tab" title="<?= e((string) $show['show_name']) ?>">
-                                    <i class="ti ti-clipboard-list show-card-tab-icon" aria-hidden="true"></i>
-                                    <span class="show-card-tab-text"><?= e((string) $show['show_name']) ?></span>
-                                </div>
-                                <h3 class="mb-2"><?= e((string) $show['show_name']) ?></h3>
+                                <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
                                 <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
                                 <div class="mt-auto d-grid gap-2">
                                     <?php if ($canLx): ?>
