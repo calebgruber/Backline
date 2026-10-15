@@ -156,7 +156,7 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
                                     <i class="ti ti-clipboard-list show-card-tab-icon" aria-hidden="true"></i>
                                     <span class="show-card-tab-text"><?= e((string) $show['show_name']) ?></span>
                                 </div>
-                                <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
+                                <h3 class="mb-2"><?= e((string) $show['show_name']) ?></h3>
                                 <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
                                 <div class="mt-auto d-grid gap-2">
                                     <?php if ($canLx): ?>
