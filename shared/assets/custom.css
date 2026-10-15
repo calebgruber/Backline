@@ -43,7 +43,9 @@
 :root {
   --app-shell-bg: #e4ebf7;
   --app-page-surface: #f3f6fd;
-  --app-tab-surface: #eaf0fb;
+  --app-workspace-strip-surface: #edf2fb;
+  --app-workspace-tab-surface: #e5ecf8;
+  --app-nav-tab-surface: #eaf0fb;
   --app-tab-active: #f3f6fd;
 }
 
@@ -73,7 +75,9 @@ body {
 html[data-bs-theme="dark"] body {
   --app-shell-bg: #0a1120;
   --app-page-surface: #121d32;
-  --app-tab-surface: #1a2842;
+  --app-workspace-strip-surface: #141f35;
+  --app-workspace-tab-surface: #17253d;
+  --app-nav-tab-surface: #1a2842;
   --app-tab-active: #121d32;
   background-color: var(--app-shell-bg);
 }
@@ -343,7 +347,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 .workspace-tabs-wrap {
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: var(--app-page-surface);
+  background: var(--app-workspace-strip-surface);
 }
 
 .workspace-tabs {
@@ -359,8 +363,8 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   align-items: center;
   gap: .4rem;
   border: 1px solid rgba(15, 23, 42, 0.18);
-  border-radius: .55rem;
-  background: var(--app-tab-surface);
+  border-radius: 0;
+  background: var(--app-workspace-tab-surface);
   color: #1e293b;
   padding: .15rem .45rem .15rem .65rem;
 }
@@ -393,12 +397,12 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 html[data-bs-theme="dark"] .workspace-tabs-wrap {
   border-bottom-color: rgba(148, 163, 184, 0.22);
-  background: var(--app-page-surface);
+  background: var(--app-workspace-strip-surface);
 }
 
 html[data-bs-theme="dark"] .workspace-tab-item {
   border-color: rgba(148, 163, 184, 0.3);
-  background: var(--app-tab-surface);
+  background: var(--app-workspace-tab-surface);
   color: #dbe7ff;
 }
 
@@ -428,7 +432,7 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
-  background: var(--app-tab-surface);
+  background: var(--app-nav-tab-surface);
   color: var(--tblr-body-color);
   padding-top: .45rem;
   padding-bottom: .5rem;
