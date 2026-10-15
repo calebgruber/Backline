@@ -379,7 +379,7 @@ body.workspace-tabs-active .page-body {
   gap: .4rem;
   border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 0;
-  background: var(--app-tab-active);
+  background: var(--app-workspace-tab-surface);
   color: #1e293b;
   clip-path: polygon(var(--workspace-tab-angle) 0, 100% 0, calc(100% - var(--workspace-tab-angle)) 100%, 0 100%);
   padding: .34rem 1rem .34rem 1.15rem;
@@ -453,7 +453,7 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
-  background: var(--app-tab-active);
+  background: var(--app-nav-tab-surface);
   color: var(--tblr-body-color);
   padding-top: .45rem;
   padding-bottom: .5rem;
@@ -491,6 +491,22 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   padding-top: .7rem;
   padding-bottom: .7rem;
   min-height: 2.75rem;
+}
+
+body.shop-app-context {
+  --app-shell-bg: #1f2d45;
+  --app-page-surface: #e5eefc;
+  --app-navbar-surface: #2a3a56;
+  --app-workspace-strip-surface: #344968;
+  --app-workspace-tab-surface: #edf3ff;
+  --app-nav-tab-surface: #d4e1f6;
+  --app-nav-row-surface: #2f435f;
+  --app-tab-active: #f3f7ff;
+}
+
+body.shop-app-context .page-wrapper,
+body.shop-app-context .page-body {
+  background: var(--app-tab-active);
 }
 
 .nav.nav-tabs .nav-link:hover {

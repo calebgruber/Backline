@@ -131,7 +131,8 @@ function render_page(string $title, callable $body, ?array $user = null): void
     <link href="/shared/assets/custom.css" rel="stylesheet">
     <?php if ($desktopMode): ?><link href="/shared/assets/desktop-mode.css" rel="stylesheet"><?php endif; ?>
 </head>
-<body class="<?= e($bodyRouteClass . ($desktopMode ? ' desktop-mode' : '')) ?>">
+<?php $bodyClass = $bodyRouteClass . ($desktopMode ? ' desktop-mode' : '') . ($isShopAppContext ? ' shop-app-context' : ''); ?>
+<body class="<?= e($bodyClass) ?>">
 <?php if ($tablerThemeJsSrc !== ''): ?><script src="<?= e($tablerThemeJsSrc) ?>"></script><?php endif; ?>
 <div id="global-preloader" class="preloader-backdrop">
     <div class="preloader-spinner" role="status" aria-label="Loading"></div>
