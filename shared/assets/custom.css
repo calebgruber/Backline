@@ -46,7 +46,8 @@
   --app-navbar-surface: #ffffff;
   --app-workspace-strip-surface: #edf2fb;
   --app-workspace-tab-surface: #e5ecf8;
-  --app-nav-tab-surface: #eaf0fb;
+  --app-nav-tab-surface: #e8effb;
+  --app-nav-row-surface: #dde8f8;
   --app-tab-active: #f3f6fd;
 }
 
@@ -79,7 +80,8 @@ html[data-bs-theme="dark"] body {
   --app-navbar-surface: #111a2e;
   --app-workspace-strip-surface: #141f35;
   --app-workspace-tab-surface: #17253d;
-  --app-nav-tab-surface: #1a2842;
+  --app-nav-tab-surface: #1b2b46;
+  --app-nav-row-surface: #14233c;
   --app-tab-active: #121d32;
   background-color: var(--app-shell-bg);
 }
@@ -357,6 +359,11 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   border-bottom-color: transparent;
 }
 
+body.workspace-tabs-active .page-wrapper,
+body.workspace-tabs-active .page-body {
+  background: var(--app-tab-active);
+}
+
 .workspace-tabs {
   display: flex;
   align-items: center;
@@ -450,6 +457,11 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   padding-bottom: .5rem;
   min-height: 2.35rem;
   transition: all .15s ease-in-out;
+}
+
+.nav.nav-tabs {
+  background: var(--app-nav-row-surface);
+  padding: .2rem .2rem 0;
 }
 
 .nav.nav-tabs .nav-link .nav-tab-icon {

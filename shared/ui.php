@@ -355,6 +355,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
   if (!userIsSignedIn) return;
   const tabsWrap = document.getElementById('workspace-tabs-wrap');
   const tabsEl = document.getElementById('workspace-tabs');
+  const bodyEl = document.body;
   if (!tabsWrap || !tabsEl) return;
   const workspaceUserId = <?= (int) ($user['id'] ?? 0) ?>;
   const workspaceSessionId = <?= json_encode((string) session_id(), JSON_UNESCAPED_SLASHES) ?>;
@@ -406,11 +407,13 @@ function render_page(string $title, callable $body, ?array $user = null): void
     tabsEl.innerHTML = '';
     if (!tabs.length) {
       tabsWrap.classList.remove('workspace-tabs-wrap-active');
+      bodyEl.classList.remove('workspace-tabs-active');
       tabsWrap.style.display = 'none';
       return;
     }
     const hasActiveTab = tabs.some((tab) => tab.url === currentPath);
     tabsWrap.classList.toggle('workspace-tabs-wrap-active', hasActiveTab);
+    bodyEl.classList.toggle('workspace-tabs-active', hasActiveTab);
     tabsWrap.style.display = '';
     tabs.forEach((tab) => {
       const item = document.createElement('div');
