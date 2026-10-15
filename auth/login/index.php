@@ -219,7 +219,7 @@ render_page('Login', function (): void {
                 <button class="btn btn-primary w-100">Sign in</button>
             </div>
             <div class="form-footer" id="passkey-panel" style="display:none;">
-                <button class="btn btn-outline-primary w-100" type="button" id="passkey-login-button">Sign in with passkey</button>
+                <button class="btn btn-primary w-100" type="button" id="passkey-login-button">Sign in with passkey</button>
             </div>
             <div class="form-footer mt-2" id="password-fallback-panel" style="display:none;">
                 <button class="btn btn-link w-100 p-0" type="button" id="password-fallback-button">Log in with password instead</button>
