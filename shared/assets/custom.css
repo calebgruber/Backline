@@ -451,7 +451,7 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
-  background: var(--app-nav-tab-surface);
+  background: var(--app-tab-active);
   color: var(--tblr-body-color);
   padding-top: .45rem;
   padding-bottom: .5rem;
@@ -459,17 +459,22 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   transition: all .15s ease-in-out;
 }
 
-.nav.nav-tabs {
-  background: var(--app-nav-row-surface);
+.shop-subtabs-row {
+  position: relative;
+  isolation: isolate;
   padding: .2rem .2rem 0;
 }
 
-.shop-subtabs-row {
-  width: calc(100vw - 2rem);
-  margin-left: calc(50% - 50vw + 1rem);
-  margin-right: calc(50% - 50vw + 1rem);
-  padding-left: 1rem;
-  padding-right: 1rem;
+.shop-subtabs-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background: var(--app-nav-row-surface);
+  z-index: -1;
 }
 
 .nav.nav-tabs .nav-link .nav-tab-icon {
