@@ -149,22 +149,32 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
         <div class="row row-cards">
             <?php if ($showRows): ?>
                 <?php foreach ($showRows as $show): ?>
-                    <div class="col-md-6 col-xl-4">
-                        <div class="card h-100 dashboard-show-card" data-card-icon="widgets">
-                            <div class="card-body d-flex flex-column">
-                                <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
-                                <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
-                                <div class="mt-auto d-grid gap-2">
-                                    <?php if ($canLx): ?>
+                    <?php if ($canLx): ?>
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100 dashboard-show-card" data-card-icon="light_mode">
+                                <div class="card-body d-flex flex-column">
+                                    <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?> - LX</h3>
+                                    <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
+                                    <div class="mt-auto d-grid gap-2">
                                         <a class="btn btn-primary btn-lg w-100" href="/dash/lx?show=<?= (int) $show['id'] ?>&tab=info">Open LX</a>
-                                    <?php endif; ?>
-                                    <?php if ($canSnd): ?>
-                                        <a class="btn btn-primary btn-lg w-100" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
-                                    <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
+                    <?php if ($canSnd): ?>
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100 dashboard-show-card" data-card-icon="wave_sine">
+                                <div class="card-body d-flex flex-column">
+                                    <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?> - SND</h3>
+                                    <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>
+                                    <div class="mt-auto d-grid gap-2">
+                                        <a class="btn btn-primary btn-lg w-100" href="/dash/sound?show=<?= (int) $show['id'] ?>&tab=info">Open Sound</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             <?php else: ?>
                 <div class="col-12">
