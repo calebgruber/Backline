@@ -150,7 +150,7 @@ render_page('Dashboard', function () use ($canAdmin, $canLx, $canSnd, $showRows,
             <?php if ($showRows): ?>
                 <?php foreach ($showRows as $show): ?>
                     <div class="col-md-6 col-xl-4">
-                        <div class="card h-100 dashboard-show-card">
+                        <div class="card h-100 dashboard-show-card" data-show-tab="<?= e((string) $show['show_name']) ?>">
                             <div class="card-body d-flex flex-column">
                                 <h3 class="card-title mb-2"><?= e((string) $show['show_name']) ?></h3>
                                 <p class="text-secondary mb-2"><?= e((string) ($show['theatre_name'] ?? '')) ?></p>

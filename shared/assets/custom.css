@@ -302,7 +302,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 }
 
 .dashboard-show-card::before {
-  content: "EXISTING";
+  content: attr(data-show-tab);
   position: absolute;
   top: 0;
   left: 0;
@@ -315,6 +315,10 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   background: var(--card-accent-color, #206bc4);
   border-bottom-right-radius: 10px;
   z-index: 2;
+  max-width: calc(100% - .75rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-show-card .btn.btn-lg {
@@ -337,8 +341,12 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 .navbar .nav-link.nav-tab-link,
 .nav.nav-tabs .nav-link {
   --tab-accent: #206bc4;
+  border: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-left: 0 !important;
   border-radius: 0 !important;
-  border-bottom: 3px solid var(--tab-accent);
+  border-bottom: 3px solid var(--tab-accent) !important;
   padding-inline: .75rem;
   margin-right: .25rem;
   display: inline-flex;
@@ -366,10 +374,18 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   min-height: 2.75rem;
 }
 
+.navbar .nav-link.nav-tab-link.active {
+  background: #eef3fb !important;
+}
+
 .navbar .nav-link.nav-tab-link:hover,
 .nav.nav-tabs .nav-link:hover {
   color: var(--tab-accent);
   border-bottom-color: var(--tab-accent);
+}
+
+html[data-bs-theme="dark"] .navbar .nav-link.nav-tab-link.active {
+  background: #0b1220 !important;
 }
 
 .navbar .nav-item:nth-child(6n + 1) > .nav-link,
