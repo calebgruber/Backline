@@ -1683,32 +1683,6 @@ if (!function_exists('render_shop_app_page')) {
                 }
                 ?>
                 <?php if ($selectedShow): ?>
-                    <div class="shop-workspace-banner mb-3">
-                        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                            <div class="text-center flex-fill">
-                                <div class="h1 mb-1"><?= e((string) $selectedShow['show_name']) ?> - <?= e(strtoupper($shopType)) ?></div>
-                                <div class="h3 mb-0 text-secondary">Revision <?= e($currentRevisionLabel) ?></div>
-                            </div>
-                            <div class="d-flex flex-wrap justify-content-md-end gap-2">
-                                <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
-                                <?php if ($hasPaidExport): ?>
-                                    <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports">Exports</a>
-                                <?php else: ?>
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Exports (Paid role required)</button>
-                                <?php endif; ?>
-                                <?php if ($shopType === 'snd'): ?>
-                                    <form method="post" class="d-inline-block">
-                                        <?= csrf_input() ?>
-                                        <input type="hidden" name="action" value="print_cable_labels">
-                                        <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
-                                        <input type="hidden" name="print_revision_id" value="<?= (int) $selectedRevisionId ?>">
-                                        <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
-                                        <button class="btn btn-outline-primary btn-sm" type="submit">Print Labels</button>
-                                    </form>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
                     <ul class="nav nav-tabs mb-3">
                         <?php
                         $tabMap = ['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings'];
@@ -1738,6 +1712,30 @@ if (!function_exists('render_shop_app_page')) {
                             </li>
                         <?php endforeach; ?>
                     </ul>
+                    <div class="workspace-context-strip mb-3">
+                        <div class="workspace-context-main">
+                            <div class="workspace-context-title"><?= e((string) $selectedShow['show_name']) ?> - <?= e(strtoupper($shopType)) ?></div>
+                            <div class="workspace-context-subtitle">Revision <?= e($currentRevisionLabel) ?></div>
+                        </div>
+                        <div class="workspace-context-actions">
+                            <a class="btn btn-outline-danger btn-sm" href="/dash/home">Exit Show</a>
+                            <?php if ($hasPaidExport): ?>
+                                <a class="btn btn-outline-primary btn-sm" href="<?= e($appPath) ?>?show=<?= (int) $selectedShowId ?>&tab=exports">Exports</a>
+                            <?php else: ?>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Exports (Paid role required)</button>
+                            <?php endif; ?>
+                            <?php if ($shopType === 'snd'): ?>
+                                <form method="post" class="d-inline-block">
+                                    <?= csrf_input() ?>
+                                    <input type="hidden" name="action" value="print_cable_labels">
+                                    <input type="hidden" name="show_id" value="<?= (int) $selectedShowId ?>">
+                                    <input type="hidden" name="print_revision_id" value="<?= (int) $selectedRevisionId ?>">
+                                    <input type="hidden" name="current_tab" value="<?= e($currentTab) ?>">
+                                    <button class="btn btn-outline-primary btn-sm" type="submit">Print Labels</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <?php if (!$hasPaidExport): ?>
                         <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
                             <span class="icon text-warning" aria-hidden="true">

@@ -40,12 +40,19 @@
 }
 
 /* Surface hierarchy: page background < navbar/card surfaces */
+:root {
+  --app-shell-bg: #e4ebf7;
+  --app-page-surface: #f3f6fd;
+  --app-tab-surface: #eaf0fb;
+  --app-tab-active: #f3f6fd;
+}
+
 body {
-  background-color: #e4ebf7;
+  background-color: var(--app-shell-bg);
 }
 
 .page-body {
-  background-color: #f3f6fd;
+  background-color: var(--app-page-surface);
 }
 
 .navbar {
@@ -64,11 +71,15 @@ body {
 }
 
 html[data-bs-theme="dark"] body {
-  background-color: #0a1120;
+  --app-shell-bg: #0a1120;
+  --app-page-surface: #121d32;
+  --app-tab-surface: #1a2842;
+  --app-tab-active: #121d32;
+  background-color: var(--app-shell-bg);
 }
 
 html[data-bs-theme="dark"] .page-body {
-  background-color: #121d32;
+  background-color: var(--app-page-surface);
 }
 
 html[data-bs-theme="dark"] .navbar {
@@ -273,6 +284,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   .preloader-backdrop,
   .paperwork-preview-actions,
   .shop-workspace-banner,
+  .workspace-context-strip,
   .alert {
     display: none !important;
   }
@@ -331,7 +343,7 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 .workspace-tabs-wrap {
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--app-page-surface);
 }
 
 .workspace-tabs {
@@ -348,13 +360,13 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   gap: .4rem;
   border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: .55rem;
-  background: #eaf0fb;
+  background: var(--app-tab-surface);
   color: #1e293b;
   padding: .15rem .45rem .15rem .65rem;
 }
 
 .workspace-tab-item.active {
-  background: #dce9ff;
+  background: var(--app-tab-active);
   border-color: rgba(32, 107, 196, 0.45);
 }
 
@@ -381,17 +393,17 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 html[data-bs-theme="dark"] .workspace-tabs-wrap {
   border-bottom-color: rgba(148, 163, 184, 0.22);
-  background: rgba(17, 26, 46, 0.65);
+  background: var(--app-page-surface);
 }
 
 html[data-bs-theme="dark"] .workspace-tab-item {
   border-color: rgba(148, 163, 184, 0.3);
-  background: #1a2842;
+  background: var(--app-tab-surface);
   color: #dbe7ff;
 }
 
 html[data-bs-theme="dark"] .workspace-tab-item.active {
-  background: #233a63;
+  background: var(--app-tab-active);
   border-color: rgba(96, 165, 250, 0.5);
 }
 
@@ -416,6 +428,7 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
+  background: var(--app-tab-surface);
   color: var(--tblr-body-color);
   padding-top: .45rem;
   padding-bottom: .5rem;
@@ -431,7 +444,7 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
 .nav.nav-tabs .nav-link.active {
   border-top-color: var(--tab-accent);
   color: var(--tab-accent);
-  background: #f3f6fd !important;
+  background: var(--app-tab-active) !important;
   padding-top: .7rem;
   padding-bottom: .7rem;
   min-height: 2.75rem;
@@ -442,13 +455,52 @@ html[data-bs-theme="dark"] .workspace-tab-close:hover {
   border-top-color: var(--tab-accent);
 }
 
-html[data-bs-theme="dark"] .nav.nav-tabs .nav-link.active {
-  background: #121d32 !important;
-}
-
 .nav.nav-tabs .nav-item:nth-child(6n + 1) > .nav-link { --tab-accent: #206bc4; }
 .nav.nav-tabs .nav-item:nth-child(6n + 2) > .nav-link { --tab-accent: #2fb344; }
 .nav.nav-tabs .nav-item:nth-child(6n + 3) > .nav-link { --tab-accent: #f76707; }
 .nav.nav-tabs .nav-item:nth-child(6n + 4) > .nav-link { --tab-accent: #7950f2; }
 .nav.nav-tabs .nav-item:nth-child(6n + 5) > .nav-link { --tab-accent: #0ca678; }
 .nav.nav-tabs .nav-item:nth-child(6n) > .nav-link { --tab-accent: #d63384; }
+
+.workspace-context-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .65rem .85rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: .55rem;
+  background: var(--app-tab-surface);
+}
+
+.workspace-context-main {
+  min-width: 0;
+}
+
+.workspace-context-title {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-context-subtitle {
+  font-size: .85rem;
+  color: #64748b;
+}
+
+.workspace-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  justify-content: flex-end;
+}
+
+html[data-bs-theme="dark"] .workspace-context-strip {
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+html[data-bs-theme="dark"] .workspace-context-subtitle {
+  color: #94a3b8;
+}
