@@ -351,11 +351,11 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
 
 .workspace-tabs-wrap {
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: var(--app-navbar-surface);
+  background: var(--app-tab-active);
 }
 
 .workspace-tabs-wrap.workspace-tabs-wrap-active {
-  background: var(--app-workspace-strip-surface);
+  background: var(--app-tab-active);
   border-bottom-color: rgba(15, 23, 42, 0.08);
 }
 
@@ -373,14 +373,16 @@ body.workspace-tabs-active .page-body {
 }
 
 .workspace-tab-item {
+  --workspace-tab-angle: 16px;
   display: inline-flex;
   align-items: center;
   gap: .4rem;
   border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 0;
-  background: var(--app-workspace-tab-surface);
+  background: var(--app-tab-active);
   color: #1e293b;
-  padding: .3rem .7rem .3rem .85rem;
+  clip-path: polygon(var(--workspace-tab-angle) 0, 100% 0, calc(100% - var(--workspace-tab-angle)) 100%, 0 100%);
+  padding: .34rem 1rem .34rem 1.15rem;
 }
 
 .workspace-tab-item.active {
@@ -411,17 +413,17 @@ body.workspace-tabs-active .page-body {
 
 html[data-bs-theme="dark"] .workspace-tabs-wrap {
   border-bottom-color: rgba(148, 163, 184, 0.22);
-  background: var(--app-navbar-surface);
+  background: var(--app-tab-active);
 }
 
 html[data-bs-theme="dark"] .workspace-tabs-wrap.workspace-tabs-wrap-active {
-  background: var(--app-workspace-strip-surface);
+  background: var(--app-tab-active);
   border-bottom-color: rgba(148, 163, 184, 0.22);
 }
 
 html[data-bs-theme="dark"] .workspace-tab-item {
   border-color: rgba(148, 163, 184, 0.3);
-  background: var(--app-workspace-tab-surface);
+  background: var(--app-tab-active);
   color: #dbe7ff;
 }
 
