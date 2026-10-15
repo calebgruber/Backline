@@ -356,12 +356,15 @@ function render_page(string $title, callable $body, ?array $user = null): void
   const tabsWrap = document.getElementById('workspace-tabs-wrap');
   const tabsEl = document.getElementById('workspace-tabs');
   if (!tabsWrap || !tabsEl) return;
-  const STORAGE_KEY = 'backline.workspace_tabs.v1';
+  const workspaceUserId = <?= (int) ($user['id'] ?? 0) ?>;
+  const workspaceSessionId = <?= json_encode((string) session_id(), JSON_UNESCAPED_SLASHES) ?>;
+  const STORAGE_KEY = `backline.workspace_tabs.v2.u${workspaceUserId}.s${workspaceSessionId}`;
+  const storage = window.sessionStorage;
   const currentPath = window.location.pathname + window.location.search;
 
   const readTabs = () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = storage.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed.filter((tab) => tab && typeof tab.url === 'string' && typeof tab.label === 'string') : [];
     } catch (_) {
@@ -370,7 +373,7 @@ function render_page(string $title, callable $body, ?array $user = null): void
   };
 
   const writeTabs = (tabs) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs.slice(0, 12)));
+    storage.setItem(STORAGE_KEY, JSON.stringify(tabs.slice(0, 12)));
   };
 
   const uniqueTabs = (tabs) => {
