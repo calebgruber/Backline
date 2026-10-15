@@ -305,6 +305,13 @@ html[data-bs-theme="dark"] .shop-line-row.shop-action-note td {
   border-radius: 1rem;
 }
 
+.dashboard-show-card .card-title-pill {
+  margin-top: -20px;
+  margin-left: -20px;
+  margin-right: 0;
+  max-width: calc(100% + 20px);
+}
+
 .dashboard-show-card .btn.btn-lg {
   border-radius: .8rem;
   padding-top: .72rem;
