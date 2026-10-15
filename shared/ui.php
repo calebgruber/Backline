@@ -402,9 +402,12 @@ function render_page(string $title, callable $body, ?array $user = null): void
     const tabs = readTabs();
     tabsEl.innerHTML = '';
     if (!tabs.length) {
+      tabsWrap.classList.remove('workspace-tabs-wrap-active');
       tabsWrap.style.display = 'none';
       return;
     }
+    const hasActiveTab = tabs.some((tab) => tab.url === currentPath);
+    tabsWrap.classList.toggle('workspace-tabs-wrap-active', hasActiveTab);
     tabsWrap.style.display = '';
     tabs.forEach((tab) => {
       const item = document.createElement('div');
