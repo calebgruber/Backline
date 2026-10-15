@@ -1683,7 +1683,7 @@ if (!function_exists('render_shop_app_page')) {
                 }
                 ?>
                 <?php if ($selectedShow): ?>
-                    <ul class="nav nav-tabs mb-3">
+                    <ul class="nav nav-tabs mb-3 shop-subtabs-row">
                         <?php
                         $tabMap = ['info' => 'Show Information', 'initial' => 'Initial Order', 'revisions' => 'Revisions', 'paperwork' => 'Paperwork Settings'];
                         if ($hasPaidExport) {
