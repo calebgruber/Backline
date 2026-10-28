@@ -25,16 +25,6 @@ if (!function_exists('app_config')) {
     require_once __DIR__ . '/bootstrap.php';
 }
 $user = require_auth();
-if (!user_has_paid_export_access($user)) {
-    http_response_code(403);
-    echo '<!doctype html><html><body style="margin:0;padding:24px;background:#f8fafc;font-family:Arial,sans-serif;color:#1f2937;">'
-        . '<div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #f1c40f;border-radius:12px;padding:18px 20px;">'
-        . '<div style="display:inline-block;background:#f59f00;color:#111827;font-weight:700;font-size:12px;padding:4px 8px;border-radius:999px;margin-bottom:8px;">EXPORT LOCKED</div>'
-        . '<h2 style="margin:0 0 8px;font-size:20px;">Exports are disabled.</h2>'
-        . '<p style="margin:0;color:#475569;">You need an active subscription to export paperwork.</p>'
-        . '</div></body></html>';
-    exit;
-}
 
 if (!function_exists('h')) {
     function h(?string $value): string

@@ -464,7 +464,7 @@ if (!function_exists('render_shop_app_page')) {
     {
         $appPath = $shopType === 'lx' ? '/dash/lx' : '/dash/sound';
         $isAdmin = user_has_permission($user, 'admin.access');
-        $hasPaidExport = user_has_paid_export_access($user);
+        $hasPaidExport = true;
         $canManageSoundCables = $shopType === 'snd' ? user_can_manage_sound_cables($user) : false;
         $hasShowAccessTable = show_user_access_table_exists();
         $showListStmt = $isAdmin
